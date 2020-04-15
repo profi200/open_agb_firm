@@ -1,0 +1,4 @@
+%rename link                old_link
+
+*link:
+%(old_link) -T ../arm9.ld -d --use-blx --gc-sections
