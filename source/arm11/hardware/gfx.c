@@ -85,103 +85,97 @@
 #define REG_GX_PPF_TC_OUTDIM     *((vu32*)(GX_REGS_BASE + 0x0C28)) // Texture copy output width and gap in 16 byte units.
 
 
-static u32 activeFb = 0;
-static bool eventTable[6] = {false};
+static struct
+{
+	u16 lcdIds;            // Bits 0-7 top screen, 8-15 bottom screen.
+	bool lcdIdsRead;
+	bool events[6];
+	u32 activeFb;
+	void *framebufs[2][4]; // A1, A2, B1, B2
+	u32 formats[2];        // Top, bottom
+} g_gfxState =
+{
+	0,
+	false,
+	{false, false, false, false, false, false},
+	0,
+	{
+		{FRAMEBUF_TOP_A_1, FRAMEBUF_TOP_A_2, FRAMEBUF_TOP_A_1, FRAMEBUF_TOP_A_2},
+		{FRAMEBUF_BOT_A_1, FRAMEBUF_BOT_A_2, FRAMEBUF_BOT_A_1, FRAMEBUF_BOT_A_2}
+	},
+	{8<<16 | 3<<8 | 1<<6 | 0<<4 | 3, 8<<16 | 3<<8 | 0<<6 | 0<<4 | 3}
+};
 
 
+
+static u8 fmt2PixSize(u32 format)
+{
+	u8 size;
+
+	switch(format & 7u)
+	{
+		// Pretend RGBA8 doesn't exist because it makes no sense for framebuffers.
+		//case 0:  // RGBA8888
+		//	size = 4;
+		//	break;
+		case 1:  // RGBA8880
+			size = 3;
+			break;
+		default: // 2 = RGBA5650, 3 = RGBA5551, 4 = RGBA4444
+			size = 2;
+	}
+
+	return size;
+}
 
 static void gfxSetupFramebuf(u8 lcd)
 {
 	if(lcd > 1) return;
 
-	static const u32 framebufCfgs[2][25] =
+	static const u32 framebufCfgs[2][24] =
 	{
 		{
 			// 0-0x4C
-			450,
-			209,
-			449,
-			449,
-			0,
-			207,
-			209,
-			453<<16 | 449,
-			1<<16 | 0,
-			413,
-			2,
-			402,
-			402,
-			402,
-			1,
-			2,
-			406<<16 | 402,
-			0,
-			0<<4 | 0,
-			0<<16 | 0xFF<<8 | 0,
+			450, 209, 449, 449, 0, 207, 209, 453<<16 | 449,
+			1<<16 | 0, 413, 2, 402, 402, 402, 1, 2,
+			406<<16 | 402, 0, 0<<4 | 0, 0<<16 | 0xFF<<8 | 0,
 			// 0x5C-0x64
-			SCREEN_WIDTH_TOP<<16 | SCREEN_HEIGHT_TOP, // Width and height
+			400<<16 | 240, // Width and height
 			449<<16 | 209,
 			402<<16 | 2,
-			// 0x90
-			SCREEN_HEIGHT_TOP * 2,                    // Stride (no gap)
 			// 0x9C
 			0<<16 | 0
 		},
 		{
 			// 0-0x4C
-			450,
-			209,
-			449,
-			449,
-			205,
-			207,
-			209,
-			453<<16 | 449,
-			1<<16 | 0,
-			413,
-			82,
-			402,
-			402,
-			79,
-			80,
-			82,
-			408<<16 | 404,
-			0,
-			1<<4 | 1,
-			0<<16 | 0<<8 | 0xFF,
+			450, 209, 449, 449, 205, 207, 209, 453<<16 | 449,
+			1<<16 | 0, 413, 82, 402, 402, 79, 80, 82,
+			408<<16 | 404, 0, 1<<4 | 1, 0<<16 | 0<<8 | 0xFF,
 			// 0x5C-0x64
-			SCREEN_WIDTH_SUB<<16 | SCREEN_HEIGHT_SUB, // Width and height
+			320<<16 | 240, // Width and height
 			449<<16 | 209,
 			402<<16 | 82,
-			// 0x90
-			SCREEN_HEIGHT_SUB * 2,                    // Stride (no gap)
 			// 0x9C
 			0<<16 | 0
 		}
 	};
 
 	const u32 *const cfg = framebufCfgs[lcd];
-	vu32 *regs;
-	if(lcd == 0) regs = (vu32*)0x10400400;
-	else         regs = (vu32*)0x10400500;
+	vu32 *const regs = (vu32*)(GX_REGS_BASE + 0x400 + (0x100u * lcd));
 
-	iomemcpy(regs, cfg, 0x50);          // 0-0x4C
-	iomemcpy(regs + 23, &cfg[20], 0xC); // 0x5C-0x64
-	regs[36] = cfg[23];                 // 0x90
-	regs[39] = cfg[24];                 // 0x9C
+	const u32 format = g_gfxState.formats[lcd];
+	iomemcpy(regs, cfg, 0x50);             // 0-0x4C
+	iomemcpy(regs + 23, &cfg[20], 0xC);    // 0x5C-0x64
+	regs[36] = 240u * fmt2PixSize(format); // 0x90 stride without gap.
+	regs[39] = cfg[23];                    // 0x9C
 
 
-	static const u32 addrAndFmt[2][3] =
-	{
-		{FRAMEBUF_TOP_A_1, FRAMEBUF_TOP_A_2, 8<<16 | 3<<8 | 1<<6 | 0<<4 | 3},
-		{FRAMEBUF_SUB_A_1, FRAMEBUF_SUB_A_2, 8<<16 | 3<<8 | 0<<6 | 0<<4 | 3}
-	};
 	// 0x68, 0x6C, 0x94, 0x98 and 0x70
-	regs[26] = addrAndFmt[lcd][0]; // Framebuffer A first address.
-	regs[27] = addrAndFmt[lcd][1]; // Framebuffer A second address.
-	regs[37] = addrAndFmt[lcd][0]; // Framebuffer B first address.
-	regs[38] = addrAndFmt[lcd][1]; // Framebuffer B second address.
-	regs[28] = addrAndFmt[lcd][2]; // Format GL_RGB5_A1_OES
+	regs[26] = (u32)g_gfxState.framebufs[lcd][0]; // Framebuffer A first address.
+	regs[27] = (u32)g_gfxState.framebufs[lcd][1]; // Framebuffer A second address.
+	regs[37] = (u32)g_gfxState.framebufs[lcd][2]; // Framebuffer B first address.
+	regs[38] = (u32)g_gfxState.framebufs[lcd][3]; // Framebuffer B second address.
+	regs[28] = format;                            // Format
 
 
 	regs[32] = 0; // Gamma table index 0.
@@ -245,52 +239,73 @@ void GFX_setBrightness(u32 top, u32 sub)
 
 void* GFX_getFramebuffer(u8 screen)
 {
-	static void *const framebufTable[2][2] =
-	{
-		{(void*)FRAMEBUF_SUB_A_2, (void*)FRAMEBUF_SUB_A_1},
-		{(void*)FRAMEBUF_TOP_A_2, (void*)FRAMEBUF_TOP_A_1}
-	};
-
-	return framebufTable[screen][activeFb];
+	return g_gfxState.framebufs[screen][g_gfxState.activeFb ^ 1u];
 }
 
 void GFX_swapFramebufs(void)
 {
-	activeFb ^= 1u;
+	u32 fb = g_gfxState.activeFb;
+	fb ^= 1u;
+	g_gfxState.activeFb = fb;
 
-	const u32 tmp = 0x70000u | activeFb; // Acknowledge IRQs?
-	*((vu32*)0x10400478) = tmp;
-	*((vu32*)0x10400578) = tmp;
+	fb |= 0x70000u; // Acknowledge IRQs.
+	*((vu32*)0x10400478) = fb;
+	*((vu32*)0x10400578) = fb;
 }
 
 static void gfxIrqHandler(u32 intSource)
 {
-	atomic_store_explicit(&eventTable[intSource - IRQ_PSC0], true, memory_order_relaxed);
+	bool *const events = g_gfxState.events;
+
+	atomic_store_explicit(&events[intSource - IRQ_PSC0], true, memory_order_relaxed);
 }
 
 void GFX_waitForEvent(GfxEvent event, bool discard)
 {
-	if(discard) atomic_store_explicit(&eventTable[event], false, memory_order_relaxed);
-	while(!atomic_load_explicit(&eventTable[event], memory_order_relaxed)) __wfe();
-	atomic_store_explicit(&eventTable[event], false, memory_order_relaxed);
+	bool *const events = g_gfxState.events;
+
+	if(discard) atomic_store_explicit(&events[event], false, memory_order_relaxed);
+	while(!atomic_load_explicit(&events[event], memory_order_relaxed)) __wfe();
+	atomic_store_explicit(&events[event], false, memory_order_relaxed);
+}
+
+static u16 getLcdIds(void)
+{
+	u16 ids;
+
+	if(!g_gfxState.lcdIdsRead)
+	{
+		g_gfxState.lcdIdsRead = true;
+
+		u16 top, bot;
+		I2C_writeReg(I2C_DEV_LCD0, 0x40, 0xFF);
+		I2C_readRegBuf(I2C_DEV_LCD0, 0x40, (u8*)&top, 2);
+		I2C_writeReg(I2C_DEV_LCD1, 0x40, 0xFF);
+		I2C_readRegBuf(I2C_DEV_LCD1, 0x40, (u8*)&bot, 2);
+
+		ids = top>>8;
+		ids |= bot & 0xFF00u;
+		g_gfxState.lcdIds = ids;
+	}
+	else ids = g_gfxState.lcdIds;
+
+	return ids;
 }
 
 static void resetLcdsMaybe(void)
 {
-	u16 top, bot;
-	I2C_writeReg(I2C_DEV_LCD0, 0x40, 0xFF);
-	I2C_readRegBuf(I2C_DEV_LCD0, 0x40, (u8*)&top, 2);
-	I2C_writeReg(I2C_DEV_LCD1, 0x40, 0xFF);
-	I2C_readRegBuf(I2C_DEV_LCD1, 0x40, (u8*)&bot, 2);
+	const u16 ids = getLcdIds();
 
-	if(top>>8) I2C_writeReg(I2C_DEV_LCD0, 0xFE, 0xAA);
+	// Top screen
+	if(ids & 0xFFu) I2C_writeReg(I2C_DEV_LCD0, 0xFE, 0xAA);
 	else
 	{
 		I2C_writeReg(I2C_DEV_LCD0, 0x11, 0x10);
 		I2C_writeReg(I2C_DEV_LCD0, 0x50, 1);
 	}
 
-	if(bot>>8) I2C_writeReg(I2C_DEV_LCD1, 0xFE, 0xAA);
+	// Bottom screen
+	if(ids>>8) I2C_writeReg(I2C_DEV_LCD1, 0xFE, 0xAA);
 	else       I2C_writeReg(I2C_DEV_LCD1, 0x11, 0x10);
 
 	I2C_writeReg(I2C_DEV_LCD0, 0x60, 0);
@@ -301,13 +316,9 @@ static void resetLcdsMaybe(void)
 
 static void waitLcdsReady(void)
 {
-	u16 top, bot;
-	I2C_writeReg(I2C_DEV_LCD0, 0x40, 0xFF);
-	I2C_readRegBuf(I2C_DEV_LCD0, 0x40, (u8*)&top, 2);
-	I2C_writeReg(I2C_DEV_LCD1, 0x40, 0xFF);
-	I2C_readRegBuf(I2C_DEV_LCD1, 0x40, (u8*)&bot, 2);
+	const u16 ids = getLcdIds();
 
-	if((top>>8) == 0 || (bot>>8) == 0) // Unknown LCD?
+	if((ids & 0xFFu) == 0 || (ids>>8) == 0) // Unknown LCD?
 	{
 		TIMER_sleepMs(150);
 	}
@@ -316,6 +327,7 @@ static void waitLcdsReady(void)
 		u32 i = 0;
 		do
 		{
+			u16 top, bot;
 			I2C_writeReg(I2C_DEV_LCD0, 0x40, 0x62);
 			I2C_readRegBuf(I2C_DEV_LCD0, 0x40, (u8*)&top, 2);
 			I2C_writeReg(I2C_DEV_LCD1, 0x40, 0x62);
@@ -329,87 +341,7 @@ static void waitLcdsReady(void)
 	}
 }
 
-/*void GFX_init(bool clearScreens)
-{
-	if(REG_PDN_GPU_CNT == 0x1007F) GFX_deinit(false);
-
-	// Reset
-	REG_PDN_GPU_CNT = 0x10000;
-	wait(12);
-	REG_PDN_GPU_CNT = 0x1007F;
-	REG_GX_GPU_CLK = 0x100; // 0x70100 on GPU init.
-	REG_GX_PSC_UNK = 0;
-
-	// LCD framebuffer setup.
-	gfxSetupFramebuf(0);
-	gfxSetupFramebuf(1);
-	// Bit 0 next framebuffer, bit 4 current framebuffer?, bit 8 reset FIFO?,
-	// bit 16 ack HBlank IRQ, bit 17 ack VBlank IRQ, bit 18 ack error IRQ?
-	*((vu32*)0x10400478) = 0x70100; // Framebuffer select 0.
-	*((vu32*)0x10400578) = 0x70100; // Framebuffer select 0.
-	*((vu32*)0x10400474) = 0x10700;
-	*((vu32*)0x10400574) = 0x10700;
-
-	// LCD reg setup.
-	REG_LCD_FILL_TOP = 1u<<24; // Force blackscreen
-	REG_LCD_FILL_BOT = 1u<<24; // Force blackscreen
-	*((vu32*)0x10202000) = 0;
-	*((vu32*)0x10202004) = 0xA390A39;
-	*((vu32*)0x10202014) = 0;
-	*((vu32*)0x1020200C) = 0x10001;
-
-	// Register IRQ handlers.
-	IRQ_registerHandler(IRQ_PSC0, 14, 0, true, gfxIrqHandler);
-	IRQ_registerHandler(IRQ_PSC1, 14, 0, true, gfxIrqHandler);
-	IRQ_registerHandler(IRQ_PDC0, 14, 0, true, gfxIrqHandler);
-	IRQ_registerHandler(IRQ_PPF, 14, 0, true, gfxIrqHandler);
-	//IRQ_registerHandler(IRQ_P3D, 14, 0, true, gfxIrqHandler);
-
-	// Backlight related stuff.
-	if((REG_LCD_LIGHT_PWM_TOP & 1u<<16) == 0)
-	{
-		*((vu32*)0x10202240) = 64;
-		*((vu32*)0x10202200) &= ~1u;
-		REG_LCD_LIGHT_PWM_TOP &= ~0x20000u;
-	}
-	if((REG_LCD_LIGHT_PWM_BOT & 1u<<16) == 0)
-	{
-		*((vu32*)0x10202A40) = 64;
-		*((vu32*)0x10202A00) &= ~1u;
-		REG_LCD_LIGHT_PWM_BOT &= ~0x20000u;
-	}
-
-	GFX_setBrightness(DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS);
-	*((vu32*)0x10202014) = 1;
-	*((vu32*)0x1020200C) = 0;
-
-	MCU_powerOnLCDs(); // Power on LCDs.
-	if(clearScreens)
-	{
-		// Warning. The GPU mem fill races against the console.
-		GX_memoryFill((u64*)FRAMEBUF_TOP_A_1, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB, 0,
-		              (u64*)FRAMEBUF_TOP_A_2, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB, 0);
-		GFX_waitForEvent(GFX_EVENT_PSC1, true);
-		GX_memoryFill((u64*)RENDERBUF_TOP, 1u<<9, SCREEN_SIZE_TOP, 0, (u64*)RENDERBUF_SUB, 1u<<9, SCREEN_SIZE_SUB, 0);
-		GFX_waitForEvent(GFX_EVENT_PSC0, true);
-
-		// The transfer engine is (sometimes) borked on screen init.
-		// Doing a dummy texture copy fixes it.
-		// TODO: Proper fix.
-		//GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)RENDERBUF_SUB, 0, 16);
-	}
-	waitLcdsReady();
-	// Bit 0 enable? bit 8 HBlank IRQ enable, bit 9 VBlank IRQ enable, bit 10 error IRQ enable?, bit 16 output enable?
-	*((vu32*)0x10400474) = 0x10501;
-	*((vu32*)0x10400574) = 0x10501;
-	REG_LCD_LIGHT_PWM_TOP = 0x1023E;
-	REG_LCD_LIGHT_PWM_BOT = 0x1023E;
-	MCU_powerOnLcdBacklights();
-
-	REG_LCD_FILL_TOP = 0;
-	REG_LCD_FILL_BOT = 0;
-}*/
-void GFX_init(bool clearScreens)
+void GFX_init(void)
 {
 	if(REG_PDN_GPU_CNT == 0x1007F) GFX_deinit(false);
 
@@ -458,33 +390,32 @@ void GFX_init(bool clearScreens)
 	TIMER_sleepMs(10);
 	resetLcdsMaybe();
 	MCU_powerOnLCDs(); // Power on LCDs.
-	// Wait for MCU event 25. 24 on poweroff.
-	if(clearScreens) // TODO: Where does this belong?
-	{
-		// Warning. The GPU mem fill races against the console.
-		GX_memoryFill((u64*)FRAMEBUF_TOP_A_1, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB, 0,
-		              (u64*)FRAMEBUF_TOP_A_2, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB, 0);
-		GFX_waitForEvent(GFX_EVENT_PSC1, true);
-		GX_memoryFill((u64*)RENDERBUF_TOP, 1u<<9, SCREEN_SIZE_TOP, 0, (u64*)RENDERBUF_SUB, 1u<<9, SCREEN_SIZE_SUB, 0);
-		GFX_waitForEvent(GFX_EVENT_PSC0, true);
+	MCU_waitEvents(0x3Fu<<24); // Wait for MCU event 25. 24 on poweroff.
 
-		// The transfer engine is (sometimes) borked on screen init.
-		// Doing a dummy texture copy fixes it.
-		// TODO: Proper fix.
-		GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)RENDERBUF_SUB, 0, 16);
-	}
+	GX_memoryFill((u64*)FRAMEBUF_TOP_A_1, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT, 0,
+	              (u64*)FRAMEBUF_TOP_A_2, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT, 0);
+	GFX_waitForEvent(GFX_EVENT_PSC1, true);
+	GX_memoryFill((u64*)RENDERBUF_TOP, 1u<<9, SCREEN_SIZE_TOP, 0, (u64*)RENDERBUF_BOT, 1u<<9, SCREEN_SIZE_BOT, 0);
+	GFX_waitForEvent(GFX_EVENT_PSC0, true);
+
+	// The transfer engine is (sometimes) borked on screen init.
+	// Doing a dummy texture copy fixes it.
+	// TODO: Proper fix.
+	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)RENDERBUF_BOT, 0, 16);
+
 	waitLcdsReady();
 	REG_LCD_LIGHT_PWM_TOP = 0x1023E;
 	REG_LCD_LIGHT_PWM_BOT = 0x1023E;
-	MCU_powerOnLcdBacklights();
-	// Wait for MCU event 29 and 27. 28 and 26 on poweroff.
+	MCU_powerOnLcdLights();
+	MCU_waitEvents(0x3Fu<<24); // Wait for MCU event 29 (top) and 27 (bot). 28 and 26 on poweroff.
 	// Weird VBlank wait?
 
 	REG_LCD_FILL_TOP = 0;
 	REG_LCD_FILL_BOT = 0;
 }
 
-void GFX_enterLowPowerState(void)
+// TODO: Sleep mode stuff needs some work.
+/*void GFX_enterLowPowerState(void)
 {
 	REG_LCD_FILL_TOP = 1u<<24; // Force blackscreen
 	REG_LCD_FILL_BOT = 1u<<24; // Force blackscreen
@@ -494,28 +425,29 @@ void GFX_enterLowPowerState(void)
 
 void GFX_returnFromLowPowerState(void)
 {
-	GFX_init(false);
-}
+	GFX_init();
+}*/
 
 void GFX_deinit(bool keepLcdsOn)
 {
 	if(keepLcdsOn)
 	{
-		GX_memoryFill((u64*)FRAMEBUF_TOP_A_1, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB + 0x2A300, 0,
-		              (u64*)FRAMEBUF_TOP_A_2, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB + 0x2A300, 0);
+		GX_memoryFill((u64*)FRAMEBUF_TOP_A_1, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT + 0x2A300, 0,
+		              (u64*)FRAMEBUF_TOP_A_2, 1u<<9, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT + 0x2A300, 0);
 		GFX_waitForEvent(GFX_EVENT_PSC1, true);
-		*((vu32*)(0x10400400+0x70)) = 0x80341;                    // Format GL_RGB8_OES.
-		*((vu32*)(0x10400400+0x78)) = 0;                          // Select first framebuffer.
-		*((vu32*)(0x10400400+0x90)) = SCREEN_HEIGHT_TOP * 3;      // Stride (no gap).
-		*((vu32*)(0x10400500+0x68)) = FRAMEBUF_SUB_A_1 + 0x17700; // Bottom framebuffer first address.
-		*((vu32*)(0x10400500+0x6C)) = FRAMEBUF_SUB_A_2 + 0x17700; // Bottom framebuffer second address.
-		*((vu32*)(0x10400500+0x70)) = 0x80301;                    // Format GL_RGB8_OES.
-		*((vu32*)(0x10400500+0x78)) = 0;                          // Select first framebuffer.
-		*((vu32*)(0x10400500+0x90)) = SCREEN_HEIGHT_SUB * 3;      // Stride (no gap).
+		*((vu32*)(0x10400400+0x70)) = 0x80341;                         // Format GL_RGB8_OES.
+		*((vu32*)(0x10400400+0x78)) = 0;                               // Select first framebuffer.
+		*((vu32*)(0x10400400+0x90)) = SCREEN_HEIGHT_TOP * 3;           // Stride (no gap).
+		*((vu32*)(0x10400500+0x68)) = (u32)FRAMEBUF_BOT_A_1 + 0x17700; // Bottom framebuffer first address.
+		*((vu32*)(0x10400500+0x6C)) = (u32)FRAMEBUF_BOT_A_2 + 0x17700; // Bottom framebuffer second address.
+		*((vu32*)(0x10400500+0x70)) = 0x80301;                         // Format GL_RGB8_OES.
+		*((vu32*)(0x10400500+0x78)) = 0;                               // Select first framebuffer.
+		*((vu32*)(0x10400500+0x90)) = SCREEN_HEIGHT_BOT * 3;           // Stride (no gap).
 	}
 	else
 	{
 		MCU_powerOffLCDs();
+		MCU_waitEvents(0x3Fu<<24);
 		GFX_setBrightness(0, 0);
 		REG_LCD_LIGHT_PWM_TOP = 0;
 		REG_LCD_LIGHT_PWM_BOT = 0;

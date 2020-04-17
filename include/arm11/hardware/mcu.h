@@ -19,19 +19,33 @@
  */
 
 #include "types.h"
+#include "arm11/hardware/i2c.h"
 
-
-#define MCU_HID_POWER_BUTTON_PRESSED       (1u)
-#define MCU_HID_POWER_BUTTON_LONG_PRESSED  (1u<<1)
-#define MCU_HID_HOME_BUTTON_PRESSED        (1u<<2)
-#define MCU_HID_HOME_BUTTON_RELEASED       (1u<<3)
-#define MCU_HID_HOME_BUTTON_NOT_HELD       (1u<<1)
-#define MCU_HID_SHELL_GOT_CLOSED           (1u<<5)
-#define MCU_HID_SHELL_GOT_OPENED           (1u<<6)
 
 typedef enum
 {
-	PWLED_NORMAL    = 0u,
+	MCU_REG_VERS_HIGH    = 0x00u,
+	MCU_REG_VERS_LOW     = 0x01u,
+	MCU_REG_3D_SLIDER    = 0x08u,
+	MCU_REG_VOL_SLIDER   = 0x09u, // 0-0x3F
+	MCU_REG_BATTERY      = 0x0Bu,
+	MCU_REG_EX_HW_STATE  = 0x0Fu,
+	MCU_REG_EVENTS       = 0x10u,
+	MCU_REG_EVENT_MASK   = 0x18u,
+	MCU_REG_POWER        = 0x20u,
+	MCU_REG_LCDs         = 0x22u,
+	MCU_REG_POWER_LED    = 0x29u,
+	MCU_REG_WIFI_LED     = 0x2Au,
+	MCU_REG_CAM_LED      = 0x2Bu,
+	MCU_REG_3D_LED       = 0x2Cu,
+	MCU_REG_RTC_TIME     = 0x30u,
+	MCU_REG_RAW_STATE    = 0x7Fu
+} McuReg;
+
+typedef enum
+{
+	PWLED_AUTO      = 0u,
+	//PWLED_BLUE      = 1u, // wtf is "forced default blue"?
 	PWLED_SLEEP     = 2u,
 	PWLED_OFF       = 3u,
 	PWLED_RED       = 4u,
@@ -42,17 +56,89 @@ typedef enum
 
 
 void MCU_init(void);
-void MCU_disableLEDs(void);
-void MCU_powerOnLCDs(void);
-void MCU_powerOffLCDs(void);
-void MCU_triggerPowerOff(void);
-void MCU_triggerReboot(void);
-u8 MCU_readBatteryLevel(void);
-u8 MCU_readExternalHwState(void);
-u8 MCU_readSystemModel(void);
-void MCU_readRTC(void *rtc);
-u32 MCU_readReceivedIrqs(void);
-bool MCU_setIrqBitmask(u32 mask);
-u8 MCU_readHidHeld(void);
-bool MCU_powerOnLcdBacklights(void);
-bool MCU_setPowerLedState(PwLedState state);
+
+bool MCU_setEventMask(u32 mask);
+
+u32 MCU_getEvents(u32 mask);
+
+u32 MCU_waitEvents(u32 mask);
+
+u8 MCU_readReg(McuReg reg);
+
+bool MCU_writeReg(McuReg reg, u8 data);
+
+bool MCU_readRegBuf(McuReg reg, u8 *out, u32 size);
+
+bool MCU_writeRegBuf(McuReg reg, const u8 *const in, u32 size);
+
+
+static inline u8 MCU_getBatteryLevel(void)
+{
+	u8 state;
+
+	if(!MCU_readRegBuf(MCU_REG_BATTERY, &state, 1)) return 0;
+	
+	return state;
+}
+
+static inline u8 MCU_getExternalHwState(void)
+{
+	return MCU_readReg(MCU_REG_EX_HW_STATE);
+}
+
+static inline void MCU_powerOffSys(void)
+{
+	I2C_writeRegIntSafe(I2C_DEV_CTR_MCU, MCU_REG_POWER, 1u);
+}
+
+static inline void MCU_rebootSys(void)
+{
+	I2C_writeRegIntSafe(I2C_DEV_CTR_MCU, MCU_REG_POWER, 1u<<2);
+}
+
+static inline void MCU_powerOnLCDs(void)
+{
+	// bit1 = lcd power enable for both screens
+	MCU_writeReg(MCU_REG_LCDs, 1u<<1);
+}
+
+static inline void MCU_powerOffLCDs(void)
+{
+	// bit0 = lcd power disable for both screens (also disables backlight)
+	MCU_writeReg(MCU_REG_LCDs, 1u);
+}
+
+static inline bool MCU_powerOnLcdLights(void)
+{
+	return MCU_writeReg(MCU_REG_LCDs, 1<<5 | 1<<3); // bit3 = lower screen, bit5 = upper
+}
+
+static inline bool MCU_setPowerLedState(PwLedState state)
+{
+	return MCU_writeReg(MCU_REG_POWER_LED, state);
+}
+
+static inline bool MCU_getRTCTime(u8 *rtc)
+{
+	if(!rtc) return true;
+
+	return MCU_readRegBuf(MCU_REG_RTC_TIME, rtc, 8);
+}
+
+static inline u8 MCU_getSystemModel(void)
+{
+	u8 buf[10];
+
+	if(!MCU_readRegBuf(MCU_REG_RAW_STATE, buf, sizeof(buf))) return 0xFF;
+	
+	return buf[9];
+}
+
+static inline u8 MCU_getHidHeld(void)
+{
+	u8 data[19];
+
+	if(!MCU_readRegBuf(MCU_REG_RAW_STATE, data, sizeof(data))) return 0xFF;
+
+	return data[18];
+}

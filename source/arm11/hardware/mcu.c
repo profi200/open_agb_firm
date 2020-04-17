@@ -16,125 +16,94 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- *  Based on code from https://github.com/smealum/ctrulib
- */
-
-#include "mem_map.h"
-#include "arm11/hardware/i2c.h"
+#include <stdatomic.h>
 #include "arm11/hardware/mcu.h"
+#include "arm11/hardware/i2c.h"
+#include "arm11/hardware/interrupt.h"
+#include "arm11/hardware/gpio.h"
 
 
-enum McuRegisters {
-	RegBattery  = 0x0Bu,
-	RegExHW     = 0x0Fu,
-	RegPower    = 0x20u,
-	RegLCDs     = 0x22u,
-	RegWifiLED  = 0x2Au,
-	RegCamLED   = 0x2Bu,
-	Reg3DLED    = 0x2Cu,
-	RegRTC      = 0x30u,
-	RegSysModel = 0x7Fu
-};
+static bool g_mcuIrq = false;
+static u32 g_events = 0;
 
 
+
+static void mcuIrqHandler(UNUSED u32 intSource);
 
 void MCU_init(void)
 {
+	static bool inited = false;
+	if(inited) return;
+	inited = true;
+
 	I2C_init();
+
+	atomic_store_explicit(&g_mcuIrq, true, memory_order_relaxed);
+	(void)MCU_getEvents(0xFFFFFFFFu);
+
+	MCU_setEventMask(0xC0BF3F80);
+	// Configure GPIO for MCU event IRQs
+	GPIO_config(GPIO_4_MCU, GPIO_INPUT | GPIO_EDGE_FALLING | GPIO_IRQ_ENABLE);
+	IRQ_registerHandler(IRQ_CTR_MCU, 14, 0, true, mcuIrqHandler);
 }
 
-void MCU_disableLEDs(void)
+static void mcuIrqHandler(UNUSED u32 intSource)
 {
-	// disable wifi LED
-	I2C_writeReg(I2C_DEV_CTR_MCU, RegWifiLED, 0);
-	
-	// disable 3D LED
-	I2C_writeReg(I2C_DEV_CTR_MCU, Reg3DLED, 0);
-	
-	// disable camera LED
-	I2C_writeReg(I2C_DEV_CTR_MCU, RegCamLED, 0);
+	g_mcuIrq = true;
 }
 
-void MCU_powerOnLCDs(void)
+bool MCU_setEventMask(u32 mask)
 {
-	// bit1 = lcd power enable for both screens
-	I2C_writeReg(I2C_DEV_CTR_MCU, RegLCDs, 1<<1);
+	return MCU_writeRegBuf(MCU_REG_EVENT_MASK, (const u8*)&mask, 4);
 }
 
-void MCU_powerOffLCDs(void)
+u32 MCU_getEvents(u32 mask)
 {
-	// bit0 = lcd power disable for both screens (also disables backlight)
-	I2C_writeReg(I2C_DEV_CTR_MCU, RegLCDs, 1);
+	u32 events = g_events;
+
+	if(atomic_load_explicit(&g_mcuIrq, memory_order_relaxed))
+	{
+		atomic_store_explicit(&g_mcuIrq, false, memory_order_relaxed);
+
+		u32 data;
+		if(!MCU_readRegBuf(MCU_REG_EVENTS, (u8*)&data, 4)) return 0;
+
+		events |= data;
+	}
+
+	g_mcuIrq = events & ~mask;
+
+	return events & mask;
 }
 
-void MCU_triggerPowerOff(void)
+u32 MCU_waitEvents(u32 mask)
 {
-	I2C_writeRegIntSafe(I2C_DEV_CTR_MCU, RegPower, 1);
+	u32 events;
+
+	while((events = MCU_getEvents(mask)) == 0u)
+	{
+		__wfi();
+	}
+
+	return events;
 }
 
-void MCU_triggerReboot(void)
+u8 MCU_readReg(McuReg reg)
 {
-	I2C_writeRegIntSafe(I2C_DEV_CTR_MCU, RegPower, 1u << 2);
+	return I2C_readReg(I2C_DEV_CTR_MCU, reg);
 }
 
-u8 MCU_readBatteryLevel(void)
+bool MCU_writeReg(McuReg reg, u8 data)
 {
-	u8 state;
-
-	if(!I2C_readRegBuf(I2C_DEV_CTR_MCU, RegBattery, &state, 1))
-		return 0;
-	
-	return state;
+	return I2C_writeReg(I2C_DEV_CTR_MCU, reg, data);
 }
 
-u8 MCU_readExternalHwState(void)
+bool MCU_readRegBuf(McuReg reg, u8 *out, u32 size)
 {
-	return I2C_readReg(I2C_DEV_CTR_MCU, RegExHW);
+	return I2C_readRegBuf(I2C_DEV_CTR_MCU, reg, out, size);
 }
 
-u8 MCU_readSystemModel(void)
+bool MCU_writeRegBuf(McuReg reg, const u8 *const in, u32 size)
 {
-	u8 sysinfo[0x13];
-
-	if(!I2C_readRegBuf(I2C_DEV_CTR_MCU, RegSysModel, sysinfo, sizeof sysinfo))
-		return 0xFF;
-	
-	return sysinfo[9];
-}
-
-void MCU_readRTC(void *rtc)
-{
-	if(!rtc) return;
-	
-	I2C_readRegBuf(I2C_DEV_CTR_MCU, RegRTC, rtc, 8);
-}
-
-u32 MCU_readReceivedIrqs(void)
-{
-	u32 data;
-	if(!I2C_readRegBuf(I2C_DEV_CTR_MCU, 0x10, (u8*)&data, 4)) return 0;
-	return data;
-}
-
-bool MCU_setIrqBitmask(u32 mask)
-{
-	return I2C_writeRegBuf(I2C_DEV_CTR_MCU, 0x18, (const u8*)&mask, 4);
-}
-
-u8 MCU_readHidHeld(void)
-{
-	u8 data[19];
-	if(!I2C_readRegBuf(I2C_DEV_CTR_MCU, 0x7F, data, sizeof(data))) return 0xFF;
-	return data[18];
-}
-
-bool MCU_powerOnLcdBacklights(void)
-{
-	return I2C_writeReg(I2C_DEV_CTR_MCU, 0x22, 1<<5 | 1<<3); // bit3 = lower screen, bit5 = upper
-}
-
-bool MCU_setPowerLedState(PwLedState state)
-{
-	return I2C_writeReg(I2C_DEV_CTR_MCU, 0x29, state);
+	return I2C_writeRegBuf(I2C_DEV_CTR_MCU, reg, in, size);
 }

@@ -22,23 +22,23 @@
 #include "types.h"
 
 
-#define SCREEN_TOP          (1)
-#define SCREEN_SUB          (0)
+#define SCREEN_TOP          (0u)
+#define SCREEN_BOT          (1u)
 
-#define SCREEN_WIDTH_TOP    (400)
-#define SCREEN_HEIGHT_TOP   (240)
+#define SCREEN_WIDTH_TOP    (400u)
+#define SCREEN_HEIGHT_TOP   (240u)
 #define SCREEN_SIZE_TOP     (SCREEN_WIDTH_TOP * SCREEN_HEIGHT_TOP * 2)
-#define SCREEN_WIDTH_SUB    (320)
-#define SCREEN_HEIGHT_SUB   (240)
-#define SCREEN_SIZE_SUB     (SCREEN_WIDTH_SUB * SCREEN_HEIGHT_SUB * 2)
+#define SCREEN_WIDTH_BOT    (320u)
+#define SCREEN_HEIGHT_BOT   (240u)
+#define SCREEN_SIZE_BOT     (SCREEN_WIDTH_BOT * SCREEN_HEIGHT_BOT * 2)
 
-#define FRAMEBUF_TOP_A_1    (VRAM_BASE)
-#define FRAMEBUF_SUB_A_1    (FRAMEBUF_TOP_A_1 + SCREEN_SIZE_TOP)
-#define FRAMEBUF_TOP_A_2    (VRAM_BASE + 0x100000)
-#define FRAMEBUF_SUB_A_2    (FRAMEBUF_TOP_A_2 + SCREEN_SIZE_TOP)
+#define FRAMEBUF_TOP_A_1    ((void*)VRAM_BASE)
+#define FRAMEBUF_BOT_A_1    ((void*)FRAMEBUF_TOP_A_1 + SCREEN_SIZE_TOP)
+#define FRAMEBUF_TOP_A_2    ((void*)VRAM_BASE + 0x100000)
+#define FRAMEBUF_BOT_A_2    ((void*)FRAMEBUF_TOP_A_2 + SCREEN_SIZE_TOP)
 
-#define RENDERBUF_TOP       (VRAM_BASE + 0x200000 - SCREEN_SIZE_TOP - SCREEN_SIZE_SUB)
-#define RENDERBUF_SUB       (VRAM_BASE + 0x200000 - SCREEN_SIZE_SUB)
+#define RENDERBUF_TOP       ((void*)VRAM_BASE + 0x200000 - SCREEN_SIZE_TOP - SCREEN_SIZE_BOT)
+#define RENDERBUF_BOT       ((void*)VRAM_BASE + 0x200000 - SCREEN_SIZE_BOT)
 
 #define DEFAULT_BRIGHTNESS  (0x30)
 
@@ -66,9 +66,9 @@ void GFX_setBrightness(u32 top, u32 sub);
 void* GFX_getFramebuffer(u8 screen);
 void GFX_swapFramebufs(void);
 void GFX_waitForEvent(GfxEvent event, bool discard);
-void GFX_init(bool clearScreens);
-void GFX_enterLowPowerState(void);
-void GFX_returnFromLowPowerState(void);
+void GFX_init(void);
+//void GFX_enterLowPowerState(void);
+//void GFX_returnFromLowPowerState(void);
 void GFX_deinit(bool keepLcdsOn);
 
 #endif

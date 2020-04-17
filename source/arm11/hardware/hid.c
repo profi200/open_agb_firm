@@ -36,44 +36,32 @@ static u32 kHeld, kDown, kUp;
 static u32 extraKeys;
 //TouchPos tPos;
 //CpadPos cPos;
-static volatile bool mcuIrq;
 
 
-
-static void hidIrqHandler(UNUSED u32 intSource);
 
 void hidInit(void)
 {
-	kUp = kDown = kHeld = 0;
-	mcuIrq = false;
+	static bool inited = false;
+	if(inited) return;
+	inited = true;
 
-	(void)MCU_readReceivedIrqs();
-	u8 state = MCU_readExternalHwState();
+	kUp = kDown = kHeld = 0;
+
+	MCU_init();
+	u8 state = MCU_getExternalHwState();
 	u32 tmp = ~state<<3 & KEY_SHELL;      // Current shell state. Bit is inverted.
 	tmp |= state<<1 & KEY_BAT_CHARGING;   // Current battery charging state
-	state = MCU_readHidHeld();
+	state = MCU_getHidHeld();
 	tmp |= ~state<<1 & KEY_HOME;          // Current HOME button state
 	extraKeys = tmp;
-
-	IRQ_registerHandler(IRQ_CTR_MCU, 14, 0, true, hidIrqHandler);
-	MCU_setIrqBitmask(0xFFBF3F80u);
-	// Configure GPIO for MCU event IRQs
-	GPIO_config(GPIO_4_MCU, GPIO_INPUT | GPIO_EDGE_FALLING | GPIO_IRQ_ENABLE);
 
 	//CODEC_init();
 }
 
-static void hidIrqHandler(UNUSED u32 intSource)
+static void updateMcuHidState(void)
 {
-	mcuIrq = true;
-}
-
-static void updateMcuIrqState(void)
-{
-	if(!mcuIrq) return;
-	mcuIrq = false;
-
-	const u32 state = MCU_readReceivedIrqs();
+	const u32 state = MCU_getEvents(0x40C07F);
+	if(state == 0) return;
 
 	u32 tmp = extraKeys;
 	tmp |= state & (KEY_POWER | KEY_POWER_HELD | KEY_HOME); // Power button pressed/held, HOME button pressed
@@ -117,7 +105,7 @@ static void updateMcuIrqState(void)
 
 void hidScanInput(void)
 {
-	updateMcuIrqState();
+	updateMcuHidState();
 
 	const u32 kOld = kHeld;
 	kHeld = /*rawCodec2Hid() |*/ REG_HID_PAD;

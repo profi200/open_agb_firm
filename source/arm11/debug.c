@@ -36,10 +36,10 @@ noreturn void panic()
 {
 	enterCriticalSection();
 
-	consoleInit(SCREEN_SUB, NULL, false);
+	consoleInit(SCREEN_BOT, NULL, false);
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n");
 	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)GFX_getFramebuffer(SCREEN_TOP),
-	               0, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB);
+	               0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_swapFramebufs();
 
 	//PXI_sendPanicCmd(IPC_CMD9_PANIC);
@@ -50,7 +50,7 @@ noreturn void panic()
 		hidScanInput();
 	} while(!(hidKeysDown() & (KEY_A | KEY_B | KEY_X | KEY_Y)));
 
-	MCU_triggerPowerOff();
+	MCU_powerOffSys();
 	while(1) __wfi();
 }
 
@@ -58,11 +58,11 @@ noreturn void panicMsg(const char *msg)
 {
 	enterCriticalSection();
 
-	consoleInit(SCREEN_SUB, NULL, false);
+	consoleInit(SCREEN_BOT, NULL, false);
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n\n");
 	ee_printf("\nERROR MESSAGE:\n%s\n", msg);
 	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)GFX_getFramebuffer(SCREEN_TOP),
-				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB);
+				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_swapFramebufs();
 
 	//PXI_sendPanicCmd(IPC_CMD9_PANIC);
@@ -73,7 +73,7 @@ noreturn void panicMsg(const char *msg)
 		hidScanInput();
 	} while(!(hidKeysDown() & (KEY_A | KEY_B | KEY_X | KEY_Y)));
 
-	MCU_triggerPowerOff();
+	MCU_powerOffSys();
 	while(1) __wfi();
 }
 
@@ -92,7 +92,7 @@ noreturn void guruMeditation(u8 type, const u32 *excStack)
 	if(prevHash != debugHash)
 		codeChanged = true;*/
 
-	consoleInit(SCREEN_SUB, NULL, false);
+	consoleInit(SCREEN_BOT, NULL, false);
 
 	if(excStack[16] & 0x20) instSize = 2;                 // Processor was in Thumb mode?
 	if(type == 2) realPc = excStack[15] - (instSize * 2); // Data abort
@@ -131,7 +131,7 @@ noreturn void guruMeditation(u8 type, const u32 *excStack)
 
 	//if(codeChanged) ee_printf("Attention: RO section data changed!!");
 	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)GFX_getFramebuffer(SCREEN_TOP),
-				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_SUB);
+				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_swapFramebufs();
 
 	//PXI_sendPanicCmd(IPC_CMD9_EXCEPTION);
@@ -142,7 +142,7 @@ noreturn void guruMeditation(u8 type, const u32 *excStack)
 		hidScanInput();
 	} while(!(hidKeysDown() & (KEY_A | KEY_B | KEY_X | KEY_Y)));
 
-	MCU_triggerPowerOff();
+	MCU_powerOffSys();
 	while(1) __wfi();
 }
 
