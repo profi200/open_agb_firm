@@ -34,7 +34,8 @@ static void lgySleepIrqHandler(u32 intSource)
 
 void LGY_prepareLegacyMode(void)
 {
-	PXI_sendCmd(IPC_CMD9_PREPARE_AGB, NULL, 0);
+	const u32 cmdBuf = false;
+	PXI_sendCmd(IPC_CMD9_PREPARE_AGB, &cmdBuf, 1);
 
 	LGYFB_init();
 

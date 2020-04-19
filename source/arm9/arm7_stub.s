@@ -3,56 +3,51 @@
 .fpu softvfp
 
 .global _arm7_stub_start
+.global _arm7_stub_swi
 .global _arm7_stub_end
 
 .type _arm7_stub_start %function
-.type gbaReset %function
-.type waitCycles %function
 
 
 .align 2
+@ Must be located at 0x3007E00.
 _arm7_stub_start:
 	mov r0, #0xD3
+	adr r1, _arm7_stub_start + 0x200  @ 0x3008000
 	msr CPSR_cxsf, r0
-	ldr sp, =0x03008000
 	mov r0, #0xD2
+	mov sp, r1
 	msr CPSR_cxsf, r0
-	ldr sp, =0x03007FA0
 	mov r0, #0xDF
+	sub sp, r1, #0x60  @ 0x3007FA0
 	msr CPSR_cxsf, r0
-	ldr sp, =0x03007F80
-	mov r3, #0x04700000
-	mov r0, #1
-	str r0, [r3]        @ Disable BIOS overlay.
-	mov r0, #0x100
-	bl  waitCycles
-	ldr r0, =0x1999E8
-	bl  waitCycles
+	mov r3, #0x4700000
+	adr r2, _arm7_stub_16 + 1
+	sub sp, r1, #0x80  @ 0x3007F80
+	bx  r2
 
-	ldr r3, =0x04000006 @ REG_VCOUNT
+.thumb
+_arm7_stub_16:
+	mov r0, #1
+	str r0, [r3]  @ Disable BIOS overlay.
+	@ The original ARM7 stub waits 256 cycles here (for the BIOS overlay disable?).
+	@ The original ARM7 stub waits 1677800 cycles (100 ms) here.
+
+	lsl  r3, r0, #26   @ 0x4000000
 wait_vcount_160_lp:
-	ldrb r0, [r3]
-	cmp  r0, #160       @ Wait for REG_VCOUNT = 160.
+	ldrb r0, [r3, #6]  @ REG_VCOUNT
+	cmp  r0, #160      @ Wait for REG_VCOUNT == 160.
 	bne  wait_vcount_160_lp
 
+	mov  r4, r3     @ Needed for function call 0xBC below.
 	mov  r0, #0xFF
-	bl   gbaReset
+_arm7_stub_swi:
+	swi  0x10       @ RegisterRamReset
+	@swi  0x26       @ HardReset (BIOS animation)
+	mov  r0, #0xBC
 	mov  r2, #0
-	mov  r4, #0x04000000
-	mov  lr, #0xBC
-	bx   lr
+	bx   r0
 .pool
 
-
-gbaReset:
-	swi 0x10000   @ RegisterRamReset
-	@swi 0x260000  @ HardReset
-	bx lr
-
-
-waitCycles:
-	subs r0, r0, #4
-	bcs waitCycles
-	bx lr
-
+.align 2
 _arm7_stub_end:

@@ -22,8 +22,12 @@
 #define REGs_LGY_GBA_SAVE_TIMING   ((vu32*)(LGY_REGS_BASE + 0x120))
 
 
-#define MAX_ROM_SIZE   (1024u * 1024u * 32u)
-#define MAX_SAVE_SIZE  (1024u * 128u)
+#define MAX_ROM_SIZE    (1024u * 1024u * 32u)
+#define MAX_SAVE_SIZE   (1024u * 128u)
+#define ARM7_STUB_LOC   (0x3007E00u)
+#define ARM7_STUB_LOC9  (0x80BFE00u)
+#define ROM_LOC         (0x20000000u)
+#define SAVE_LOC        (0x08080000u)
 
 
 static FATFS g_sd = {0};
@@ -32,16 +36,17 @@ static u32 g_saveHash[8] = {0};
 
 
 
-void LGY_prepareLegacyMode(void)
+void LGY_prepareLegacyMode(bool gbaBios)
 {
 	REG_LGY_MODE = 2; // GBA mode
 
 	// BIOS overlay
 	REGs_LGY_A7_VECTOR[0] = 0xE51FF004; //ldr pc, [pc, #-4]
-	REGs_LGY_A7_VECTOR[1] = 0x03007E00;
-	// GBA address: 0x03007E00
-	NDMA_copy((u32*)0x080BFE00, _arm7_stub_start, (u32)_arm7_stub_end - (u32)_arm7_stub_start);
-	//iomemcpy((u32*)0x080BFE00, _arm7_stub_start, (u32)_arm7_stub_end - (u32)_arm7_stub_start);
+	REGs_LGY_A7_VECTOR[1] = ARM7_STUB_LOC;
+	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_end - (u32)_arm7_stub_start);
+	//iomemcpy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_end - (u32)_arm7_stub_start);
+	// Patch swi 0x10 (RegisterRamReset) to swi 0x26 (HardReset).
+	if(gbaBios) *((u8*)(ARM7_STUB_LOC9 + ((u32)_arm7_stub_swi - (u32)_arm7_stub_start))) = 0x26;
 
 	REG_LGY_GBA_SAVE_TYPE = 0xE;
 	static const u32 saveStuff[4] = {0x27C886, 0x8CE35, 0x184, 0x31170};
@@ -55,7 +60,7 @@ void LGY_prepareLegacyMode(void)
 		{
 			if((romSize = f_size(&f)) > MAX_ROM_SIZE) panic();
 
-			u8 *ptr = (u8*)0x20000000u;
+			u8 *ptr = (u8*)ROM_LOC;
 			UINT read;
 			FRESULT res;
 			while((res = f_read(&f, ptr, 0x100000u, &read)) == FR_OK && read == 0x100000u)
@@ -70,17 +75,17 @@ void LGY_prepareLegacyMode(void)
 		if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_EXISTING | FA_READ) == FR_OK)
 		{
 			UINT read;
-			if(f_read(&f, (void*)0x08080000, MAX_SAVE_SIZE, &read) != FR_OK) panic();
+			if(f_read(&f, (void*)SAVE_LOC, MAX_SAVE_SIZE, &read) != FR_OK) panic();
 			f_close(&f);
 
-			sha((u32*)0x08080000, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+			sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
 		}
-		else NDMA_fill((u32*)0x08080000, 0xFFFFFFFFu, g_saveSize);
+		else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
 	}
 
 	// Pad ROM area with "open bus" value.
 	if(romSize < MAX_ROM_SIZE)
-		NDMA_fill((u32*)(0x20000000 + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
+		NDMA_fill((u32*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
 }
 
 void LGY_backupGbaSave(void)
@@ -91,14 +96,14 @@ void LGY_backupGbaSave(void)
 		REG_LGY_GBA_SAVE_MAP = 1;
 
 		u32 newHash[8];
-		sha((u32*)0x08080000, g_saveSize, newHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+		sha((u32*)SAVE_LOC, g_saveSize, newHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
 		if(memcmp(g_saveHash, newHash, 32) != 0) // Backup save if it changed.
 		{
 			FIL f;
 			if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_ALWAYS | FA_WRITE) == FR_OK)
 			{
 				UINT written;
-				if(f_write(&f, (void*)0x08080000, g_saveSize, &written) != FR_OK) panic();
+				if(f_write(&f, (void*)SAVE_LOC, g_saveSize, &written) != FR_OK) panic();
 				f_close(&f);
 			}
 		}

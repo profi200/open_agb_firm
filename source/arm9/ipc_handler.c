@@ -36,7 +36,7 @@ u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, const u32 *const buf)
 	switch(cmdId)
 	{
 		case IPC_CMD_ID_MASK(IPC_CMD9_PREPARE_AGB):
-			LGY_prepareLegacyMode();
+			LGY_prepareLegacyMode(*buf);
 			break;
 		case IPC_CMD_ID_MASK(IPC_CMD9_PREPARE_POWER):
 			LGY_backupGbaSave();
