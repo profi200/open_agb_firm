@@ -86,8 +86,8 @@
 
 // P3D (GPU) regs.
 #define REG_GX_P3D_UNK           *((vu32*)(GX_REGS_BASE + 0x1000)) // GSP writes 0 before running a cmd list.
-#define REG_GX_P3D_LIST_SIZE     *((vu32*)(GX_REGS_BASE + 0x18E0)) // cmd list length in 16 bytes units.
-#define REG_GX_P3D_LIST_ADR      *((vu32*)(GX_REGS_BASE + 0x18E8)) // cmd list address / 64.
+#define REG_GX_P3D_LIST_SIZE     *((vu32*)(GX_REGS_BASE + 0x18E0)) // cmd list length in 8 bytes units. Must be aligned to 16.
+#define REG_GX_P3D_LIST_ADR      *((vu32*)(GX_REGS_BASE + 0x18E8)) // cmd list address / 8. Must be aligned to 16.
 #define REG_GX_P3D_LIST_RUN      *((vu32*)(GX_REGS_BASE + 0x18F0)) // Start list processing by writing 1.
 
 
