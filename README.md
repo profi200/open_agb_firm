@@ -8,7 +8,7 @@ We are not responsible for any damage that may occur to your system as a direct 
 ## How to build
 To compile open_agb_firm you need
 * [devkitARM](https://sourceforge.net/projects/devkitpro/)
-* Corelink DMA-330 assembler (soon)
+* [Corelink DMA-330 assembler](https://github.com/profi200/dma330as)
 * [CTR firm builder](https://github.com/derrekr/ctr_firm_builder)
 
 installed in your system. Additionally you need 7-Zip or on Linux p7z installed to make release builds. Also make sure the CTR firm builder and dma330as binaries are in your $PATH environment variable and accessible to the Makefile. Build open_agb_firm as debug build via `make` or as release build via `make release`.
@@ -35,7 +35,7 @@ You may use this under the terms of the GNU General Public License GPL v3 or und
 * **Luma 3DS devs** (for fmt.c/gfx code)
 * **devkitPro** (for the toolchain/makefiles)
 * **ChaN** (for the FATFS library)
-* **fastboot3DS project** (heavily based on it's codebase)
+* **fastboot3DS project** (heavily based on its codebase)
 * ...everyone who contributed to **3dbrew.org**
 
 Copyright (C) 2020 derrek, profi200, d0k3

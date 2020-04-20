@@ -84,6 +84,12 @@
 #define REG_GX_PPF_TC_INDIM      *((vu32*)(GX_REGS_BASE + 0x0C24)) // Texture copy input width and gap in 16 byte units.
 #define REG_GX_PPF_TC_OUTDIM     *((vu32*)(GX_REGS_BASE + 0x0C28)) // Texture copy output width and gap in 16 byte units.
 
+// P3D (GPU) regs.
+#define REG_GX_P3D_UNK           *((vu32*)(GX_REGS_BASE + 0x1000)) // GSP writes 0 before running a cmd list.
+#define REG_GX_P3D_LIST_SIZE     *((vu32*)(GX_REGS_BASE + 0x18E0)) // cmd list length in 16 bytes units.
+#define REG_GX_P3D_LIST_ADR      *((vu32*)(GX_REGS_BASE + 0x18E8)) // cmd list address / 64.
+#define REG_GX_P3D_LIST_RUN      *((vu32*)(GX_REGS_BASE + 0x18F0)) // Start list processing by writing 1.
+
 
 static struct
 {
@@ -349,8 +355,11 @@ void GFX_init(void)
 	REG_PDN_GPU_CNT = 0x10000;
 	wait(12);
 	REG_PDN_GPU_CNT = 0x1007F;
-	REG_GX_GPU_CLK = 0x100; // 0x70100 on GPU init.
+	REG_GX_GPU_CLK = 0x100;
 	REG_GX_PSC_UNK = 0;
+	REG_GX_PSC_FILL0_CNT = 0;
+	REG_GX_PSC_FILL1_CNT = 0;
+	REG_GX_PPF_CNT = 0;
 
 	// LCD framebuffer setup.
 	gfxSetupFramebuf(0);
@@ -374,7 +383,7 @@ void GFX_init(void)
 	IRQ_registerHandler(IRQ_PDC0, 14, 0, true, gfxIrqHandler);
 	//IRQ_registerHandler(IRQ_PDC1, 14, 0, true, gfxIrqHandler);
 	IRQ_registerHandler(IRQ_PPF, 14, 0, true, gfxIrqHandler);
-	//IRQ_registerHandler(IRQ_P3D, 14, 0, true, gfxIrqHandler);
+	IRQ_registerHandler(IRQ_P3D, 14, 0, true, gfxIrqHandler);
 
 	// Backlight and other stuff.
 	REG_LCD_LIGHT_TOP = 64;
@@ -412,6 +421,35 @@ void GFX_init(void)
 
 	REG_LCD_FILL_TOP = 0;
 	REG_LCD_FILL_BOT = 0;
+}
+
+void GFX_gpuInit(void)
+{
+	*((vu32*)0x10140140) = 0; // REG_CFG11_GPUPROT
+	//*((vu32*)0x10141204) = 1;
+
+	REG_GX_GPU_CLK = 0x70100;
+	*((vu32*)0x10400050) = 0x22221200;
+	*((vu32*)0x10400054) = 0xFF2;
+
+	*((vu32*)0x10401000) = 0;
+	*((vu32*)0x10401080) = 0x12345678;
+	*((vu32*)0x104010C0) = 0xFFFFFFF0;
+	*((vu32*)0x104010D0) = 1;
+
+
+	// Works.
+	/*alignas(16) static const u32 cmdList[4] = {0x12345678, 0xF0010, 0x12345678, 0xF0010};
+	GX_processCommandList(16, cmdList);
+	GFX_waitForEvent(GFX_EVENT_P3D, false);*/
+}
+
+void GX_processCommandList(u32 size, const u32 *const cmdList)
+{
+	REG_GX_P3D_UNK = 0; // Acknowledge last P3D?
+	REG_GX_P3D_LIST_SIZE = size>>3;
+	REG_GX_P3D_LIST_ADR = (u32)cmdList>>3;
+	REG_GX_P3D_LIST_RUN = 1;
 }
 
 // TODO: Sleep mode stuff needs some work.
