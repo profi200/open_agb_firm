@@ -29,7 +29,6 @@
 
 static void power_safe_halt(void)
 {
-	MCU_powerOffLCDs();
 	PXI_sendCmd(IPC_CMD9_PREPARE_POWER, NULL, 0);
 
 	// give the screens a bit of time to turn off

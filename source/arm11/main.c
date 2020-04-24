@@ -25,19 +25,18 @@
 #include "arm11/power.h"
 #include "hardware/gfx.h"
 #include "arm.h"
- #include "arm11/hardware/i2c.h"
 
 
 
 void clearScreens(void)
 {
-	GX_memoryFill((u64*)RENDERBUF_TOP, 1u<<9, SCREEN_SIZE_TOP, 0, (u64*)RENDERBUF_BOT, 1u<<9, SCREEN_SIZE_BOT, 0);
+	GX_memoryFill((u32*)RENDERBUF_TOP, 1u<<9, SCREEN_SIZE_TOP, 0, (u32*)RENDERBUF_BOT, 1u<<9, SCREEN_SIZE_BOT, 0);
 	GFX_waitForEvent(GFX_EVENT_PSC0, true);
 }
 
 void updateScreens(void)
 {
-	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)GFX_getFramebuffer(SCREEN_TOP),
+	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
 				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_waitForEvent(GFX_EVENT_PPF, true); // Texture copy
 	GFX_swapFramebufs();
@@ -46,8 +45,9 @@ void updateScreens(void)
 
 int main(void)
 {
-	GFX_init();
-	consoleInit(SCREEN_TOP, NULL, false);
+	GFX_init(GFX_RGB5A1, GFX_RGB565);
+	GFX_setBrightness(0x30, 0x30);
+	consoleInit(SCREEN_BOT, NULL, false);
 	CODEC_init();
 
 	ee_puts("Prepare legacy mode...");
@@ -71,7 +71,7 @@ int main(void)
 
 	LGY_deinit();
 	CODEC_deinit();
-	GFX_deinit(false);
+	GFX_deinit();
 	power_off();
 
 	return 0;

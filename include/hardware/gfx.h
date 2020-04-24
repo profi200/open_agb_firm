@@ -46,6 +46,17 @@
 #define RGB8_to_565(r,g,b)  (((b)>>3)&0x1f)|((((g)>>2)&0x3f)<<5)|((((r)>>3)&0x1f)<<11)
 
 
+/// Framebuffer format.
+typedef enum
+{
+	GFX_RGBA8  = 0,  ///< RGBA8. (4 bytes)
+	GFX_BGR8   = 1,  ///< BGR8. (3 bytes)
+	GFX_RGB565 = 2,  ///< RGB565. (2 bytes)
+	GFX_RGB5A1 = 3,  ///< RGB5A1. (2 bytes)
+	GFX_RGBA4  = 4   ///< RGBA4. (2 bytes)
+} GfxFbFmt;
+
+
 #ifdef ARM11
 typedef enum
 {
@@ -59,18 +70,39 @@ typedef enum
 
 
 
-void GX_memoryFill(u64 *buf0a, u32 buf0v, u32 buf0Sz, u32 val0, u64 *buf1a, u32 buf1v, u32 buf1Sz, u32 val1);
-void GX_displayTransfer(u64 *in, u32 indim, u64 *out, u32 outdim, u32 flags);
-void GX_textureCopy(u64 *in, u32 indim, u64 *out, u32 outdim, u32 size);
-void GFX_setBrightness(u32 top, u32 sub);
-void* GFX_getFramebuffer(u8 screen);
-void GFX_swapFramebufs(void);
-void GFX_waitForEvent(GfxEvent event, bool discard);
-void GFX_init(void);
+void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
+
+static inline void GFX_initDefault(void)
+{
+	GFX_init(GFX_BGR8, GFX_BGR8);
+}
+
+void GFX_deinit(void);
+
 void GFX_gpuInit(void);
+
+void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
+
+void GFX_setBrightness(u8 top, u8 bot);
+
+void GFX_setForceBlack(bool top, bool bot);
+
+void* GFX_getFramebuffer(u8 screen);
+
+void GFX_swapFramebufs(void);
+
+void GFX_waitForEvent(GfxEvent event, bool discard);
+
+void GX_memoryFill(u32 *buf0a, u32 buf0v, u32 buf0Sz, u32 val0, u32 *buf1a, u32 buf1v, u32 buf1Sz, u32 val1);
+
+void GX_displayTransfer(const u32 *const in, u32 indim, u32 *out, u32 outdim, u32 flags);
+
+void GX_textureCopy(const u32 *const in, u32 indim, u32 *out, u32 outdim, u32 size);
+
 void GX_processCommandList(u32 size, const u32 *const cmdList);
+
 //void GFX_enterLowPowerState(void);
+
 //void GFX_returnFromLowPowerState(void);
-void GFX_deinit(bool keepLcdsOn);
 
 #endif

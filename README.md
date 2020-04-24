@@ -29,13 +29,13 @@ You may use this under the terms of the GNU General Public License GPL v3 or und
 * **yellows8**
 * **plutoo**
 * **smea**
-* **Normmatt** (for sdmmc code)
-* **WinterMute** (for console code)
-* **ctrulib devs** (for HID code)
-* **Luma 3DS devs** (for fmt.c/gfx code)
-* **devkitPro** (for the toolchain/makefiles)
-* **ChaN** (for the FATFS library)
-* **fastboot3DS project** (heavily based on its codebase)
+* **Normmatt**
+* **WinterMute**
+* **ctrulib devs**
+* **Luma 3DS devs**
+* **devkitPro**
+* **ChaN**
+* **fastboot3DS project**
 * ...everyone who contributed to **3dbrew.org**
 
 Copyright (C) 2020 derrek, profi200, d0k3

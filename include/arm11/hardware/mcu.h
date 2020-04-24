@@ -96,21 +96,9 @@ static inline void MCU_rebootSys(void)
 	I2C_writeRegIntSafe(I2C_DEV_CTR_MCU, MCU_REG_POWER, 1u<<2);
 }
 
-static inline void MCU_powerOnLCDs(void)
+static inline void MCU_controlLCDPower(u8 bits)
 {
-	// bit1 = lcd power enable for both screens
-	MCU_writeReg(MCU_REG_LCDs, 1u<<1);
-}
-
-static inline void MCU_powerOffLCDs(void)
-{
-	// bit0 = lcd power disable for both screens (also disables backlight)
-	MCU_writeReg(MCU_REG_LCDs, 1u);
-}
-
-static inline bool MCU_powerOnLcdLights(void)
-{
-	return MCU_writeReg(MCU_REG_LCDs, 1<<5 | 1<<3); // bit3 = lower screen, bit5 = upper
+	MCU_writeReg(MCU_REG_LCDs, bits);
 }
 
 static inline bool MCU_setPowerLedState(PwLedState state)

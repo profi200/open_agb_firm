@@ -38,7 +38,7 @@ noreturn void panic()
 
 	consoleInit(SCREEN_BOT, NULL, false);
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n");
-	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)GFX_getFramebuffer(SCREEN_TOP),
+	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
 	               0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_swapFramebufs();
 
@@ -61,7 +61,7 @@ noreturn void panicMsg(const char *msg)
 	consoleInit(SCREEN_BOT, NULL, false);
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n\n");
 	ee_printf("\nERROR MESSAGE:\n%s\n", msg);
-	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)GFX_getFramebuffer(SCREEN_TOP),
+	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
 				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_swapFramebufs();
 
@@ -130,7 +130,7 @@ noreturn void guruMeditation(u8 type, const u32 *excStack)
 	}
 
 	//if(codeChanged) ee_printf("Attention: RO section data changed!!");
-	GX_textureCopy((u64*)RENDERBUF_TOP, 0, (u64*)GFX_getFramebuffer(SCREEN_TOP),
+	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
 				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_swapFramebufs();
 
