@@ -212,7 +212,8 @@ alignas(16) static const u8 secondList[448] =
 	}
 	GX_processCommandList(listSize, list);
 	GFX_waitForEvent(GFX_EVENT_P3D, false);
-	GX_displayTransfer((u32*)0x18180000, 400u<<16 | 240u, GFX_getFramebuffer(SCREEN_TOP), 400u<<16 | 240u, 3u<<12 | 3u<<8);
+	GX_displayTransfer((u32*)(0x18180000 + (80 * 240 * 2)), 240u<<16 | 240u,
+	                   GFX_getFramebuffer(SCREEN_TOP) + (80 * 240 * 2), 240u<<16 | 240u, 3u<<12 | 3u<<8);
 	GFX_waitForEvent(GFX_EVENT_PPF, false);
 }
 
