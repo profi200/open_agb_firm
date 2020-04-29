@@ -44,15 +44,15 @@ void LGYFB_init(void)
 	REG_LGYFB_TOP_STAT  = LGYFB_IRQ_MASK;
 	REG_LGYFB_TOP_IRQ   = 0;
 	REG_LGYFB_TOP_ALPHA = 0xFF;
-	REG_LGYFB_TOP_CNT   = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_5551 | LGYFB_ENABLE;
+	REG_LGYFB_TOP_CNT   = LGYFB_DMA_E /*| LGYFB_OUT_SWIZZLE*/ | LGYFB_OUT_FMT_5551 | LGYFB_ENABLE;
 
 	IRQ_registerHandler(IRQ_CDMA_EVENT0, 13, 0, true, lgyFbDmaIrqHandler);
 }
 
 void rotateFrame(void)
 {
-	/*GX_displayTransfer((u32*)0x18400000, 256u<<16 | 256u, (u32*)0x18200000, 256u<<16 | 256u, 3u<<12 | 3u<<8 | 1u<<1);
-	GFX_waitForEvent(GFX_EVENT_PPF, false);*/
+	GX_displayTransfer((u32*)0x18400000, 160u<<16 | 256u, (u32*)0x18200000, 160u<<16 | 256u, 3u<<12 | 3u<<8 | 1u<<1);
+	GFX_waitForEvent(GFX_EVENT_PPF, false);
 
 alignas(16) static const u8 firstList[1136] =
 {
@@ -210,9 +210,6 @@ alignas(16) static const u8 secondList[448] =
 		listSize = 448;
 		list = (u32*)secondList;
 	}
-	/*GX_memoryFill((u32*)0x18180000, 0, 240 * 400 * 2, 0, (u32*)0x18300000, 0, 0x100000, 0);
-	GFX_waitForEvent(GFX_EVENT_PSC0, false);
-	GFX_waitForEvent(GFX_EVENT_PSC1, false);*/
 	GX_processCommandList(listSize, list);
 	GFX_waitForEvent(GFX_EVENT_P3D, false);
 	GX_displayTransfer((u32*)0x18180000, 400u<<16 | 240u, GFX_getFramebuffer(SCREEN_TOP), 400u<<16 | 240u, 3u<<12 | 3u<<8);
@@ -225,24 +222,7 @@ void LGYFB_processFrame(void)
 	{
 		atomic_store_explicit(&flag, false, memory_order_relaxed);
 
-		// TODO: Do this with the GPU.
-		/*u16 *fb = GFX_getFramebuffer(SCREEN_TOP) + (160 * 2) + (80 * 2 * 240);
-		const u64 *data = (u64*)RENDERBUF_TOP;
-		for(u32 y = 0; y < 160; y++)
-		{
-			for(u32 x = 0; x < 240; x += 4)
-			{
-				u64 tmp = data[x / 4];
-
-				fb[x * 240] = tmp;
-				fb[(x + 1) * 240] = tmp>>16;
-				fb[(x + 2) * 240] = tmp>>32;
-				fb[(x + 3) * 240] = tmp>>48;
-			}
-
-			fb--;
-			data += 240 / 4;
-		}*/
+		// Rotate the 240x160 frame using the GPU.
 		rotateFrame();
 
 		// CDMA takes some cycles to get to stopped state so we will use this time
