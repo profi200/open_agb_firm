@@ -1,9 +1,9 @@
-# 8 bytes burst with 4 transfers. Total 32 bytes per burst.
+# 8 bytes burst with 16 transfers. Total 128 bytes per burst.
 # Source fixed address and destination incrementing.
 # Source and destination privileged data access.
-MOV CCR, SB4 SS64 SAF SP3 DB4 DS64 DAI DP3
+MOV CCR, SB16 SS64 SAF SP3 DB16 DS64 DAI DP3
 MOV SAR, 0x10311000
-MOV DAR, 0x18200000
+MOV DAR, 0x181ABA00
 
 FLUSHP 14
 
@@ -16,21 +16,12 @@ LPFE
 	# LgyFb sometimes (at the end of each scanline?) sends
 	# single requests. Since we can transfer all 8 scanlines
 	# with bursts only we will ignore them.
-	LP 7
-		LP 15
-			LDB
-			STB
-		LPENDB
-		ADDH DAR, 0x10
-	LPENDB
-
-	LP 14
+	LP 29
 		LDB
 		STB
 	LPENDB
 	LDPB 14
 	STB
-	ADDH DAR, 0x10
 LPEND
 SEV 0
 END

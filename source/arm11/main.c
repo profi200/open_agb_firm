@@ -47,6 +47,7 @@ int main(void)
 {
 	GFX_init(GFX_RGB5A1, GFX_RGB565);
 	GFX_setBrightness(0x30, 0x30);
+	GFX_gpuInit();
 	consoleInit(SCREEN_BOT, NULL, false);
 	CODEC_init();
 

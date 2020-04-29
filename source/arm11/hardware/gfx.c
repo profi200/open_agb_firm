@@ -30,6 +30,7 @@
 #include "arm.h"
 #include "util.h"
 #include "arm11/allocator/vram.h"
+#include "arm11/hardware/gpu_init_list.h"
 
 
 #define PDN_REGS_BASE            (IO_MEM_ARM9_ARM11 + 0x40000)
@@ -235,6 +236,9 @@ void GFX_gpuInit(void)
 	*((vu32*)0x10401080) = 0x12345678;
 	*((vu32*)0x104010C0) = 0xFFFFFFF0;
 	*((vu32*)0x104010D0) = 1;
+
+	GX_processCommandList(29824, (u32*)gpuInitList);
+	GFX_waitForEvent(GFX_EVENT_P3D, false);
 }
 
 void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
