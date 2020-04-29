@@ -33,6 +33,7 @@ static bool flag = false;
 static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 {
 	DMA330_ackIrq(0);
+	DMA330_run(0, program);
 	atomic_store_explicit(&flag, true, memory_order_relaxed);
 }
 
@@ -225,10 +226,6 @@ void LGYFB_processFrame(void)
 
 		// Rotate the 240x160 frame using the GPU.
 		rotateFrame();
-
-		// CDMA takes some cycles to get to stopped state so we will use this time
-		// to do the frame rotation and restart it later.
-		DMA330_run(0, program);
 		GFX_swapFramebufs();
 	}
 }
