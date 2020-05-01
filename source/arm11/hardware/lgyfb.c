@@ -196,12 +196,12 @@ alignas(16) static const u8 secondList[448] =
 	0x10, 0x00, 0x0F, 0x00
 };
 
-	static bool firstRender = false;
+	static bool normalRender = false;
 	u32 listSize;
 	const u32 *list;
-	if(firstRender == false)
+	if(normalRender == false)
 	{
-		firstRender = true;
+		normalRender = true;
 
 		listSize = 1136;
 		list = (u32*)firstList;

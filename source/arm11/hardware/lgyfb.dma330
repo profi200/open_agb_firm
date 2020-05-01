@@ -1,7 +1,7 @@
 # 8 bytes burst with 4 transfers. Total 32 bytes per burst.
 # Source fixed address and destination incrementing.
-# Source and destination privileged data access.
-MOV CCR, SB4 SS64 SAF SP3 DB4 DS64 DAI DP3
+# Source and destination unprivileged, non-secure data access.
+MOV CCR, SB4 SS64 SAF SP2 DB4 DS64 DAI DP2
 MOV SAR, 0x10311000
 MOV DAR, 0x18400000
 
