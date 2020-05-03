@@ -15,8 +15,8 @@ installed in your system. Additionally you need 7-Zip or on Linux p7z installed 
 
 ## Known issues
 This section is reserved for a listing of known issues. At present only this remains:
-* Drops a single frame roughly every 5 seconds. This is due to different refresh rates of the LCDs and the builtin GBA hardware.
 * Save type hardcoded to 32 KiB (256k) SRAM. Unknown how save type detection will be done.
+* Sleep mode is not fully implemented.
 
 If you happen to stumble over another bug, please open an issue in the [official open_agb_firm repo on GitHub](https://github.com/profi200/open_agb_firm/issues) or contact me via other platforms.
 
