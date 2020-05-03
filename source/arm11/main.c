@@ -77,34 +77,3 @@ int main(void)
 
 	return 0;
 }
-
-
-/*u32 vblankTest(void);
-int main(void)
-{
-	GFX_init(GFX_RGB5A1, GFX_RGB565);
-	GFX_setBrightness(0x30, 0x30);
-	consoleInit(SCREEN_BOT, NULL, false);
-
-
-	do
-	{
-		const u32 cycles = vblankTest();
-		ee_printf("\r%lu %lu %lu %lu", 268111856u / 2 / cycles, cycles, *((vu32*)0x10400424), *((vu32*)0x10400400));
-		updateScreens();
-
-		hidScanInput();
-		const u32 kDown = hidKeysDown();
-		if(kDown & KEY_DUP)   *((vu32*)0x10400424) += 1; // 494 = 50.040660858 Hz
-		if(kDown & KEY_DDOWN) *((vu32*)0x10400424) -= 1;
-		if(kDown & KEY_DRIGHT) *((vu32*)0x10400400) += 1;
-		if(kDown & KEY_DLEFT)  *((vu32*)0x10400400) -= 1;
-
-		if(hidGetExtraKeys(KEY_POWER) & KEY_POWER) break;
-	} while(1);
-
-	GFX_deinit();
-	power_off();
-
-	return 0;
-}*/

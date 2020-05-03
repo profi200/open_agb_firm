@@ -34,6 +34,14 @@ static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 {
 	DMA330_ackIrq(0);
 	DMA330_run(0, program);
+
+	// If the top LCD ran >=20% ahead of LgyFb, slow it down.
+	// Check V-position.
+	u32 vtotal;
+	if(*((vu32*)0x10400454) > 83) vtotal = 415;
+	else                          vtotal = 413;
+	*((vu32*)0x10400424) = vtotal;
+
 	atomic_store_explicit(&flag, true, memory_order_relaxed);
 }
 
