@@ -35,11 +35,13 @@ static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 	DMA330_ackIrq(0);
 	DMA330_run(0, program);
 
-	// If the top LCD ran >=20% ahead of LgyFb, slow it down.
+	// We can't match the GBA refreshrate exactly so keep the LCDs around 90%
+	// ahead of the GBA output which gives us a time window of around 1.6 ms to
+	// render the frame and hopefully reduces output lag as much as possible.
 	// Check V-position.
 	u32 vtotal;
-	if(*((vu32*)0x10400454) > 83) vtotal = 415;
-	else                          vtotal = 413;
+	if(*((vu32*)0x10400454) > 414 - 41) vtotal = 415; // Slower than GBA.
+	else                                vtotal = 414; // Faster than GBA.
 	*((vu32*)0x10400424) = vtotal;
 
 	atomic_store_explicit(&flag, true, memory_order_relaxed);
