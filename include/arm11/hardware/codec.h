@@ -21,6 +21,15 @@
 #include "types.h"
 
 
+typedef struct
+{
+	u16 touchX[5];
+	u16 touchY[5];
+	u16 cpadY[8];
+	u16 cpadX[8];
+} CdcAdcData;
+
+
 
 /**
  * @brief      Initialize CODEC for Circle-Pad/Touchscreen/Sound.
@@ -40,6 +49,8 @@ void CODEC_wakeup(void);
 /**
  * @brief      Get raw ADC data for Circle-Pad/Touchscreen.
  *
- * @param[in]  buf   The buffer to write the data to.
+ * @param      data  The output data pointer. Must be 4 bytes aligned.
+ *
+ * @return     Returns true if data was available and false otherwise.
  */
-void CODEC_getRawAdcData(u32 buf[13]);
+bool CODEC_getRawAdcData(CdcAdcData *data);

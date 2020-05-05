@@ -32,10 +32,10 @@
 #define CPAD_THRESHOLD  (400)
 
 
-static u32 kHeld, kDown, kUp;
-static u32 extraKeys;
-//TouchPos tPos;
-//CpadPos cPos;
+static u32 g_kHeld = 0, g_kDown = 0, g_kUp = 0;
+static u32 g_extraKeys = 0;
+TouchPos tPos = {0};
+CpadPos cPos = {0};
 
 
 
@@ -45,17 +45,15 @@ void hidInit(void)
 	if(inited) return;
 	inited = true;
 
-	kUp = kDown = kHeld = 0;
-
 	MCU_init();
 	u8 state = MCU_getExternalHwState();
 	u32 tmp = ~state<<3 & KEY_SHELL;      // Current shell state. Bit is inverted.
 	tmp |= state<<1 & KEY_BAT_CHARGING;   // Current battery charging state
 	state = MCU_getHidHeld();
 	tmp |= ~state<<1 & KEY_HOME;          // Current HOME button state
-	extraKeys = tmp;
+	g_extraKeys = tmp;
 
-	//CODEC_init();
+	CODEC_init();
 }
 
 static void updateMcuHidState(void)
@@ -63,7 +61,7 @@ static void updateMcuHidState(void)
 	const u32 state = MCU_getEvents(0x40C07F);
 	if(state == 0) return;
 
-	u32 tmp = extraKeys;
+	u32 tmp = g_extraKeys;
 	tmp |= state & (KEY_POWER | KEY_POWER_HELD | KEY_HOME); // Power button pressed/held, HOME button pressed
 	if(state & 1u<<3) tmp &= ~KEY_HOME;                     // HOME released
 	tmp |= state>>1 & (KEY_WIFI | KEY_SHELL);               // WiFi switch, shell closed
@@ -71,64 +69,68 @@ static void updateMcuHidState(void)
 	tmp |= state>>10 & KEY_BAT_CHARGING;                    // Battery started charging
 	if(state & 1u<<14) tmp &= ~KEY_BAT_CHARGING;            // Battery stopped charging
 	tmp |= state>>16 & KEY_VOL_SLIDER;                      // Volume slider update
-	extraKeys = tmp;
+	g_extraKeys = tmp;
 }
 
-/*static u32 rawCodec2Hid(void)
+static u32 rawCodec2Hid(void)
 {
-	alignas(4) u8 buf[13 * 4];
-
-	CODEC_getRawAdcData((u32*)buf);
+	static u32 fakeKeysCache = 0;
+	alignas(4) CdcAdcData adc;
+	if(!CODEC_getRawAdcData(&adc)) return fakeKeysCache;
 
 	// Touchscreen
-	u32 emuButtons = !(buf[0] & 1u<<4)<<20; // KEY_TOUCH
-	tPos.x = (buf[0]<<8 | buf[1]) * 320u / 4096u; // TODO: Calibration
-	tPos.y = (buf[10]<<8 | buf[11]) * 240u / 4096u;
+	// TODO: Calibration
+	const u16 tx = __builtin_bswap16(adc.touchX[0]);
+	u32 fakeKeys = (~tx & 1u<<12)<<8; // KEY_TOUCH
+	tPos.x = tx * 320u / 4096u;
+	tPos.y = __builtin_bswap16(adc.touchY[0]) * 240u / 4096u;
 
 	// Circle-Pad
-	cPos.x = -(((buf[36]<<8 | buf[37]) & 0xFFFu) - 2048u); // X axis is inverted
-	cPos.y = ((buf[20]<<8 | buf[21]) & 0xFFFu) - 2048u;
+	// TODO: Calibration
+	cPos.y = (__builtin_bswap16(adc.cpadY[0]) & 0xFFFu) - 2048u;
+	cPos.x = -((__builtin_bswap16(adc.cpadX[0]) & 0xFFFu) - 2048u); // X axis is inverted.
 
 	if((cPos.x >= 0 ? cPos.x : -cPos.x) > CPAD_THRESHOLD)
 	{
-		if(cPos.x >= 0) emuButtons |= KEY_CPAD_RIGHT;
-		else            emuButtons |= KEY_CPAD_LEFT;
+		if(cPos.x >= 0) fakeKeys |= KEY_CPAD_RIGHT;
+		else            fakeKeys |= KEY_CPAD_LEFT;
 	}
 	if((cPos.y >= 0 ? cPos.y : -cPos.y) > CPAD_THRESHOLD)
 	{
-		if(cPos.y >= 0) emuButtons |= KEY_CPAD_UP;
-		else            emuButtons |= KEY_CPAD_DOWN;
+		if(cPos.y >= 0) fakeKeys |= KEY_CPAD_UP;
+		else            fakeKeys |= KEY_CPAD_DOWN;
 	}
 
-	return emuButtons;
-}*/
+	fakeKeysCache = fakeKeys;
+	return fakeKeys;
+}
 
 void hidScanInput(void)
 {
 	updateMcuHidState();
 
-	const u32 kOld = kHeld;
-	kHeld = /*rawCodec2Hid() |*/ REG_HID_PAD;
-	kDown = (~kOld) & kHeld;
-	kUp = kOld & (~kHeld);
+	const u32 kOld = g_kHeld;
+	g_kHeld = rawCodec2Hid() | REG_HID_PAD;
+	g_kDown = (~kOld) & g_kHeld;
+	g_kUp = kOld & (~g_kHeld);
 }
 
 u32 hidKeysHeld(void)
 {
-	return kHeld;
+	return g_kHeld;
 }
 
 u32 hidKeysDown(void)
 {
-	return kDown;
+	return g_kDown;
 }
 
 u32 hidKeysUp(void)
 {
-	return kUp;
+	return g_kUp;
 }
 
-/*const TouchPos* hidGetTouchPosPtr(void)
+const TouchPos* hidGetTouchPosPtr(void)
 {
 	return &tPos;
 }
@@ -136,12 +138,12 @@ u32 hidKeysUp(void)
 const CpadPos* hidGetCpadPosPtr(void)
 {
 	return &cPos;
-}*/
+}
 
 u32 hidGetExtraKeys(u32 clearMask)
 {
-	const u32 tmp = extraKeys;
-	extraKeys &= ~clearMask;
+	const u32 tmp = g_extraKeys;
+	g_extraKeys &= ~clearMask;
 
 	return tmp;
 }

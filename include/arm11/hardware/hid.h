@@ -64,6 +64,11 @@ enum
 	KEY_DOWN  = KEY_DDOWN  | KEY_CPAD_DOWN,  // D-Pad Down or Circle Pad Down
 	KEY_LEFT  = KEY_DLEFT  | KEY_CPAD_LEFT,  // D-Pad Left or Circle Pad Left
 	KEY_RIGHT = KEY_DRIGHT | KEY_CPAD_RIGHT, // D-Pad Right or Circle Pad Right
+
+	// Masks
+	KEY_DPAD   = KEY_DDOWN       | KEY_DUP       | KEY_DLEFT       | KEY_DRIGHT,
+	KEY_CSTICK = KEY_CSTICK_DOWN | KEY_CSTICK_UP | KEY_CSTICK_LEFT | KEY_CSTICK_RIGHT,
+	KEY_CPAD   = KEY_CPAD_DOWN   | KEY_CPAD_UP   | KEY_CPAD_LEFT   | KEY_CPAD_RIGHT
 };
 
 // Extra keys use with hidGetExtraKeys()
@@ -97,6 +102,6 @@ void hidScanInput(void);
 u32 hidKeysHeld(void);
 u32 hidKeysDown(void);
 u32 hidKeysUp(void);
-//const TouchPos* hidGetTouchPosPtr(void);
-//const CpadPos* hidGetCpadPosPtr(void);
+const TouchPos* hidGetTouchPosPtr(void);
+const CpadPos* hidGetCpadPosPtr(void);
 u32 hidGetExtraKeys(u32 clearMask);

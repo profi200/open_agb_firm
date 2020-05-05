@@ -49,7 +49,7 @@ int main(void)
 	GFX_setBrightness(0x30, 0x30);
 	GFX_gpuInit();
 	consoleInit(SCREEN_BOT, NULL, false);
-	CODEC_init();
+	//CODEC_init();
 
 	ee_puts("Prepare legacy mode...");
 	updateScreens();
@@ -62,12 +62,12 @@ int main(void)
 
 	do
 	{
-		__wfi();
+		hidScanInput();
+		if(hidGetExtraKeys(KEY_POWER) & KEY_POWER) break;
 
 		LGY_handleEvents();
 
-		hidScanInput();
-		if(hidGetExtraKeys(KEY_POWER) & KEY_POWER) break;
+		__wfi();
 	} while(1);
 
 	LGY_deinit();

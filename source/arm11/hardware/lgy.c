@@ -67,6 +67,17 @@ void LGY_switchMode(void)
 
 void LGY_handleEvents(void)
 {
+	// Override D-Pad if Circle-Pad is used.
+	const u32 kHeld = hidKeysHeld();
+	u16 padSel;
+	if(kHeld & KEY_CPAD)
+	{
+		REG_LGY_PAD_VAL = (kHeld>>24) ^ KEY_DPAD;
+		padSel = KEY_DPAD;
+	}
+	else padSel = 0;
+	REG_LGY_PAD_SEL = padSel;
+
 	LGYFB_processFrame();
 
 	// Bit 0 triggers wakeup. Bit 1 sleep state/ack sleep end. Bit 2 unk. Bit 15 IRQ enable (triggers IRQ 89).
