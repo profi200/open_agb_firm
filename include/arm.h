@@ -98,7 +98,7 @@ static inline u32 __getCpuId(void)
 static inline u32 __getAcr(void)
 {
 	u32 acr;
-	__asm__("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr) : );
+	__asm__ volatile("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr) : );
 	return acr;
 }
 
@@ -111,7 +111,7 @@ static inline void __setAcr(u32 acr)
 static inline u32 __getTtbr0(void)
 {
 	u32 ttb0;
-	__asm__("mrc p15, 0, %0, c2, c0, 0" : "=r" (ttb0) : );
+	__asm__ volatile("mrc p15, 0, %0, c2, c0, 0" : "=r" (ttb0) : );
 	return ttb0;
 }
 
@@ -124,7 +124,7 @@ static inline void __setTtbr0(u32 ttb0)
 static inline u32 __getTtbr1(void)
 {
 	u32 ttb1;
-	__asm__("mrc p15, 0, %0, c2, c0, 1" : "=r" (ttb1) : );
+	__asm__ volatile("mrc p15, 0, %0, c2, c0, 1" : "=r" (ttb1) : );
 	return ttb1;
 }
 
@@ -137,7 +137,7 @@ static inline void __setTtbr1(u32 ttb1)
 static inline u32 __getTtbcr(void)
 {
 	u32 ttbcr;
-	__asm__("mrc p15, 0, %0, c2, c0, 2" : "=r" (ttbcr) : );
+	__asm__ volatile("mrc p15, 0, %0, c2, c0, 2" : "=r" (ttbcr) : );
 	return ttbcr;
 }
 
@@ -150,7 +150,7 @@ static inline void __setTtbcr(u32 ttbcr)
 static inline u32 __getDacr(void)
 {
 	u32 dacr;
-	__asm__("mrc p15, 0, %0, c3, c0, 0" : "=r" (dacr) : );
+	__asm__ volatile("mrc p15, 0, %0, c3, c0, 0" : "=r" (dacr) : );
 	return dacr;
 }
 
@@ -163,7 +163,7 @@ static inline void __setDacr(u32 dacr)
 static inline u32 __getFcsepidr(void)
 {
 	u32 fcsePid;
-	__asm__("mrc p15, 0, %0, c13, c0, 0" : "=r" (fcsePid) : );
+	__asm__ volatile("mrc p15, 0, %0, c13, c0, 0" : "=r" (fcsePid) : );
 	return fcsePid;
 }
 
@@ -176,7 +176,7 @@ static inline void __setFcsepidr(u32 fcsePid)
 static inline u32 __getCidr(void)
 {
 	u32 cidr;
-	__asm__("mrc p15, 0, %0, c13, c0, 1" : "=r" (cidr) : );
+	__asm__ volatile("mrc p15, 0, %0, c13, c0, 1" : "=r" (cidr) : );
 	return cidr;
 }
 
@@ -214,7 +214,7 @@ static inline void __setCpsr(u32 cpsr)
 static inline u32 __getSpsr(void)
 {
 	u32 spsr;
-	__asm__("mrs %0, spsr" : "=r" (spsr) : );
+	__asm__ volatile("mrs %0, spsr" : "=r" (spsr) : );
 	return spsr;
 }
 
@@ -232,7 +232,7 @@ static inline void __setSpsr(u32 spsr)
 static inline u32 __getCr(void)
 {
 	u32 cr;
-	__asm__("mrc p15, 0, %0, c1, c0, 0" : "=r" (cr) : );
+	__asm__ volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (cr) : );
 	return cr;
 }
 
