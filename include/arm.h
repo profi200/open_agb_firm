@@ -197,7 +197,7 @@ static inline void __wfi(void)
 static inline u32 __getCpsr(void)
 {
 	u32 cpsr;
-	__asm__("mrs %0, cpsr" : "=r" (cpsr) : );
+	__asm__ volatile("mrs %0, cpsr" : "=r" (cpsr) : );
 	return cpsr;
 }
 
