@@ -101,13 +101,13 @@ static struct
 	bool events[6];
 	u32 swap;              // Currently active framebuffer.
 	void *framebufs[2][4]; // For each screen A1, A2, B1, B2
-	u32 strides[2];        // Top, bottom
+	u16 strides[2];        // Top, bottom
 	u32 formats[2];        // Top, bottom
 } g_gfxState = {0};
 
 
 
-static u32 fmt2PixSize(GfxFbFmt fmt);
+static u8 fmt2PixSize(GfxFbFmt fmt);
 static void setupFramebufs(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
 static void deallocFramebufs(void);
 static void setupDislayController(u8 lcd);
@@ -272,9 +272,9 @@ void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_ABL1_FILL = 0;
 }
 
-static u32 fmt2PixSize(GfxFbFmt fmt)
+static u8 fmt2PixSize(GfxFbFmt fmt)
 {
-	u32 size;
+	u8 size;
 
 	switch(fmt)
 	{
@@ -293,8 +293,8 @@ static u32 fmt2PixSize(GfxFbFmt fmt)
 
 static void setupFramebufs(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 {
-	const u32 topPixSize = fmt2PixSize(fmtTop);
-	const u32 botPixSize = fmt2PixSize(fmtBot);
+	const u8 topPixSize = fmt2PixSize(fmtTop);
+	const u8 botPixSize = fmt2PixSize(fmtBot);
 	g_gfxState.strides[0] = 240u * topPixSize; // No gap.
 	g_gfxState.strides[1] = 240u * botPixSize; // No gap.
 
@@ -312,8 +312,8 @@ static void setupFramebufs(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	g_gfxState.framebufs[1][3] = botPtr;             // Bottom B2 (unused)
 	g_gfxState.framebufs[0][3] = vramAlloc(topSize); // Top B2 (3D right eye)
 
-	g_gfxState.formats[0] = 0<<16 | 3<<8 | 1<<6 | 0<<4 | fmtTop;
-	g_gfxState.formats[1] = 0<<16 | 3<<8 | 0<<6 | 0<<4 | fmtBot;
+	g_gfxState.formats[0] = 0u<<16 | 3u<<8 | 1u<<6 | 0u<<4 | fmtTop;
+	g_gfxState.formats[1] = 0u<<16 | 3u<<8 | 0u<<6 | 0u<<4 | fmtBot;
 }
 
 static void deallocFramebufs(void)
