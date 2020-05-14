@@ -19,8 +19,8 @@
 #define LGYFB_DMA_E          (1u<<15)
 #define LGYFB_UNK            (1u<<16)
 
-// REG_LGYFB_SIZE
-#define LGYFB_SIZE(v, h)     (((v) - 1)<<16 | ((h) - 1))
+// REG_LGYFB_SIZE width and hight
+#define LGYFB_SIZE(w, h)     (((h) - 1)<<16 | ((w) - 1))
 
 // REG_LGYFB_STAT and REG_LGYFB_IRQ
 #define LGYFB_IRQ_DMA_REQ    (1u)

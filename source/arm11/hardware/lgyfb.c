@@ -51,20 +51,18 @@ void LGYFB_init(void)
 {
 	if(DMA330_run(0, program)) return;
 
-	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(160u, 240u);
+	// Insert 16 pixels padding horizontally to fit the texture.
+	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(256u, 160u);
 	REG_LGYFB_TOP_STAT  = LGYFB_IRQ_MASK;
 	REG_LGYFB_TOP_IRQ   = 0;
 	REG_LGYFB_TOP_ALPHA = 0xFF;
-	REG_LGYFB_TOP_CNT   = LGYFB_DMA_E /*| LGYFB_OUT_SWIZZLE*/ | LGYFB_OUT_FMT_5551 | LGYFB_ENABLE;
+	REG_LGYFB_TOP_CNT   = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_5551 | LGYFB_ENABLE;
 
 	IRQ_registerHandler(IRQ_CDMA_EVENT0, 13, 0, true, lgyFbDmaIrqHandler);
 }
 
 void rotateFrame(void)
 {
-	GX_displayTransfer((u32*)0x18400000, 160u<<16 | 256u, (u32*)0x18200000, 160u<<16 | 256u, 3u<<12 | 3u<<8 | 1u<<1);
-	GFX_waitForEvent(GFX_EVENT_PPF, false);
-
 alignas(16) static const u8 firstList[1136] =
 {
 	0x01, 0x00, 0x00, 0x00, 0x10, 0x01, 0x0F, 0x00, 0x00, 0x00, 0x06, 0x03,

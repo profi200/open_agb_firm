@@ -36,7 +36,7 @@ void clearScreens(void)
 
 void updateScreens(void)
 {
-	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
+	GX_textureCopy(RENDERBUF_TOP, 0, GFX_getFramebuffer(SCREEN_TOP),
 				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
 	GFX_waitForEvent(GFX_EVENT_PPF, true); // Texture copy
 	GFX_swapFramebufs();
