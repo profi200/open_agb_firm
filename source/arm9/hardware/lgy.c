@@ -48,7 +48,7 @@ void LGY_prepareLegacyMode(bool gbaBios)
 	// Patch swi 0x10 (RegisterRamReset) to swi 0x26 (HardReset).
 	if(gbaBios) *((u8*)(ARM7_STUB_LOC9 + ((u32)_arm7_stub_swi - (u32)_arm7_stub_start))) = 0x26;
 
-	REG_LGY_GBA_SAVE_TYPE = 0xE;
+	REG_LGY_GBA_SAVE_TYPE = 0xA;
 	static const u32 saveStuff[4] = {0x27C886, 0x8CE35, 0x184, 0x31170};
 	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveStuff, 16);
 
@@ -71,7 +71,7 @@ void LGY_prepareLegacyMode(bool gbaBios)
 			f_close(&f);
 		}
 
-		g_saveSize = 1024 * 32;
+		g_saveSize = 1024 * 128;
 		if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_EXISTING | FA_READ) == FR_OK)
 		{
 			UINT read;
