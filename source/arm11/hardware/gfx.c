@@ -19,8 +19,11 @@
 #include <string.h>
 #include <stdatomic.h>
 #include "types.h"
-#include "mem_map.h"
 #include "hardware/gfx.h"
+#include "arm11/hardware/lcd.h"
+#include "arm11/hardware/gx.h"
+#include "arm11/hardware/gpu_regs.h"
+#include "mem_map.h"
 #include "mmio.h"
 #include "arm11/hardware/i2c.h"
 #include "arm11/hardware/mcu.h"
@@ -34,62 +37,6 @@
 
 #define PDN_REGS_BASE            (IO_MEM_ARM9_ARM11 + 0x40000)
 #define REG_PDN_GPU_CNT          *((vu32*)(PDN_REGS_BASE + 0x1200))
-
-// LCD/ABL regs.
-#define LCD_REGS_BASE            (IO_MEM_ARM11_ONLY + 0x2000)
-#define REG_LCD_ABL0_CNT         *((vu32*)(LCD_REGS_BASE + 0x200)) // Bit 0 enables ABL aka power saving mode.
-#define REG_LCD_ABL0_FILL        *((vu32*)(LCD_REGS_BASE + 0x204))
-#define REG_LCD_ABL0_LIGHT       *((vu32*)(LCD_REGS_BASE + 0x240))
-#define REG_LCD_ABL0_LIGHT_PWM   *((vu32*)(LCD_REGS_BASE + 0x244))
-
-#define REG_LCD_ABL1_CNT         *((vu32*)(LCD_REGS_BASE + 0xA00)) // Bit 0 enables ABL aka power saving mode.
-#define REG_LCD_ABL1_FILL        *((vu32*)(LCD_REGS_BASE + 0xA04))
-#define REG_LCD_ABL1_LIGHT       *((vu32*)(LCD_REGS_BASE + 0xA40))
-#define REG_LCD_ABL1_LIGHT_PWM   *((vu32*)(LCD_REGS_BASE + 0xA44))
-
-#define GX_REGS_BASE             (IO_MEM_ARM11_ONLY + 0x200000)
-#define REG_GX_GPU_CLK           *((vu32*)(GX_REGS_BASE + 0x0004)) // ?
-
-// PSC (memory fill) regs.
-#define REG_GX_PSC_FILL0_S_ADR   *((vu32*)(GX_REGS_BASE + 0x0010)) // Start address
-#define REG_GX_PSC_FILL0_E_ADR   *((vu32*)(GX_REGS_BASE + 0x0014)) // End address
-#define REG_GX_PSC_FILL0_VAL     *((vu32*)(GX_REGS_BASE + 0x0018)) // Fill value
-#define REG_GX_PSC_FILL0_CNT     *((vu32*)(GX_REGS_BASE + 0x001C))
-
-#define REG_GX_PSC_FILL1_S_ADR   *((vu32*)(GX_REGS_BASE + 0x0020))
-#define REG_GX_PSC_FILL1_E_ADR   *((vu32*)(GX_REGS_BASE + 0x0024))
-#define REG_GX_PSC_FILL1_VAL     *((vu32*)(GX_REGS_BASE + 0x0028))
-#define REG_GX_PSC_FILL1_CNT     *((vu32*)(GX_REGS_BASE + 0x002C))
-
-#define REG_GX_PSC_UNK           *((vu32*)(GX_REGS_BASE + 0x0030)) // ? gsp mudule only changes bit 8-11.
-#define REG_GX_PSC_STAT          *((vu32*)(GX_REGS_BASE + 0x0034))
-
-// PDC0 (top screen display controller) regs.
-#define REG_LCD_PDC0_G_TBL_IDX   *((vu32*)(GX_REGS_BASE + 0x0480)) // Gamma table index.
-#define REG_LCD_PDC0_G_TBL_FIFO  *((vu32*)(GX_REGS_BASE + 0x0484)) // Gamma table FIFO.
-
-// PDC1 (bottom screen display controller) regs.
-#define REG_LCD_PDC1_G_TBL_IDX   *((vu32*)(GX_REGS_BASE + 0x0580)) // Gamma table index.
-#define REG_LCD_PDC1_G_TBL_FIFO  *((vu32*)(GX_REGS_BASE + 0x0584)) // Gamma table FIFO.
-
-// PPF (transfer engine) regs.
-#define REG_GX_PPF_IN_ADR        *((vu32*)(GX_REGS_BASE + 0x0C00))
-#define REG_GX_PPF_OUT_ADR       *((vu32*)(GX_REGS_BASE + 0x0C04))
-#define REG_GX_PPF_DT_OUTDIM     *((vu32*)(GX_REGS_BASE + 0x0C08)) // Display transfer output dimensions.
-#define REG_GX_PPF_DT_INDIM      *((vu32*)(GX_REGS_BASE + 0x0C0C)) // Display transfer input dimensions.
-#define REG_GX_PPF_CFG           *((vu32*)(GX_REGS_BASE + 0x0C10))
-#define REG_GX_PPF_UNK14         *((vu32*)(GX_REGS_BASE + 0x0C14)) // Transfer interval?
-#define REG_GX_PPF_CNT           *((vu32*)(GX_REGS_BASE + 0x0C18))
-#define REG_GX_PPF_UNK1C         *((vu32*)(GX_REGS_BASE + 0x0C1C)) // ?
-#define REG_GX_PPF_LEN           *((vu32*)(GX_REGS_BASE + 0x0C20)) // Texture copy size in bytes.
-#define REG_GX_PPF_TC_INDIM      *((vu32*)(GX_REGS_BASE + 0x0C24)) // Texture copy input width and gap in 16 byte units.
-#define REG_GX_PPF_TC_OUTDIM     *((vu32*)(GX_REGS_BASE + 0x0C28)) // Texture copy output width and gap in 16 byte units.
-
-// P3D (GPU) regs.
-#define REG_GX_P3D_UNK           *((vu32*)(GX_REGS_BASE + 0x1000)) // GSP writes 0 before running a cmd list.
-#define REG_GX_P3D_LIST_SIZE     *((vu32*)(GX_REGS_BASE + 0x18E0)) // cmd list length in 8 bytes units. Must be aligned to 16.
-#define REG_GX_P3D_LIST_ADR      *((vu32*)(GX_REGS_BASE + 0x18E8)) // cmd list address / 8. Must be aligned to 16.
-#define REG_GX_P3D_LIST_RUN      *((vu32*)(GX_REGS_BASE + 0x18F0)) // Start list processing by writing 1.
 
 
 static struct
@@ -126,7 +73,7 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	wait(12);
 	REG_PDN_GPU_CNT = 0x1007F;
 	REG_GX_GPU_CLK = 0x100;
-	REG_GX_PSC_UNK = 0;
+	REG_GX_PSC_VRAM = 0;
 	REG_GX_PSC_FILL0_CNT = 0;
 	REG_GX_PSC_FILL1_CNT = 0;
 	REG_GX_PPF_CNT = 0;
@@ -134,18 +81,18 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	// LCD framebuffer setup.
 	setupDislayController(0);
 	setupDislayController(1);
-	*((vu32*)0x10400478) = 0x70100; // Framebuffer select 0.
-	*((vu32*)0x10400578) = 0x70100; // Framebuffer select 0.
-	*((vu32*)0x10400474) = 0x10501; // Start
-	*((vu32*)0x10400574) = 0x10501; // Start
+	REG_LCD_PDC0_SWAP = 0; // Select framebuf 0.
+	REG_LCD_PDC1_SWAP = 0;
+	REG_LCD_PDC0_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ERR | PDC_CNT_I_MASK_H | PDC_CNT_E; // Start
+	REG_LCD_PDC1_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ERR | PDC_CNT_I_MASK_H | PDC_CNT_E;
 
 	// LCD reg setup.
 	REG_LCD_ABL0_FILL = 1u<<24; // Force blackscreen
 	REG_LCD_ABL1_FILL = 1u<<24; // Force blackscreen
-	*((vu32*)0x10202000) = 0;
-	*((vu32*)0x10202004) = 0xA390A39;
-	*((vu32*)0x10202014) = 0;
-	*((vu32*)0x1020200C) = 0x10001;
+	REG_LCD_PARALLAX_CNT = 0;
+	REG_LCD_PARALLAX_PWM = 0xA390A39;
+	REG_LCD_RST = 0;
+	REG_LCD_UNK00C = 0x10001;
 
 	// Register IRQ handlers.
 	IRQ_registerHandler(IRQ_PSC0, 14, 0, true, gfxIrqHandler);
@@ -167,8 +114,8 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_ABL1_CNT = 0;
 	REG_LCD_ABL1_LIGHT_PWM = 0;
 
-	*((vu32*)0x10202014) = 1;
-	*((vu32*)0x1020200C) = 0;
+	REG_LCD_RST = 1;
+	REG_LCD_UNK00C = 0;
 	TIMER_sleepMs(10);
 	resetLcdsMaybe();
 	MCU_controlLCDPower(2u); // Power on LCDs.
@@ -191,6 +138,20 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	GFX_waitForEvent(GFX_EVENT_PSC1, false);
 	REG_LCD_ABL0_FILL = 0;
 	REG_LCD_ABL1_FILL = 0;
+
+	// GPU stuff.
+	REG_GX_GPU_CLK = 0x70100;
+	*((vu32*)0x10400050) = 0x22221200;
+	*((vu32*)0x10400054) = 0xFF2;
+
+	REG_GX_P3D(GPUREG_IRQ_ACK) = 0;
+	REG_GX_P3D(GPUREG_IRQ_CMP) = 0x12345678;
+	REG_GX_P3D(GPUREG_IRQ_MASK) = 0xFFFFFFF0;
+	REG_GX_P3D(GPUREG_IRQ_AUTOSTOP) = 1;
+
+	// This reg needs to be set to 1 (configuration)
+	// before running the first cmd list.
+	REG_GX_P3D(GPUREG_START_DRAW_FUNC0) = 1;
 }
 
 void GFX_deinit(void)
@@ -209,9 +170,9 @@ void GFX_deinit(void)
 	GFX_setBrightness(0, 0);
 	REG_LCD_ABL0_LIGHT_PWM = 0;
 	REG_LCD_ABL1_LIGHT_PWM = 0;
-	*((vu32*)0x1020200C) = 0x10001;
-	*((vu32*)0x10202014) = 0;
-	REG_GX_PSC_UNK = 0xF00;
+	REG_LCD_UNK00C = 0x10001;
+	REG_LCD_RST = 0;
+	REG_GX_PSC_VRAM = 0xF00;
 	REG_GX_GPU_CLK = 0;
 	REG_PDN_GPU_CNT = 0x10001;
 
@@ -223,23 +184,6 @@ void GFX_deinit(void)
 	//IRQ_unregisterHandler(IRQ_PDC1);
 	IRQ_unregisterHandler(IRQ_PPF);
 	IRQ_unregisterHandler(IRQ_P3D);
-}
-
-void GFX_gpuInit(void)
-{
-	REG_GX_GPU_CLK = 0x70100;
-	*((vu32*)0x10400050) = 0x22221200;
-	*((vu32*)0x10400054) = 0xFF2;
-
-	*((vu32*)0x10401000) = 0;
-	*((vu32*)0x10401080) = 0x12345678;
-	*((vu32*)0x104010C0) = 0xFFFFFFF0;
-	*((vu32*)0x104010D0) = 1;
-
-	// GPUREG_START_DRAW_FUNC0
-	// This reg needs to be set to 1 (configuration)
-	// before running the first cmd list.
-	*((vu32*)0x10401914) = 1;
 }
 
 void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
@@ -254,19 +198,19 @@ void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	}
 
 	// Update PDC regs.
-	*((vu32*)0x10400468) = (u32)g_gfxState.framebufs[0][0];
-	*((vu32*)0x1040046C) = (u32)g_gfxState.framebufs[0][1];
-	*((vu32*)0x10400494) = (u32)g_gfxState.framebufs[0][2];
-	*((vu32*)0x10400498) = (u32)g_gfxState.framebufs[0][3];
-	*((vu32*)0x10400490) = g_gfxState.strides[0];
-	*((vu32*)0x10400470) = g_gfxState.formats[0];
+	REG_LCD_PDC0_FB_A1  = (u32)g_gfxState.framebufs[0][0];
+	REG_LCD_PDC0_FB_A2  = (u32)g_gfxState.framebufs[0][1];
+	REG_LCD_PDC0_FB_B1  = (u32)g_gfxState.framebufs[0][2];
+	REG_LCD_PDC0_FB_B2  = (u32)g_gfxState.framebufs[0][3];
+	REG_LCD_PDC0_STRIDE = g_gfxState.strides[0];
+	REG_LCD_PDC0_FMT    = g_gfxState.formats[0];
 
-	*((vu32*)0x10400568) = (u32)g_gfxState.framebufs[1][0];
-	*((vu32*)0x1040056C) = (u32)g_gfxState.framebufs[1][1];
-	*((vu32*)0x10400594) = (u32)g_gfxState.framebufs[1][2];
-	*((vu32*)0x10400598) = (u32)g_gfxState.framebufs[1][3];
-	*((vu32*)0x10400590) = g_gfxState.strides[1];
-	*((vu32*)0x10400570) = g_gfxState.formats[1];
+	REG_LCD_PDC1_FB_A1  = (u32)g_gfxState.framebufs[1][0];
+	REG_LCD_PDC1_FB_A2  = (u32)g_gfxState.framebufs[1][1];
+	REG_LCD_PDC1_FB_B1  = (u32)g_gfxState.framebufs[1][2];
+	REG_LCD_PDC1_FB_B2  = (u32)g_gfxState.framebufs[1][3];
+	REG_LCD_PDC1_STRIDE = g_gfxState.strides[1];
+	REG_LCD_PDC1_FMT    = g_gfxState.formats[1];
 
 	REG_LCD_ABL0_FILL = 0;
 	REG_LCD_ABL1_FILL = 0;
@@ -478,9 +422,9 @@ void GFX_swapFramebufs(void)
 	swap ^= 1u;
 	g_gfxState.swap = swap;
 
-	swap |= 0x70000u; // Acknowledge IRQs.
-	*((vu32*)0x10400478) = swap;
-	*((vu32*)0x10400578) = swap;
+	swap |= PDC_SWAP_I_ALL; // Acknowledge IRQs.
+	REG_LCD_PDC0_SWAP = swap;
+	REG_LCD_PDC1_SWAP = swap;
 }
 
 void GFX_waitForEvent(GfxEvent event, bool discard)
@@ -503,18 +447,18 @@ void GX_memoryFill(u32 *buf0a, u32 buf0v, u32 buf0Sz, u32 val0, u32 *buf1a, u32 
 {
 	if(buf0a)
 	{
-		REG_GX_PSC_FILL0_S_ADR = (u32)buf0a>>3;
-		REG_GX_PSC_FILL0_E_ADR = ((u32)buf0a + buf0Sz)>>3;
-		REG_GX_PSC_FILL0_VAL   = val0;
-		REG_GX_PSC_FILL0_CNT   = buf0v | 1u; // Pattern + start
+		REG_GX_PSC_FILL0_S_ADDR = (u32)buf0a>>3;
+		REG_GX_PSC_FILL0_E_ADDR = ((u32)buf0a + buf0Sz)>>3;
+		REG_GX_PSC_FILL0_VAL    = val0;
+		REG_GX_PSC_FILL0_CNT    = buf0v | 1u; // Pattern + start
 	}
 
 	if(buf1a)
 	{
-		REG_GX_PSC_FILL1_S_ADR = (u32)buf1a>>3;
-		REG_GX_PSC_FILL1_E_ADR = ((u32)buf1a + buf1Sz)>>3;
-		REG_GX_PSC_FILL1_VAL   = val1;
-		REG_GX_PSC_FILL1_CNT   = buf1v | 1u; // Pattern + start
+		REG_GX_PSC_FILL1_S_ADDR = (u32)buf1a>>3;
+		REG_GX_PSC_FILL1_E_ADDR = ((u32)buf1a + buf1Sz)>>3;
+		REG_GX_PSC_FILL1_VAL    = val1;
+		REG_GX_PSC_FILL1_CNT    = buf1v | 1u; // Pattern + start
 	}
 }
 
@@ -524,11 +468,11 @@ void GX_displayTransfer(const u32 *const in, u32 indim, u32 *out, u32 outdim, u3
 {
 	if(!in || !out) return;
 
-	REG_GX_PPF_IN_ADR = (u32)in>>3;
-	REG_GX_PPF_OUT_ADR = (u32)out>>3;
+	REG_GX_PPF_IN_ADDR = (u32)in>>3;
+	REG_GX_PPF_OUT_ADDR = (u32)out>>3;
 	REG_GX_PPF_DT_INDIM = indim;
 	REG_GX_PPF_DT_OUTDIM = outdim;
-	REG_GX_PPF_CFG = flags;
+	REG_GX_PPF_FlAGS = flags;
 	REG_GX_PPF_UNK14 = 0;
 	REG_GX_PPF_CNT = 1;
 }
@@ -539,9 +483,9 @@ void GX_textureCopy(const u32 *const in, u32 indim, u32 *out, u32 outdim, u32 si
 {
 	if(!in || !out) return;
 
-	REG_GX_PPF_IN_ADR = (u32)in>>3;
-	REG_GX_PPF_OUT_ADR = (u32)out>>3;
-	REG_GX_PPF_CFG = 1u<<3;
+	REG_GX_PPF_IN_ADDR = (u32)in>>3;
+	REG_GX_PPF_OUT_ADDR = (u32)out>>3;
+	REG_GX_PPF_FlAGS = 1u<<3;
 	REG_GX_PPF_LEN = size;
 	REG_GX_PPF_TC_INDIM = indim;
 	REG_GX_PPF_TC_OUTDIM = outdim;
@@ -550,12 +494,12 @@ void GX_textureCopy(const u32 *const in, u32 indim, u32 *out, u32 outdim, u32 si
 
 void GX_processCommandList(u32 size, const u32 *const cmdList)
 {
-	REG_GX_P3D_UNK = 0; // Acknowledge last P3D?
+	REG_GX_P3D(GPUREG_IRQ_ACK) = 0; // Acknowledge last P3D.
 	while(REG_GX_PSC_STAT & 1u<<31) wait(0x30);
 
-	REG_GX_P3D_LIST_SIZE = size>>3;
-	REG_GX_P3D_LIST_ADR = (u32)cmdList>>3;
-	REG_GX_P3D_LIST_RUN = 1;
+	REG_GX_P3D(GPUREG_CMDBUF_SIZE0) = size>>3;
+	REG_GX_P3D(GPUREG_CMDBUF_ADDR0) = (u32)cmdList>>3;
+	REG_GX_P3D(GPUREG_CMDBUF_JUMP0) = 1;
 }
 
 // TODO: Sleep mode stuff needs some work.
@@ -566,19 +510,19 @@ void GX_processCommandList(u32 size, const u32 *const cmdList)
 	GFX_waitForEvent(GFX_EVENT_PDC0, true);
 
 	// Stop PDCs.
-	*((vu32*)0x10400474) = 0x700; // Stop
-	*((vu32*)0x10400574) = 0x700; // Stop
-	*((vu32*)0x10400478) = 0x70100;
-	*((vu32*)0x10400578) = 0x70100;
+	REG_LCD_PDC0_CNT = 0x700; // Stop
+	REG_LCD_PDC1_CNT = 0x700; // Stop
+	REG_LCD_PDC0_SWAP = 0x70100;
+	REG_LCD_PDC1_SWAP = 0x70100;
 
-	REG_GX_PSC_UNK = 0xF00;
+	REG_GX_PSC_VRAM = 0xF00;
 	REG_PDN_GPU_CNT = 0x7F;
 }
 
 void GFX_returnFromLowPowerState(void)
 {
 	REG_PDN_GPU_CNT = 0x1007F;
-	REG_GX_PSC_UNK = 0;
+	REG_GX_PSC_VRAM = 0;
 	//REG_GX_GPU_CLK = 0x70100;
 	REG_GX_PSC_FILL0_CNT = 0;
 	REG_GX_PSC_FILL1_CNT = 0;
@@ -588,10 +532,10 @@ void GFX_returnFromLowPowerState(void)
 	setupDislayController(0);
 	setupDislayController(1);
 	const u32 swap = 0x70100 | g_gfxState.swap;
-	*((vu32*)0x10400478) = swap;
-	*((vu32*)0x10400578) = swap;
-	*((vu32*)0x10400474) = 0x10501; // Start
-	*((vu32*)0x10400574) = 0x10501; // Start
+	REG_LCD_PDC0_SWAP = swap;
+	REG_LCD_PDC1_SWAP = swap;
+	REG_LCD_PDC0_CNT = 0x10501; // Start
+	REG_LCD_PDC1_CNT = 0x10501; // Start
 
 	REG_LCD_ABL0_FILL = 0;
 	REG_LCD_ABL1_FILL = 0;

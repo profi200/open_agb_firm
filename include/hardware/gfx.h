@@ -81,8 +81,6 @@ static inline void GFX_initDefault(void)
 
 void GFX_deinit(void);
 
-void GFX_gpuInit(void);
-
 void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
 
 void GFX_setBrightness(u8 top, u8 bot);

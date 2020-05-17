@@ -3,6 +3,7 @@
 #include "arm11/hardware/lgyfb.h"
 #include "arm11/hardware/interrupt.h"
 #include "hardware/corelink_dma-330.h"
+#include "arm11/hardware/lcd.h"
 #include "hardware/gfx.h"
 #include "lgyfb_dma330.h"
 
@@ -38,11 +39,10 @@ static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 	// We can't match the GBA refreshrate exactly so keep the LCDs around 90%
 	// ahead of the GBA output which gives us a time window of around 1.6 ms to
 	// render the frame and hopefully reduces output lag as much as possible.
-	// Check V-position.
 	u32 vtotal;
-	if(*((vu32*)0x10400454) > 414 - 41) vtotal = 415; // Slower than GBA.
-	else                                vtotal = 414; // Faster than GBA.
-	*((vu32*)0x10400424) = vtotal;
+	if(REG_LCD_PDC0_VPOS > 414 - 41) vtotal = 415; // Slower than GBA.
+	else                             vtotal = 414; // Faster than GBA.
+	REG_LCD_PDC0_VTOTAL = vtotal;
 
 	atomic_store_explicit(&flag, true, memory_order_relaxed);
 }
