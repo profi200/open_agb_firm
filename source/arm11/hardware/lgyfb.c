@@ -58,7 +58,7 @@ void LGYFB_init(void)
 	REG_LGYFB_TOP_ALPHA = 0xFF;
 	REG_LGYFB_TOP_CNT   = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_5551 | LGYFB_ENABLE;
 
-	IRQ_registerHandler(IRQ_CDMA_EVENT0, 13, 0, true, lgyFbDmaIrqHandler);
+	IRQ_registerIsr(IRQ_CDMA_EVENT0, 13, 0, true, lgyFbDmaIrqHandler);
 }
 
 void rotateFrame(void)
@@ -244,5 +244,5 @@ void LGYFB_deinit(void)
 
 	DMA330_kill(0);
 
-	IRQ_unregisterHandler(IRQ_CDMA_EVENT0);
+	IRQ_unregisterIsr(IRQ_CDMA_EVENT0);
 }

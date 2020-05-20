@@ -28,11 +28,13 @@
 
 
 
-#define PACKED   __attribute__((packed))
-#define USED     __attribute__((used))
-#define UNUSED   __attribute__((unused))
-#define NAKED    __attribute__((naked))
-#define WEAK     __attribute__((weak))
+#define PACKED        __attribute__((packed))
+#define USED          __attribute__((used))
+#define UNUSED        __attribute__((unused))
+#define NAKED         __attribute__((naked))
+#define WEAK          __attribute__((weak))
+#define TARGET_ARM    __attribute__((target("arm")))
+#define TARGET_THUMB  __attribute__((target("thumb")))
 
 
 typedef uint8_t  u8;

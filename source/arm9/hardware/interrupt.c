@@ -26,7 +26,7 @@
 #define REG_IRQ_IF     *((vu32*)(IRQ_REGS_BASE + 0x04))
 
 
-IrqHandler irqHandlerTable[32] = {0};
+IrqIsr irqIsrTable[32] = {0};
 
 
 
@@ -36,22 +36,22 @@ void IRQ_init(void)
 	REG_IRQ_IF = 0xFFFFFFFFu;
 }
 
-void IRQ_registerHandler(Interrupt id, IrqHandler handler)
+void IRQ_registerIsr(Interrupt id, IrqIsr isr)
 {
 	const u32 oldState = enterCriticalSection();
 
-	irqHandlerTable[id] = handler;
+	irqIsrTable[id] = isr;
 	REG_IRQ_IE |= 1u<<id;
 
 	leaveCriticalSection(oldState);
 }
 
-void IRQ_unregisterHandler(Interrupt id)
+void IRQ_unregisterIsr(Interrupt id)
 {
 	const u32 oldState = enterCriticalSection();
 
 	REG_IRQ_IE &= ~(1u<<id);
-	irqHandlerTable[id] = (IrqHandler)NULL;
+	irqIsrTable[id] = (IrqIsr)NULL;
 
 	leaveCriticalSection(oldState);
 }

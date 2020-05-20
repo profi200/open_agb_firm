@@ -84,7 +84,7 @@ void SPICARD_init(void)
 
 	REG_CFG9_CARDCTL |= 1u<<8;
 
-	IRQ_registerHandler(IRQ_CTR_CARD_1, NULL);
+	IRQ_registerIsr(IRQ_CTR_CARD_1, NULL);
 	REG_NSPI_INT_MASK = NSPI_INT_TRANSF_END; // Disable interrupt 1
 	REG_NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END; // Aknowledge
 }

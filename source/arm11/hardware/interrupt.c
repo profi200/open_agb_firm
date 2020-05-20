@@ -24,7 +24,7 @@
 
 // First 32 interrupts are private to each core (4 * 32).
 // 96 external interrupts (total 128).
-IrqHandler irqHandlerTable[224] = {0};
+IrqIsr irqIsrTable[224] = {0};
 
 
 
@@ -88,14 +88,14 @@ void IRQ_init(void)
 	} while(tmp != 1023);
 }
 
-void IRQ_registerHandler(Interrupt id, u8 prio, u8 cpuMask, bool edgeTriggered, IrqHandler handler)
+void IRQ_registerIsr(Interrupt id, u8 prio, u8 cpuMask, bool edgeTriggered, IrqIsr isr)
 {
 	const u32 cpuId = __getCpuId();
 	if(!cpuMask) cpuMask = 1u<<cpuId;
 
 	const u32 oldState = enterCriticalSection();
 
-	irqHandlerTable[(id < 32 ? 32 * cpuId + id : 96u + id)] = handler;
+	irqIsrTable[(id < 32 ? 32 * cpuId + id : 96u + id)] = isr;
 
 	// Priority
 	u32 shift = (id % 4 * 8) + 4;
@@ -118,13 +118,13 @@ void IRQ_registerHandler(Interrupt id, u8 prio, u8 cpuMask, bool edgeTriggered, 
 	leaveCriticalSection(oldState);
 }
 
-void IRQ_unregisterHandler(Interrupt id)
+void IRQ_unregisterIsr(Interrupt id)
 {
 	const u32 oldState = enterCriticalSection();
 
 	REGs_GID_ENA_CLR[id>>5] = 1u<<(id % 32);
 
-	irqHandlerTable[(id < 32 ? 32 * __getCpuId() + id : 96u + id)] = (IrqHandler)NULL;
+	irqIsrTable[(id < 32 ? 32 * __getCpuId() + id : 96u + id)] = (IrqIsr)NULL;
 
 	leaveCriticalSection(oldState);
 }

@@ -50,8 +50,8 @@ void LGY_prepareLegacyMode(void)
 	while(*((vu8*)0x10141210) & 4u); // Wait for acknowledge?
 
 	REG_LGY_SLEEP = 1u<<15;
-	IRQ_registerHandler(IRQ_LGY_SLEEP, 14, 0, true, lgySleepIrqHandler);
-	IRQ_registerHandler(IRQ_HID_PADCNT, 14, 0, true, lgySleepIrqHandler);
+	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, true, lgySleepIrqHandler);
+	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, true, lgySleepIrqHandler);
 }
 
 void LGY_switchMode(void)
@@ -92,6 +92,6 @@ void LGY_deinit(void)
 	// TODO: Tell ARM9 to backup the savegame.
 	LGYFB_deinit();
 
-	IRQ_unregisterHandler(IRQ_LGY_SLEEP);
-	IRQ_unregisterHandler(IRQ_HID_PADCNT);
+	IRQ_unregisterIsr(IRQ_LGY_SLEEP);
+	IRQ_unregisterIsr(IRQ_HID_PADCNT);
 }

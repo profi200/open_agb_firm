@@ -95,12 +95,12 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_UNK00C = 0x10001;
 
 	// Register IRQ handlers.
-	IRQ_registerHandler(IRQ_PSC0, 14, 0, true, gfxIrqHandler);
-	IRQ_registerHandler(IRQ_PSC1, 14, 0, true, gfxIrqHandler);
-	IRQ_registerHandler(IRQ_PDC0, 14, 0, true, gfxIrqHandler);
-	//IRQ_registerHandler(IRQ_PDC1, 14, 0, true, gfxIrqHandler);
-	IRQ_registerHandler(IRQ_PPF, 14, 0, true, gfxIrqHandler);
-	IRQ_registerHandler(IRQ_P3D, 14, 0, true, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PSC0, 14, 0, true, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PSC1, 14, 0, true, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PDC0, 14, 0, true, gfxIrqHandler);
+	//IRQ_registerIsr(IRQ_PDC1, 14, 0, true, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PPF, 14, 0, true, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_P3D, 14, 0, true, gfxIrqHandler);
 
 	// Clear entire VRAM.
 	GX_memoryFill((u32*)VRAM_BANK0, 1u<<9, VRAM_SIZE / 2, 0,
@@ -178,12 +178,12 @@ void GFX_deinit(void)
 
 	deallocFramebufs();
 
-	IRQ_unregisterHandler(IRQ_PSC0);
-	IRQ_unregisterHandler(IRQ_PSC1);
-	IRQ_unregisterHandler(IRQ_PDC0);
-	//IRQ_unregisterHandler(IRQ_PDC1);
-	IRQ_unregisterHandler(IRQ_PPF);
-	IRQ_unregisterHandler(IRQ_P3D);
+	IRQ_unregisterIsr(IRQ_PSC0);
+	IRQ_unregisterIsr(IRQ_PSC1);
+	IRQ_unregisterIsr(IRQ_PDC0);
+	//IRQ_unregisterIsr(IRQ_PDC1);
+	IRQ_unregisterIsr(IRQ_PPF);
+	IRQ_unregisterIsr(IRQ_P3D);
 }
 
 void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot)

@@ -22,11 +22,6 @@
 #include "arm11/hardware/interrupt.h"
 
 
-#define I2C1_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x61000)
-#define I2C2_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x44000)
-#define I2C3_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x48000)
-
-
 typedef struct
 {
 	vu8  I2C_DATA;
@@ -101,7 +96,8 @@ static inline void i2cWaitBusyIrq(const I2cRegs *const regs)
 
 static bool i2cCheckAck(I2cRegs *const regs)
 {
-	if(!(regs->I2C_CNT & I2C_ACK)) // If ack flag is 0 it failed.
+	// If we received a NACK stop the transfer.
+	if((regs->I2C_CNT & I2C_ACK) == 0u)
 	{
 		regs->I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_ERROR | I2C_STOP;
 		return false;
@@ -115,10 +111,6 @@ void I2C_init(void)
 	static bool inited = false;
 	if(inited) return;
 	inited = true;
-
-	IRQ_registerHandler(IRQ_I2C1, 14, 0, true, NULL);
-	IRQ_registerHandler(IRQ_I2C2, 14, 0, true, NULL);
-	IRQ_registerHandler(IRQ_I2C3, 14, 0, true, NULL);
 
 	I2cRegs *regs = i2cGetBusRegsBase(I2C_BUS1);
 	while(regs->I2C_CNT & I2C_ENABLE);
@@ -134,6 +126,10 @@ void I2C_init(void)
 	while(regs->I2C_CNT & I2C_ENABLE);
 	regs->I2C_CNTEX = I2C_CLK_STRETCH;
 	regs->I2C_SCL = I2C_DELAYS(5u, 0u);
+
+	IRQ_registerIsr(IRQ_I2C1, 14, 0, true, NULL);
+	IRQ_registerIsr(IRQ_I2C2, 14, 0, true, NULL);
+	IRQ_registerIsr(IRQ_I2C3, 14, 0, true, NULL);
 }
 
 static bool i2cStartTransfer(u8 devAddr, u8 regAddr, bool read, I2cRegs *const regs)
@@ -141,6 +137,7 @@ static bool i2cStartTransfer(u8 devAddr, u8 regAddr, bool read, I2cRegs *const r
 	u32 tries = 8;
 	do
 	{
+		// Edge case on previous transfer error.
 		// This is a special case where we can't predict when or if
 		// the IRQ has already fired. If it fires after checking but
 		// before a wfi this would hang.

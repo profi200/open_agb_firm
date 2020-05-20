@@ -57,9 +57,9 @@ typedef enum
 } Interrupt;
 
 
-// IRQ handler type.
+// IRQ interrupt service routine type.
 // id: contains the interrupt ID
-typedef void (*IrqHandler)(u32 id);
+typedef void (*IrqIsr)(u32 id);
 
 
 
@@ -69,21 +69,22 @@ typedef void (*IrqHandler)(u32 id);
 void IRQ_init(void);
 
 /**
- * @brief      Registers a interrupt handler and enables the specified interrupt.
+ * @brief      Registers a interrupt service routine and enables the specified interrupt.
  *
- * @param[in]  id       The interrupt ID. Must be <32.
- * @param[in]  handler  The interrupt handler to call.
+ * @param[in]  id    The interrupt ID. Must be <32.
+ * @param[in]  isr   The interrupt service routine to call.
  */
-void IRQ_registerHandler(Interrupt id, IrqHandler handler);
+void IRQ_registerIsr(Interrupt id, IrqIsr isr);
 
 /**
- * @brief      Unregisters the interrupt handler and disables the specified interrupt.
+ * @brief      Unregisters the interrupt service routine and disables the specified interrupt.
  *
  * @param[in]  id    The interrupt ID. Must be <32.
  */
-void IRQ_unregisterHandler(Interrupt id);
+void IRQ_unregisterIsr(Interrupt id);
 
 
+#if !__thumb__
 static inline u32 enterCriticalSection(void)
 {
 	u32 tmp;
@@ -95,3 +96,4 @@ static inline void leaveCriticalSection(u32 oldState)
 {
 	__setCpsr_c((__getCpsr() & ~PSR_I) | oldState);
 }
+#endif

@@ -106,10 +106,6 @@ void NSPI_init(void)
 	// Switch all 3 buses to the new interface
 	REG_CFG11_SPI_CNT = 1u<<2 | 1u<<1 | 1u;
 
-	IRQ_registerHandler(IRQ_SPI2, 14, 0, true, NULL);
-	IRQ_registerHandler(IRQ_SPI3, 14, 0, true, NULL);
-	IRQ_registerHandler(IRQ_SPI1, 14, 0, true, NULL);
-
 	SpiRegs *regs = nspiGetBusRegsBase(SPI_BUS1);
 	regs->NSPI_INT_MASK = NSPI_INT_TRANSF_END; // Disable interrupt 1
 	regs->NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END; // Aknowledge
@@ -121,6 +117,10 @@ void NSPI_init(void)
 	regs = nspiGetBusRegsBase(SPI_BUS3);
 	regs->NSPI_INT_MASK = NSPI_INT_TRANSF_END;
 	regs->NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END;
+
+	IRQ_registerIsr(IRQ_SPI2, 14, 0, true, NULL);
+	IRQ_registerIsr(IRQ_SPI3, 14, 0, true, NULL);
+	IRQ_registerIsr(IRQ_SPI1, 14, 0, true, NULL);
 }
 
 bool _NSPI_autoPollBit(SpiDevice dev, u32 params)

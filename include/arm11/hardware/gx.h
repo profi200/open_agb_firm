@@ -22,7 +22,7 @@
 #define REG_GX_PSC_VRAM          *((vu32*)(GX_REGS_BASE + 0x0030)) // gsp mudule only changes bit 8-11.
 #define REG_GX_PSC_STAT          *((vu32*)(GX_REGS_BASE + 0x0034))
 
-// PDC0/1 regs see lcd_regs.h.
+// PDC0/1 regs see lcd.h.
 
 // PPF (transfer engine) regs.
 #define REG_GX_PPF_IN_ADDR       *((vu32*)(GX_REGS_BASE + 0x0C00))

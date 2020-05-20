@@ -67,12 +67,12 @@ void PXI_init(void)
 	pxiSendWord(0x99);
 	while(pxiRecvWord() != 0x11);
 
-	IRQ_registerHandler(IRQ_PXI_SYNC, pxiIrqHandler);
+	IRQ_registerIsr(IRQ_PXI_SYNC, pxiIrqHandler);
 #elif ARM11
 	while(pxiRecvWord() != 0x99);
 	pxiSendWord(0x11);
 
-	IRQ_registerHandler(IRQ_PXI_SYNC, 13, 0, true, pxiIrqHandler);
+	IRQ_registerIsr(IRQ_PXI_SYNC, 13, 0, true, pxiIrqHandler);
 #endif
 }
 

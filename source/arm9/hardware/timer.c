@@ -55,7 +55,7 @@ void TIMER_init(void)
 		REG_TIMER_CNT(i) = 0;
 	}
 
-	IRQ_registerHandler(IRQ_TIMER_3, timerSleepHandler);
+	IRQ_registerIsr(IRQ_TIMER_3, timerSleepHandler);
 }
 
 void TIMER_start(Timer timer, TimerPrescaler prescaler, u16 ticks, bool enableIrq)

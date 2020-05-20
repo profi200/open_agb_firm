@@ -143,10 +143,10 @@ typedef enum
 } Interrupt;
 
 
-// IRQ handler type.
+// IRQ interrupt service routine type.
 // intSource: bit 10-12 CPU source ID (0 except for interrupt ID 0-15),
 // bit 0-9 interrupt ID
-typedef void (*IrqHandler)(u32 intSource);
+typedef void (*IrqIsr)(u32 intSource);
 
 
 
@@ -156,22 +156,22 @@ typedef void (*IrqHandler)(u32 intSource);
 void IRQ_init(void);
 
 /**
- * @brief      Registers a interrupt handler and enables the specified interrupt.
+ * @brief      Registers a interrupt service routine and enables the specified interrupt.
  *
  * @param[in]  id             The interrupt ID. Must be <128.
  * @param[in]  prio           The priority. 0 = highest, 14 = lowest, 15 = disabled
  * @param[in]  cpuMask        The CPU mask. Each of the 4 bits stands for 1 core. 0 means current CPU.
  * @param[in]  edgeTriggered  Set to true to make the interrupt edge triggered. false is level triggered.
- * @param[in]  handler        The interrupt handler to call.
+ * @param[in]  isr            The interrupt service routine to call.
  */
-void IRQ_registerHandler(Interrupt id, u8 prio, u8 cpuMask, bool edgeTriggered, IrqHandler handler);
+void IRQ_registerIsr(Interrupt id, u8 prio, u8 cpuMask, bool edgeTriggered, IrqIsr isr);
 
 /**
- * @brief      Unregisters the interrupt handler and disables the specified interrupt.
+ * @brief      Unregisters the interrupt service routine and disables the specified interrupt.
  *
  * @param[in]  id    The interrupt ID. Must be <128.
  */
-void IRQ_unregisterHandler(Interrupt id);
+void IRQ_unregisterIsr(Interrupt id);
 
 /**
  * @brief      Reenables a previously disabled but registered interrupt.
@@ -204,6 +204,7 @@ void IRQ_setPriority(Interrupt id, u8 prio);
 void IRQ_softwareInterrupt(Interrupt id, u8 cpuMask);
 
 
+#if !__thumb__
 static inline u32 enterCriticalSection(void)
 {
 	const u32 tmp = __getCpsr();
@@ -215,3 +216,4 @@ static inline void leaveCriticalSection(u32 oldState)
 {
 	__setCpsr_c((__getCpsr() & ~PSR_I) | oldState);
 }
+#endif

@@ -37,7 +37,7 @@ void TIMER_init(void)
 	REG_TIMER_CNT = 0;
 	REG_TIMER_INT_STAT = 1;
 
-	IRQ_registerHandler(IRQ_TIMER, 12, 0, true, NULL);
+	IRQ_registerIsr(IRQ_TIMER, 12, 0, true, NULL);
 }
 
 void TIMER_start(u8 prescaler, u32 ticks, bool autoReload, bool enableIrq)

@@ -177,7 +177,7 @@ void AES_init(void)
 	REG_NDMA1_SRC_ADDR = REG_AESRDFIFO;
 	REG_NDMA1_INT_CNT = NDMA_INT_SYS_FREQ;
 
-	IRQ_registerHandler(IRQ_AES, NULL);
+	IRQ_registerIsr(IRQ_AES, NULL);
 
 	setupKeys();
 }
@@ -606,7 +606,7 @@ void RSA_init(void)
 {
 	REG_RSA_UNK_F0 = 0;
 
-	IRQ_registerHandler(IRQ_RSA, NULL);
+	IRQ_registerIsr(IRQ_RSA, NULL);
 }
 
 void RSA_selectKeyslot(u8 keyslot)

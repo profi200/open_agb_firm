@@ -21,6 +21,25 @@
 #include "types.h"
 
 
+#define I2C1_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x61000)
+#define REG_I2C1_DATA   *((vu8* )(I2C1_REGS_BASE + 0x0))
+#define REG_I2C1_CNT    *((vu8* )(I2C1_REGS_BASE + 0x1))
+#define REG_I2C1_CNTEX  *((vu16*)(I2C1_REGS_BASE + 0x2))
+#define REG_I2C1_SCL    *((vu16*)(I2C1_REGS_BASE + 0x4))
+
+#define I2C2_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x44000)
+#define REG_I2C2_DATA   *((vu8* )(I2C2_REGS_BASE + 0x0))
+#define REG_I2C2_CNT    *((vu8* )(I2C2_REGS_BASE + 0x1))
+#define REG_I2C2_CNTEX  *((vu16*)(I2C2_REGS_BASE + 0x2))
+#define REG_I2C2_SCL    *((vu16*)(I2C2_REGS_BASE + 0x4))
+
+#define I2C3_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x48000)
+#define REG_I2C3_DATA   *((vu8* )(I2C3_REGS_BASE + 0x0))
+#define REG_I2C3_CNT    *((vu8* )(I2C3_REGS_BASE + 0x1))
+#define REG_I2C3_CNTEX  *((vu16*)(I2C3_REGS_BASE + 0x2))
+#define REG_I2C3_SCL    *((vu16*)(I2C3_REGS_BASE + 0x4))
+
+
 // REG_I2C_CNT
 #define I2C_STOP          (1u)
 #define I2C_START         (1u<<1)
@@ -34,10 +53,10 @@
 // REG_I2C_CNTEX
 #define I2C_SCL_STATE     (1u)     // Read-only SCL line state?
 #define I2C_CLK_STRETCH   (1u<<1)  // Enables clock stretching
-#define I2C_UNK_CNTEX15   (1u<<15) // Unknown
+#define I2C_UNK_CNTEX15   (1u<<15) // "LGCY" Redirect from DSi I2C regs?
 
 // REG_I2C_SCL
-#define I2C_DELAYS(high, low)  ((high)<<8 | (low)) // TODO: How long and when does it delay?
+#define I2C_DELAYS(high, low)  ((high)<<8 | (low)) // "PRD" TODO: How long and when does it delay?
 
 
 typedef enum

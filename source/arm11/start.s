@@ -28,12 +28,10 @@
 .global _start
 .global _init
 .global deinitCpu
-.global __superhaxEnabled
 
 .type vectors %function
 .type _start %function
 .type stubExceptionVectors %function
-.type checkSuperhax %function
 .type setupVfp %function
 .type _init %function
 .type deinitCpu %function
@@ -127,7 +125,6 @@ _start:
 	cmp r4, #0
 	bne _start_skip_bss_init_array
 
-	bl checkSuperhax
 	@ Clear bss section
 	ldr r0, =__bss_start__
 	ldr r1, =__bss_end__
@@ -183,23 +180,6 @@ stubExceptionVectors:
 
 
 .align 2
-checkSuperhax:
-	ldr r0, =BOOT11_BASE + 0x8000
-	ldr r1, [r0]
-	cmp r1, #0
-	bxeq lr
-	ldr r1, =__superhaxEnabled
-	mov r2, #1
-	ldr r0, =VRAM_BASE + VRAM_SIZE - OTP_SIZE - BOOT11_SIZE
-	strb r2, [r1]
-	ldr r1, =BOOT11_BASE
-	ldr r2, =BOOT11_SIZE
-	b iomemcpy
-
-.pool
-
-
-.align 2
 setupVfp:
 	mov r0, #0xF00000           @ Give full access to cp10/11 in user and privileged mode
 	mov r1, #0
@@ -246,8 +226,3 @@ deinitCpu:
 	bx r3
 
 .pool
-
-
-.section ".rodata", "a"
-__superhaxEnabled:
-	.byte 0
