@@ -112,7 +112,7 @@ u32 PXI_sendCmd(u32 cmd, const u32 *buf, u32 words)
 	for(u32 i = 0; i < inBufs; i++)
 	{
 		const IpcBuffer *const inBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];
-		if(inBuf->ptr && inBuf->size) flushDCacheRange(inBuf->ptr, inBuf->size);
+		if(inBuf->ptr && inBuf->size) cleanDCacheRange(inBuf->ptr, inBuf->size);
 	}
 	for(u32 i = inBufs; i < inBufs + outBufs; i++)
 	{

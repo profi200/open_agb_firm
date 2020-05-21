@@ -54,18 +54,34 @@ BEGIN_ASM_FUNC invalidateICacheRange
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC flushDCache
+BEGIN_ASM_FUNC cleanDCache
 	mov r0, #0
-	mcr p15, 0, r0, c7, c10, 0      @ "Clean Entire Data Cache"
+	mcr p15, 0, r0, c7, c10, 0      @ Clean Entire Data Cache
 	mcr p15, 0, r0, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC flushInvalidateDCache
+BEGIN_ASM_FUNC flushDCache
 	mov r0, #0
-	mcr p15, 0, r0, c7, c14, 0      @ "Clean and Invalidate Entire Data Cache"
+	mcr p15, 0, r0, c7, c14, 0      @ Clean and Invalidate Entire Data Cache
 	mcr p15, 0, r0, c7, c10, 4      @ Data Synchronization Barrier
+	bx lr
+END_ASM_FUNC
+
+
+BEGIN_ASM_FUNC cleanDCacheRange
+	cmp r1, #DCACHE_SIZE
+	bhi cleanDCache
+	add r1, r1, r0
+	bic r0, r0, #(CACHE_LINE_SIZE - 1)
+	mov r2, #0
+	cleanDCacheRange_lp:
+		mcr p15, 0, r0, c7, c10, 1  @ Clean Data Cache Line (using MVA)
+		add r0, r0, #CACHE_LINE_SIZE
+		cmp r0, r1
+		blt cleanDCacheRange_lp
+	mcr p15, 0, r2, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
 END_ASM_FUNC
 
@@ -77,26 +93,10 @@ BEGIN_ASM_FUNC flushDCacheRange
 	bic r0, r0, #(CACHE_LINE_SIZE - 1)
 	mov r2, #0
 	flushDCacheRange_lp:
-		mcr p15, 0, r0, c7, c10, 1  @ "Clean Data Cache Line (using MVA)"
+		mcr p15, 0, r0, c7, c14, 1  @ Clean and Invalidate Data Cache Line (using MVA)
 		add r0, r0, #CACHE_LINE_SIZE
 		cmp r0, r1
 		blt flushDCacheRange_lp
-	mcr p15, 0, r2, c7, c10, 4      @ Data Synchronization Barrier
-	bx lr
-END_ASM_FUNC
-
-
-BEGIN_ASM_FUNC flushInvalidateDCacheRange
-	cmp r1, #DCACHE_SIZE
-	bhi flushInvalidateDCache
-	add r1, r1, r0
-	bic r0, r0, #(CACHE_LINE_SIZE - 1)
-	mov r2, #0
-	flushInvalidateDCacheRange_lp:
-		mcr p15, 0, r0, c7, c14, 1  @ "Clean and Invalidate Data Cache Line (using MVA)"
-		add r0, r0, #CACHE_LINE_SIZE
-		cmp r0, r1
-		blt flushInvalidateDCacheRange_lp
 	mcr p15, 0, r2, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
 END_ASM_FUNC
@@ -112,12 +112,12 @@ END_ASM_FUNC
 
 BEGIN_ASM_FUNC invalidateDCacheRange
 	cmp r1, #DCACHE_SIZE
-	bhi flushInvalidateDCache
+	bhi flushDCache
 	add r1, r1, r0
 	tst r0, #(CACHE_LINE_SIZE - 1)
-	mcrne p15, 0, r0, c7, c10, 1    @ "Clean Data Cache Line (using MVA)"
+	mcrne p15, 0, r0, c7, c10, 1    @ Clean Data Cache Line (using MVA)
 	tst r1, #(CACHE_LINE_SIZE - 1)
-	mcrne p15, 0, r1, c7, c10, 1    @ "Clean Data Cache Line (using MVA)"
+	mcrne p15, 0, r1, c7, c10, 1    @ Clean Data Cache Line (using MVA)
 	bic r0, r0, #(CACHE_LINE_SIZE - 1)
 	mov r2, #0
 	invalidateDCacheRange_lp:

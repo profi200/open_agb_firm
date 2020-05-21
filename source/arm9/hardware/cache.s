@@ -47,6 +47,24 @@ BEGIN_ASM_FUNC invalidateICacheRange
 END_ASM_FUNC
 
 
+BEGIN_ASM_FUNC cleanDCache
+	mov r1, #0
+	cleanDCache_outer_lp:
+		mov r0, #0
+		cleanDCache_inner_lp:
+			orr r2, r1, r0             @ Generate segment and line address
+			add r0, r0, #CACHE_LINE_SIZE
+			mcr p15, 0, r2, c7, c10, 2 @ "Clean data cache entry Index and segment"
+			cmp r0, #(DCACHE_SIZE / 4)
+			bne cleanDCache_inner_lp
+		add r1, r1, #0x40000000
+		cmp r1, #0
+		bne cleanDCache_outer_lp
+	mcr p15, 0, r1, c7, c10, 4         @ Drain write buffer
+	bx lr
+END_ASM_FUNC
+
+
 BEGIN_ASM_FUNC flushDCache
 	mov r1, #0
 	flushDCache_outer_lp:
@@ -54,7 +72,7 @@ BEGIN_ASM_FUNC flushDCache
 		flushDCache_inner_lp:
 			orr r2, r1, r0             @ Generate segment and line address
 			add r0, r0, #CACHE_LINE_SIZE
-			mcr p15, 0, r2, c7, c10, 2 @ "Clean data cache entry Index and segment"
+			mcr p15, 0, r2, c7, c14, 2 @ Clean and flush data cache entry Index and segment
 			cmp r0, #(DCACHE_SIZE / 4)
 			bne flushDCache_inner_lp
 		add r1, r1, #0x40000000
@@ -65,20 +83,18 @@ BEGIN_ASM_FUNC flushDCache
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC flushInvalidateDCache
-	mov r1, #0
-	flushInvalidateDCache_outer_lp:
-		mov r0, #0
-		flushInvalidateDCache_inner_lp:
-			orr r2, r1, r0             @ Generate segment and line address
-			add r0, r0, #CACHE_LINE_SIZE
-			mcr p15, 0, r2, c7, c14, 2 @ "Clean and flush data cache entry Index and segment"
-			cmp r0, #(DCACHE_SIZE / 4)
-			bne flushInvalidateDCache_inner_lp
-		add r1, r1, #0x40000000
-		cmp r1, #0
-		bne flushInvalidateDCache_outer_lp
-	mcr p15, 0, r1, c7, c10, 4         @ Drain write buffer
+BEGIN_ASM_FUNC cleanDCacheRange
+	cmp r1, #DCACHE_SIZE
+	bhi cleanDCache
+	add r1, r1, r0
+	bic r0, r0, #(CACHE_LINE_SIZE - 1)
+	mov r2, #0
+	cleanDCacheRange_lp:
+		mcr p15, 0, r0, c7, c10, 1  @ Clean data cache entry Address
+		add r0, r0, #CACHE_LINE_SIZE
+		cmp r0, r1
+		blt cleanDCacheRange_lp
+	mcr p15, 0, r2, c7, c10, 4      @ Drain write buffer
 	bx lr
 END_ASM_FUNC
 
@@ -90,26 +106,10 @@ BEGIN_ASM_FUNC flushDCacheRange
 	bic r0, r0, #(CACHE_LINE_SIZE - 1)
 	mov r2, #0
 	flushDCacheRange_lp:
-		mcr p15, 0, r0, c7, c10, 1  @ "Clean data cache entry Address"
+		mcr p15, 0, r0, c7, c14, 1  @ Clean and flush data cache entry Address
 		add r0, r0, #CACHE_LINE_SIZE
 		cmp r0, r1
 		blt flushDCacheRange_lp
-	mcr p15, 0, r2, c7, c10, 4      @ Drain write buffer
-	bx lr
-END_ASM_FUNC
-
-
-BEGIN_ASM_FUNC flushInvalidateDCacheRange
-	cmp r1, #DCACHE_SIZE
-	bhi flushInvalidateDCache
-	add r1, r1, r0
-	bic r0, r0, #(CACHE_LINE_SIZE - 1)
-	mov r2, #0
-	flushInvalidateDCacheRange_lp:
-		mcr p15, 0, r0, c7, c14, 1  @ "Clean and flush data cache entry Address"
-		add r0, r0, #CACHE_LINE_SIZE
-		cmp r0, r1
-		blt flushInvalidateDCacheRange_lp
 	mcr p15, 0, r2, c7, c10, 4      @ Drain write buffer
 	bx lr
 END_ASM_FUNC
@@ -124,16 +124,16 @@ END_ASM_FUNC
 
 BEGIN_ASM_FUNC invalidateDCacheRange
 	cmp r1, #DCACHE_SIZE
-	bhi flushInvalidateDCache
+	bhi flushDCache
 	add r1, r1, r0
 	tst r0, #(CACHE_LINE_SIZE - 1)
-	mcrne p15, 0, r0, c7, c10, 1    @ "Clean data cache entry Address"
+	mcrne p15, 0, r0, c7, c10, 1    @ Clean data cache entry Address
 	tst r1, #(CACHE_LINE_SIZE - 1)
-	mcrne p15, 0, r1, c7, c10, 1    @ "Clean data cache entry Address"
+	mcrne p15, 0, r1, c7, c10, 1    @ Clean data cache entry Address
 	bic r0, r0, #(CACHE_LINE_SIZE - 1)
 	mov r2, #0
 	invalidateDCacheRange_lp:
-		mcr p15, 0, r0, c7, c6, 1   @ "Flush data cache single entry Address"
+		mcr p15, 0, r0, c7, c6, 1   @ Flush data cache single entry Address
 		add r0, r0, #CACHE_LINE_SIZE
 		cmp r0, r1
 		blt invalidateDCacheRange_lp

@@ -34,7 +34,7 @@ static void power_safe_halt(void)
 	// give the screens a bit of time to turn off
 	TIMER_sleepMs(400);
 
-	flushDCache();
+	cleanDCache();
 }
 
 noreturn void power_off(void)

@@ -204,7 +204,7 @@ void DMA330_init(void)
 			waitForChannelStatus(0, CSR_STATUS_STOPPED);
 
 			progBuf[1] = i<<3; // Periphal ID
-			flushDCacheRange(progBuf, 3);
+			cleanDCacheRange(progBuf, 3);
 			// DMAGO channel 0 non-secure
 			sendDebugCmd(DBGINST0_BYTES01(0x00A2u) | DBGINST0_THREAD_MGR, (u32)progBuf);
 		}

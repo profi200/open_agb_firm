@@ -192,7 +192,7 @@ BEGIN_ASM_FUNC deinitCpu
 
 	cpsid aif, #PSR_SYS_MODE
 	bl stubExceptionVectors
-	bl flushDCache
+	bl cleanDCache
 
 	ldr r1, =0xC03805           @ Disable MMU, D-Cache, Program flow prediction, I-Cache,
 	                            @ high exception vectors, Unaligned data access,

@@ -317,7 +317,7 @@ BEGIN_ASM_FUNC deinitCpu
 		subs r1, r1, #1
 		bne deinitCpu_lp
 
-	bl flushDCache
+	bl cleanDCache
 	mov r2, #0
 	ldrh r1, =0x1005            @ MPU, D-Cache and I-Cache bitmask
 	mrc p15, 0, r0, c1, c0, 0   @ Read control register
