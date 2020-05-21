@@ -17,47 +17,37 @@
  */
 
 #include "arm.h"
-#define ARM11
 #include "mem_map.h"
-#undef ARM11
 
-.arm
 .cpu arm946e-s
 .fpu softvfp
 
-.global _start
-.global _init
-.global deinitCpu
+.macro BEGIN_ASM_FUNC name, type=arm, linkage=global
+.if \type == thumb
+	.align          1
+	.thumb
+.else
+	.align          2
+	.arm
+.endif
+	.\linkage       \name
+	.type           \name, %function
+	.func           \name
+	.cfi_sections   .debug_frame
+	.cfi_startproc
+\name:
+.endm
 
-.type _start %function
-.type setupExceptionVectors %function
-.type setupTcms %function
-.type setupMpu %function
-.type _init %function
-.type deinitCpu %function
+.macro END_ASM_FUNC
+	.cfi_endproc
+	.endfunc
+.endm
 
-.extern __bss_start__
-.extern __bss_end__
-.extern __end__
-.extern iomemset
-.extern iomemcpy
-.extern fake_heap_start
-.extern fake_heap_end
-.extern __libc_init_array
-.extern __systemInit
-.extern main
-.extern __systemDeinit
-.extern irqHandler
-.extern undefInstrHandler
-.extern prefetchAbortHandler
-.extern dataAbortHandler
-
-.section ".crt0", "ax"
+.section .crt0, "ax", %progbits
 
 
 
-__start__:
-_start:
+BEGIN_ASM_FUNC _start
 	msr cpsr_cxsf, #PSR_INT_OFF | PSR_SVC_MODE
 
 	@ Control register:
@@ -125,13 +115,13 @@ _start:
 
 .pool
 _dummyArgv:
-	.word 0
+	.4byte 0
+END_ASM_FUNC
 
 
 #define MAKE_BRANCH(src, dst) (0xEA000000 | (((((dst) - (src)) >> 2) - 2) & 0xFFFFFF))
 
-.align 2
-setupExceptionVectors:
+BEGIN_ASM_FUNC setupExceptionVectors
 	adr r0, _vectorStubs
 	ldr r1, =A9_VECTORS_START
 	ldmia r0!, {r2-r9}
@@ -143,21 +133,21 @@ setupExceptionVectors:
 .pool
 _vectorStubs:
 	ldr pc, irqHandlerPtr
-	irqHandlerPtr:                  .word irqHandler
+	irqHandlerPtr:                  .4byte irqHandler
 	udf #2
-	fiqHandlerPtr:                  .word (A9_VECTORS_START + 0x08)
+	fiqHandlerPtr:                  .4byte (A9_VECTORS_START + 0x08)
 	udf #3
-	svcHandlerPtr:                  .word (A9_VECTORS_START + 0x10)
+	svcHandlerPtr:                  .4byte (A9_VECTORS_START + 0x10)
 	ldr pc, undefInstrHandlerPtr
-	undefInstrHandlerPtr:           .word undefInstrHandler
+	undefInstrHandlerPtr:           .4byte undefInstrHandler
 	ldr pc, prefetchAbortHandlerPtr
-	prefetchAbortHandlerPtr:        .word prefetchAbortHandler
+	prefetchAbortHandlerPtr:        .4byte prefetchAbortHandler
 	ldr pc, dataAbortHandlerPtr
-	dataAbortHandlerPtr:            .word dataAbortHandler
+	dataAbortHandlerPtr:            .4byte dataAbortHandler
+END_ASM_FUNC
 
 
-.align 2
-setupTcms:
+BEGIN_ASM_FUNC setupTcms
 	ldr r1, =(ITCM_BASE | 0x24) @ Base = 0x00000000, size = 128 MiB (32 KiB mirrored)
 	ldr r0, =(DTCM_BASE | 0x0A) @ Base = 0xFFF00000, size = 16 KiB
 	mcr p15, 0, r0, c9, c1, 0   @ Write DTCM region reg
@@ -168,6 +158,7 @@ setupTcms:
 	bx lr
 
 .pool
+END_ASM_FUNC
 
 
 #define REGION_4KiB   (0b01011)
@@ -202,8 +193,7 @@ setupTcms:
 #define MAKE_PERMISSIONS(r0, r1, r2, r3, r4, r5, r6, r7) \
         ((r0) | (r1<<4) | (r2<<8) | (r3<<12) | (r4<<16) | (r5<<20) | (r6<<24) | (r7<<28))
 
-.align 2
-setupMpu:
+BEGIN_ASM_FUNC setupMpu
 	adr r0, _mpu_regions        @ Table at end of file
 	ldm r0, {r1-r10}
 	mcr p15, 0, r1, c6, c0, 0   @ Write MPU region reg 0-7
@@ -260,6 +250,7 @@ setupMpu:
 	mcr p15, 0, r0, c1, c0, 0   @ Write control register
 	bx lr
 
+.pool
 _mpu_regions:
 	@ Region 0: ITCM kernel mirror 32 KiB
 	@ Region 1: ARM9 internal mem + N3DS extension 2 MiB
@@ -269,14 +260,14 @@ _mpu_regions:
 	@ Region 5: FCRAM + N3DS extension 256 MiB
 	@ Region 6: DTCM 16 KiB
 	@ Region 7: Exception vectors + ARM9 bootrom 64 KiB
-	.word MAKE_REGION(ITCM_KERNEL_MIRROR, REGION_32KiB)
-	.word MAKE_REGION(A9_RAM_BASE,        REGION_2MiB)
-	.word MAKE_REGION(IO_MEM_ARM9_ONLY,   REGION_2MiB)
-	.word MAKE_REGION(VRAM_BASE,          REGION_8MiB)
-	.word MAKE_REGION(DSP_MEM_BASE,       REGION_1MiB)
-	.word MAKE_REGION(FCRAM_BASE,         REGION_256MiB)
-	.word MAKE_REGION(DTCM_BASE,          REGION_16KiB)
-	.word MAKE_REGION(BOOT9_BASE,         REGION_64KiB)
+	.4byte MAKE_REGION(ITCM_KERNEL_MIRROR, REGION_32KiB)
+	.4byte MAKE_REGION(A9_RAM_BASE,        REGION_2MiB)
+	.4byte MAKE_REGION(IO_MEM_ARM9_ONLY,   REGION_2MiB)
+	.4byte MAKE_REGION(VRAM_BASE,          REGION_8MiB)
+	.4byte MAKE_REGION(DSP_MEM_BASE,       REGION_1MiB)
+	.4byte MAKE_REGION(FCRAM_BASE,         REGION_256MiB)
+	.4byte MAKE_REGION(DTCM_BASE,          REGION_16KiB)
+	.4byte MAKE_REGION(BOOT9_BASE,         REGION_64KiB)
 _mpu_permissions:
 	@ Data access permissions:
 	@ Region 0: User = --, Privileged = RW
@@ -287,7 +278,7 @@ _mpu_permissions:
 	@ Region 5: User = --, Privileged = RW
 	@ Region 6: User = --, Privileged = RW
 	@ Region 7: User = --, Privileged = RO
-	.word MAKE_PERMISSIONS(PER_PRIV_RW_USR_NA, PER_PRIV_RW_USR_NA,
+	.4byte MAKE_PERMISSIONS(PER_PRIV_RW_USR_NA, PER_PRIV_RW_USR_NA,
 	                       PER_PRIV_RW_USR_NA, PER_PRIV_RW_USR_NA,
 	                       PER_PRIV_RW_USR_NA, PER_PRIV_RW_USR_NA,
 	                       PER_PRIV_RW_USR_NA, PER_PRIV_RO_USR_NA)
@@ -300,23 +291,20 @@ _mpu_permissions:
 	@ Region 5: User = --, Privileged = --
 	@ Region 6: User = --, Privileged = --
 	@ Region 7: User = --, Privileged = RO
-	.word MAKE_PERMISSIONS(PER_PRIV_RO_USR_NA, PER_PRIV_RO_USR_NA,
+	.4byte MAKE_PERMISSIONS(PER_PRIV_RO_USR_NA, PER_PRIV_RO_USR_NA,
 	                       PER_NA,             PER_NA,
 	                       PER_NA,             PER_NA,
 	                       PER_NA, PER_PRIV_RO_USR_NA)
-.pool
+END_ASM_FUNC
 
 
 @ Needed by libc
-.align 2
-_init:
+BEGIN_ASM_FUNC _init, thumb
 	bx lr
+END_ASM_FUNC
 
-.pool
 
-
-.align 2
-deinitCpu:
+BEGIN_ASM_FUNC deinitCpu
 	mov r3, lr
 
 	msr cpsr_cxsf, #PSR_INT_OFF | PSR_SYS_MODE
@@ -341,3 +329,4 @@ deinitCpu:
 	bx r3
 
 .pool
+END_ASM_FUNC

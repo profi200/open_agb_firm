@@ -17,49 +17,37 @@
  */
 
 #include "arm.h"
-#define ARM9
 #include "mem_map.h"
-#undef ARM9
 
-.arm
 .cpu mpcore
 .fpu vfpv2
 
-.global _start
-.global _init
-.global deinitCpu
+.macro BEGIN_ASM_FUNC name, type=arm, linkage=global
+.if \type == thumb
+	.align          1
+	.thumb
+.else
+	.align          2
+	.arm
+.endif
+	.\linkage       \name
+	.type           \name, %function
+	.func           \name
+	.cfi_sections   .debug_frame
+	.cfi_startproc
+\name:
+.endm
 
-.type vectors %function
-.type _start %function
-.type stubExceptionVectors %function
-.type setupVfp %function
-.type _init %function
-.type deinitCpu %function
+.macro END_ASM_FUNC
+	.cfi_endproc
+	.endfunc
+.endm
 
-.extern irqHandler
-.extern undefInstrHandler
-.extern prefetchAbortHandler
-.extern dataAbortHandler
-.extern __bss_start__
-.extern __bss_end__
-.extern __end__
-.extern iomemset
-.extern iomemcpy
-.extern fake_heap_start
-.extern fake_heap_end
-.extern setupMmu
-.extern __libc_init_array
-.extern core123Init
-.extern __systemInit
-.extern main
-.extern __systemDeinit
-
-.section ".crt0", "ax"
+.section .crt0, "ax", %progbits
 
 
 
-__start__:
-vectors:
+BEGIN_ASM_FUNC vectors
 	ldr pc, resetHandlerPtr         @ Reset vector
 	ldr pc, undefInstrHandlerPtr    @ Undefined instruction vector
 	udf #3                          @ Software interrupt (SVC) vector
@@ -68,16 +56,17 @@ vectors:
 	udf #6                          @ Reserved (unused) vector
 	ldr pc, irqHandlerPtr           @ Interrupt (IRQ) vector
 	udf #8                          @ Fast interrupt (FIQ) vector
-	resetHandlerPtr:         .word _start
-	undefInstrHandlerPtr:    .word undefInstrHandler
-	@svcHandlerPtr:           .word (vectors + 0x08)
-	prefetchAbortHandlerPtr: .word prefetchAbortHandler
-	dataAbortHandlerPtr:     .word dataAbortHandler
-	irqHandlerPtr:           .word irqHandler
-	@fiqHandlerPtr:           .word (vectors + 0x1C)
+	resetHandlerPtr:         .4byte _start
+	undefInstrHandlerPtr:    .4byte undefInstrHandler
+	@svcHandlerPtr:           .4byte (vectors + 0x08)
+	prefetchAbortHandlerPtr: .4byte prefetchAbortHandler
+	dataAbortHandlerPtr:     .4byte dataAbortHandler
+	irqHandlerPtr:           .4byte irqHandler
+	@fiqHandlerPtr:           .4byte (vectors + 0x1C)
+END_ASM_FUNC
 
 
-_start:
+BEGIN_ASM_FUNC _start
 	cpsid aif, #PSR_SVC_MODE
 
 	@ Control register:
@@ -155,18 +144,18 @@ _start_lp:
 
 .pool
 _sysmode_stacks:
-	.word A11_C0_STACK_END      @ Stack for core 0
-	.word A11_C1_STACK_END      @ Stack for core 1
-	.word A11_C2_STACK_END      @ Stack for core 2
-	.word A11_C3_STACK_END      @ Stack for core 3
+	.4byte A11_C0_STACK_END      @ Stack for core 0
+	.4byte A11_C1_STACK_END      @ Stack for core 1
+	.4byte A11_C2_STACK_END      @ Stack for core 2
+	.4byte A11_C3_STACK_END      @ Stack for core 3
 _dummyArgv:
-	.word 0
+	.4byte 0
+END_ASM_FUNC
 
 
 #define MAKE_BRANCH(src, dst) (0xEA000000 | (((((dst) - (src)) >> 2) - 2) & 0xFFFFFF))
 
-.align 2
-stubExceptionVectors:
+BEGIN_ASM_FUNC stubExceptionVectors
 	ldr r0, =A11_VECTORS_START
 	ldr r2, =MAKE_BRANCH(0, 0)  @ Endless loop
 	mov r1, #6
@@ -177,10 +166,10 @@ stubExceptionVectors:
 	bx lr
 
 .pool
+END_ASM_FUNC
 
 
-.align 2
-setupVfp:
+BEGIN_ASM_FUNC setupVfp
 	mov r0, #0xF00000           @ Give full access to cp10/11 in user and privileged mode
 	mov r1, #0
 	mcr p15, 0, r0, c1, c0, 2   @ Write Coprocessor Access Control Register
@@ -190,19 +179,15 @@ setupVfp:
 	fmxr fpexc, r0              @ Write Floating-point exception register
 	fmxr fpscr, r1              @ Write Floating-Point Status and Control Register
 	bx lr
+END_ASM_FUNC
 
-.pool
 
-
-.align 2
-_init:
+BEGIN_ASM_FUNC _init, thumb
 	bx lr
+END_ASM_FUNC
 
-.pool
 
-
-.align 2
-deinitCpu:
+BEGIN_ASM_FUNC deinitCpu
 	mov r3, lr
 
 	cpsid aif, #PSR_SYS_MODE
@@ -226,3 +211,4 @@ deinitCpu:
 	bx r3
 
 .pool
+END_ASM_FUNC

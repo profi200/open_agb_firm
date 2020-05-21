@@ -16,9 +16,8 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "asmfunc.h"
+#include "asm_macros.h"
 
-.arm
 .cpu mpcore
 .fpu vfpv2
 
@@ -29,16 +28,17 @@
 
 
 
-ASM_FUNC invalidateICache
+BEGIN_ASM_FUNC invalidateICache
 	mov r0, #0
 	mcr p15, 0, r0, c7, c5, 0       @ Invalidate Entire Instruction Cache, also flushes the branch target cache
 	@mcr p15, 0, r0, c7, c5, 6       @ Flush Entire Branch Target Cache
 	mcr p15, 0, r0, c7, c10, 4      @ Data Synchronization Barrier
 	mcr p15, 0, r0, c7, c5, 4       @ Flush Prefetch Buffer
 	bx lr
+END_ASM_FUNC
 
 
-ASM_FUNC invalidateICacheRange
+BEGIN_ASM_FUNC invalidateICacheRange
 	add r1, r1, r0
 	bic r0, r0, #(CACHE_LINE_SIZE - 1)
 	mov r2, #0
@@ -51,23 +51,26 @@ ASM_FUNC invalidateICacheRange
 	mcr p15, 0, r2, c7, c10, 4      @ Data Synchronization Barrier
 	mcr p15, 0, r2, c7, c5, 4       @ Flush Prefetch Buffer
 	bx lr
+END_ASM_FUNC
 
 
-ASM_FUNC flushDCache
+BEGIN_ASM_FUNC flushDCache
 	mov r0, #0
 	mcr p15, 0, r0, c7, c10, 0      @ "Clean Entire Data Cache"
 	mcr p15, 0, r0, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
+END_ASM_FUNC
 
 
-ASM_FUNC flushInvalidateDCache
+BEGIN_ASM_FUNC flushInvalidateDCache
 	mov r0, #0
 	mcr p15, 0, r0, c7, c14, 0      @ "Clean and Invalidate Entire Data Cache"
 	mcr p15, 0, r0, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
+END_ASM_FUNC
 
 
-ASM_FUNC flushDCacheRange
+BEGIN_ASM_FUNC flushDCacheRange
 	cmp r1, #DCACHE_SIZE
 	bhi flushDCache
 	add r1, r1, r0
@@ -80,9 +83,10 @@ ASM_FUNC flushDCacheRange
 		blt flushDCacheRange_lp
 	mcr p15, 0, r2, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
+END_ASM_FUNC
 
 
-ASM_FUNC flushInvalidateDCacheRange
+BEGIN_ASM_FUNC flushInvalidateDCacheRange
 	cmp r1, #DCACHE_SIZE
 	bhi flushInvalidateDCache
 	add r1, r1, r0
@@ -95,16 +99,18 @@ ASM_FUNC flushInvalidateDCacheRange
 		blt flushInvalidateDCacheRange_lp
 	mcr p15, 0, r2, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
+END_ASM_FUNC
 
 
-ASM_FUNC invalidateDCache
+BEGIN_ASM_FUNC invalidateDCache
 	mov r0, #0
 	mcr p15, 0, r0, c7, c6, 0       @ Invalidate Entire Data Cache
 	mcr p15, 0, r0, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
+END_ASM_FUNC
 
 
-ASM_FUNC invalidateDCacheRange
+BEGIN_ASM_FUNC invalidateDCacheRange
 	cmp r1, #DCACHE_SIZE
 	bhi flushInvalidateDCache
 	add r1, r1, r0
@@ -121,6 +127,4 @@ ASM_FUNC invalidateDCacheRange
 		blt invalidateDCacheRange_lp
 	mcr p15, 0, r2, c7, c10, 4      @ Data Synchronization Barrier
 	bx lr
-
-
-.pool
+END_ASM_FUNC

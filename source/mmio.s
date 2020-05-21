@@ -16,18 +16,17 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- @ Based on https://github.com/AuroraWright/Luma3DS/blob/master/arm9/source/alignedseqmemcpy.s
+@ Based on https://github.com/AuroraWright/Luma3DS/blob/master/arm9/source/alignedseqmemcpy.s
 
-#include "asmfunc.h"
+#include "asm_macros.h"
 
-.arm
 .cpu arm946e-s
 .fpu softvfp
 
 
 
 @ void iomemcpy(vu32 *restrict dst, const vu32 *restrict src, u32 size)
-ASM_FUNC iomemcpy
+BEGIN_ASM_FUNC iomemcpy
 	bics    r12, r2, #31
 	beq     iomemcpy_test_words
 	stmfd   sp!, {r4-r10}
@@ -53,10 +52,11 @@ iomemcpy_halfword_byte:
 	ldrneb  r3, [r1]
 	strneb  r3, [r0]
 	bx      lr
+END_ASM_FUNC
 
 
 @ void iomemset(vu32 *ptr, u32 value, u32 size)
-ASM_FUNC iomemset
+BEGIN_ASM_FUNC iomemset
 	bics    r12, r2, #31
 	beq     iomemset_test_words
 	stmfd   sp!, {r4-r9}
@@ -85,3 +85,4 @@ iomemset_halfword_byte:
 	tst     r2, #1
 	strneb  r1, [r0]
 	bx      lr
+END_ASM_FUNC

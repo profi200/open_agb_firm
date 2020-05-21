@@ -23,10 +23,24 @@
 #endif
 
 
-.macro ASM_FUNC name
-	.section .text.\name, "ax", %progbits
-	.global \name
-	.type \name %function
-	.align 2
+.macro BEGIN_ASM_FUNC name, type=arm, linkage=global, section=text
+	.section        .\section\().\name, "ax", %progbits
+.if \type == thumb
+	.align          1
+	.thumb
+.else
+	.align          2
+	.arm
+.endif
+	.\linkage       \name
+	.type           \name, %function
+	.func           \name
+	.cfi_sections   .debug_frame
+	.cfi_startproc
 \name:
+.endm
+
+.macro END_ASM_FUNC
+	.cfi_endproc
+	.endfunc
 .endm

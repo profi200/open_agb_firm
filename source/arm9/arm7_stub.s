@@ -1,17 +1,12 @@
-.arm
+#include "asm_macros.h"
+
 .cpu arm7tdmi
 .fpu softvfp
 
-.global _arm7_stub_start
-.global _arm7_stub_swi
-.global _arm7_stub_end
-
-.type _arm7_stub_start %function
 
 
-.align 2
 @ Must be located at 0x3007E00.
-_arm7_stub_start:
+BEGIN_ASM_FUNC _arm7_stub_start
 	mov r0, #0xD3
 	adr r1, _arm7_stub_start + 0x200  @ 0x3008000
 	msr CPSR_cxsf, r0
@@ -41,13 +36,17 @@ wait_vcount_160_lp:
 
 	mov  r4, r3     @ Needed for function call 0xBC below.
 	mov  r0, #0xFF
+
+.global _arm7_stub_swi
 _arm7_stub_swi:
 	swi  0x10       @ RegisterRamReset
 	@swi  0x26       @ HardReset (BIOS animation)
 	mov  r0, #0xBC
 	mov  r2, #0
 	bx   r0
-.pool
 
+.pool
 .align 2
+.global _arm7_stub_end
 _arm7_stub_end:
+END_ASM_FUNC

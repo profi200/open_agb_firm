@@ -16,29 +16,26 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "asm_macros.h"
 #include "arm.h"
-#include "asmfunc.h"
 #include "mem_map.h"
 
-.arm
 .cpu arm946e-s
 .fpu softvfp
 
-.extern deinitCpu
-.extern guruMeditation
-.extern irqIsrTable
-
-
-
-ASM_FUNC undefInstrHandler
-	msr cpsr_f, #0<<29             @ Abuse conditional flags in cpsr for temporary exception type storage
+.macro EXCEPTION_ENTRY name, type
+BEGIN_ASM_FUNC \name
+	msr cpsr_f, #\type             @ Abuse conditional flags in cpsr for temporary exception type storage
 	b exceptionHandler
-ASM_FUNC prefetchAbortHandler
-	msr cpsr_f, #1<<29
-	b exceptionHandler
-ASM_FUNC dataAbortHandler
-	msr cpsr_f, #2<<29
-ASM_FUNC exceptionHandler
+END_ASM_FUNC
+.endm
+
+
+
+EXCEPTION_ENTRY undefInstrHandler, 0<<29
+EXCEPTION_ENTRY prefetchAbortHandler, 1<<29
+EXCEPTION_ENTRY dataAbortHandler, 2<<29
+BEGIN_ASM_FUNC exceptionHandler
 	sub sp, #68
 	stmia sp, {r0-r14}^            @ Save all user/system mode regs except pc
 	mrs r2, spsr                   @ Get saved cpsr
@@ -61,9 +58,10 @@ exceptionHandler_skip_other_mode:
 	mov sp, r5
 	mov r1, r5
 	b guruMeditation               @ r0 = exception type, r1 = reg dump ptr {r0-r14, pc (unmodified), cpsr}
+END_ASM_FUNC
 
 
-ASM_FUNC irqHandler
+BEGIN_ASM_FUNC irqHandler
 	sub lr, lr, #4
 	stmfd sp!, {r0-r3, r12, lr}
 	ldr r12, =IO_MEM_ARM9_ONLY + 0x1000 @ REG_IRQ_IE
@@ -92,6 +90,4 @@ ASM_FUNC irqHandler
 	msr spsr_cxsf, r0
 irqHandler_skip_processing:
 	ldmfd sp!, {r0-r3, r12, pc}^
-
-
-.pool
+END_ASM_FUNC
