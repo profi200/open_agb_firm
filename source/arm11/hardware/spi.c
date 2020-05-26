@@ -49,19 +49,27 @@ enum
 	SPI_BUS3 = 2u
 };
 
+// Chip selects.
+enum
+{
+	SPI_CS_0 = 0u<<6,
+	SPI_CS_1 = 1u<<6,
+	SPI_CS_2 = 2u<<6
+};
+
 static const struct
 {
 	u8 busId;
 	u8 csClk;
 } spiDevTable[] =
 {
-	{SPI_BUS3, 0u<<6 | NSPI_CLK_512KHz}, // TODO: Confirm clock
-	{SPI_BUS3, 1u<<6 | NSPI_CLK_1MHz},
-	{SPI_BUS3, 2u<<6 | NSPI_CLK_4MHz},   // TODO: Confirm clock
-	{SPI_BUS1, 0u<<6 | NSPI_CLK_4MHz},
-	{SPI_BUS1, 1u<<6 | 0},               // Unused?
-	{SPI_BUS1, 2u<<6 | 0},               // Unused?
-	{SPI_BUS2, 0u<<6 | 0}                // Unused?
+	{SPI_BUS3, SPI_CS_0 | NSPI_CLK_2MHz},
+	{SPI_BUS3, SPI_CS_1 | NSPI_CLK_4MHz},
+	{SPI_BUS3, SPI_CS_2 | NSPI_CLK_4MHz},   // Normally used with the old SPI interface.
+	{SPI_BUS1, SPI_CS_0 | NSPI_CLK_16MHz},
+	{SPI_BUS1, SPI_CS_1 | NSPI_CLK_512KHz}, // Unused "CS2".
+	{SPI_BUS1, SPI_CS_2 | NSPI_CLK_512KHz}, // Unused "CS3".
+	{SPI_BUS2, SPI_CS_0 | NSPI_CLK_512KHz}  // Debugger?
 };
 
 

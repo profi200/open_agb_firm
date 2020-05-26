@@ -1,8 +1,10 @@
 #include "types.h"
+#include "arm11/hardware/lgy.h"
 #include "hardware/pxi.h"
 #include "ipc_handler.h"
 #include "arm11/hardware/hid.h"
 #include "arm11/hardware/interrupt.h"
+#include "arm11/hardware/mcu.h"
 #include "arm11/hardware/lgyfb.h"
 
 
@@ -37,6 +39,13 @@ void LGY_prepareLegacyMode(void)
 	const u32 cmdBuf = false;
 	PXI_sendCmd(IPC_CMD9_PREPARE_AGB, &cmdBuf, 1);
 
+	GbaRtc rtc;
+	MCU_getRTCTime((u8*)&rtc);
+	rtc.time = __builtin_bswap32(rtc.time)>>8;
+	rtc.date = __builtin_bswap32(rtc.date)>>8;
+	// TODO: Do we need to set day of week?
+	LGY_setGbaRtc(rtc);
+
 	LGYFB_init();
 
 	//flushInvalidateDCache();
@@ -52,6 +61,17 @@ void LGY_prepareLegacyMode(void)
 	REG_LGY_SLEEP = 1u<<15;
 	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, true, lgySleepIrqHandler);
 	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, true, lgySleepIrqHandler);
+}
+
+bool LGY_setGbaRtc(GbaRtc rtc)
+{
+	return PXI_sendCmd(IPC_CMD9_SET_GBA_RTC, (u32*)&rtc, 2);
+}
+
+bool LGY_getGbaRtc(GbaRtc *out)
+{
+	const u32 cmdBuf[2] = {(u32)out, sizeof(GbaRtc)};
+	return PXI_sendCmd(IPC_CMD9_GET_GBA_RTC, cmdBuf, sizeof(GbaRtc) / 4);
 }
 
 void LGY_switchMode(void)

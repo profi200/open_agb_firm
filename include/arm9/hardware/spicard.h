@@ -39,7 +39,7 @@
 
 // REG_NSPI_INT_MASK Bit set = disabled.
 // REG_NSPI_INT_STAT Status and aknowledge.
-#define NSPI_INT_TRANSF_END  (1u)    // Fires on (each?) auto poll try aswell
+#define NSPI_INT_TRANSF_END  (1u)    // Also fires on each auto poll try.
 #define NSPI_INT_AP_SUCCESS  (1u<<1) // Auto poll
 #define NSPI_INT_AP_TIMEOUT  (1u<<2) // Auto poll
 

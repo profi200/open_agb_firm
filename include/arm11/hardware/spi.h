@@ -39,32 +39,41 @@
 
 // REG_NSPI_INT_MASK Bit set = disabled.
 // REG_NSPI_INT_STAT Status and aknowledge.
-#define NSPI_INT_TRANSF_END  (1u)    // Fires on (each?) auto poll try aswell
+#define NSPI_INT_TRANSF_END  (1u)    // Also fires on each auto poll try.
 #define NSPI_INT_AP_SUCCESS  (1u<<1) // Auto poll
 #define NSPI_INT_AP_TIMEOUT  (1u<<2) // Auto poll
 
 
-// TODO: Confirm these clocks
+// Old interface clocks.
 enum
 {
-	NSPI_CLK_128KHz = 0u,
-	NSPI_CLK_256KHz = 1u,
-	NSPI_CLK_512KHz = 2u,
-	NSPI_CLK_1MHz   = 3u,
-	NSPI_CLK_2MHz   = 4u,
-	NSPI_CLK_4MHz   = 5u,
+	SPI_CLK_4MHz   = 0u,
+	SPI_CLK_2MHz   = 1u,
+	SPI_CLK_1MHz   = 2u,
+	SPI_CLK_512KHz = 3u,
+	SPI_CLK_8MHz   = 4u  // Only in DSi/3DS mode.
 };
 
-// TODO: Proper device table
+// New interface clocks.
+enum
+{
+	NSPI_CLK_512KHz = 0u,
+	NSPI_CLK_1MHz   = 1u,
+	NSPI_CLK_2MHz   = 2u,
+	NSPI_CLK_4MHz   = 3u,
+	NSPI_CLK_8MHz   = 4u,
+	NSPI_CLK_16MHz  = 5u
+};
+
 typedef enum
 {
 	NSPI_DEV_POWERMAN   = 0u, // Unused DS(i) mode power management
 	NSPI_DEV_NVRAM      = 1u, // WiFi SPI flash
 	NSPI_DEV_TWL_CODEC  = 2u,
 	NSPI_DEV_CTR_CODEC  = 3u,
-	NSPI_DEV_UNK5       = 4u, // Unused?
-	NSPI_DEV_UNK6       = 5u, // Unused?
-	NSPI_DEV_UNK7       = 6u  // Unused?
+	NSPI_DEV_UNUSED5    = 4u, // Unused "CS2".
+	NSPI_DEV_UNUSED6    = 5u, // Unused "CS3".
+	NSPI_DEV_UNUSED7    = 6u  // Debugger?
 } SpiDevice;
 
 

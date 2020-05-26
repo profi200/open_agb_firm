@@ -17,7 +17,7 @@
 #define LGYFB_ROT_270CW      (3u<<10)
 #define LGYFB_OUT_SWIZZLE    (1u<<12)
 #define LGYFB_DMA_E          (1u<<15)
-#define LGYFB_UNK            (1u<<16) // "IFMT" ?
+#define LGYFB_IN_FMT         (1u<<16) // Use input format but this bit does nothing?
 
 // REG_LGYFB_SIZE width and hight
 #define LGYFB_SIZE(w, h)     (((h) - 1)<<16 | ((w) - 1))

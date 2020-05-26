@@ -53,7 +53,7 @@
 // REG_I2C_CNTEX
 #define I2C_SCL_STATE     (1u)     // Read-only SCL line state?
 #define I2C_CLK_STRETCH   (1u<<1)  // Enables clock stretching
-#define I2C_UNK_CNTEX15   (1u<<15) // "LGCY" Redirect from DSi I2C regs?
+#define I2C_UNK_CNTEX15   (1u<<15) // "LGCY" Legacy related?
 
 // REG_I2C_SCL
 #define I2C_DELAYS(high, low)  ((high)<<8 | (low)) // "PRD" TODO: How long and when does it delay?

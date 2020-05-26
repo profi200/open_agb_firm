@@ -26,7 +26,7 @@ _arm7_stub_16:
 	mov r0, #1
 	str r0, [r3]  @ Disable BIOS overlay.
 	@ The original ARM7 stub waits 256 cycles here (for the BIOS overlay disable?).
-	@ The original ARM7 stub waits 1677800 cycles (100 ms) here.
+	@ The original ARM7 stub waits 1677800 cycles (100 ms) here for LCD/LgyFb sync.
 
 	lsl  r3, r0, #26   @ 0x4000000
 wait_vcount_160_lp:

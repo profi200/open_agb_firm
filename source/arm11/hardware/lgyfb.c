@@ -12,6 +12,7 @@
 #define REG_LGYFB_TOP_SIZE   *((vu32*)(0x10111004))
 #define REG_LGYFB_TOP_STAT   *((vu32*)(0x10111008))
 #define REG_LGYFB_TOP_IRQ    *((vu32*)(0x1011100C))
+#define REG_LGYFB_TOP_FLUSH  *((vu32*)(0x10111010)) // Write 0 to flush LgyFb FIFO.
 #define REG_LGYFB_TOP_ALPHA  *((vu32*)(0x10111020))
 #define REG_LGYFB_TOP_UNK_F0 *((vu32*)(0x101110F0))
 // TODO: Add the missing regs.
@@ -21,6 +22,7 @@
 #define REG_LGYFB_BOT_SIZE   *((vu32*)(0x10110004))
 #define REG_LGYFB_BOT_STAT   *((vu32*)(0x10110008))
 #define REG_LGYFB_BOT_IRQ    *((vu32*)(0x1011000C))
+#define REG_LGYFB_BOT_FLUSH  *((vu32*)(0x10110010)) // Write 0 to flush LgyFb FIFO.
 #define REG_LGYFB_BOT_ALPHA  *((vu32*)(0x10110020)) // 8 bit alpha for all pixels.
 #define REG_LGYFB_BOT_UNK_F0 *((vu32*)(0x101100F0))
 // TODO: Add the missing regs.

@@ -1,5 +1,6 @@
 #include <string.h>
 #include "types.h"
+#include "arm9/hardware/lgy.h"
 #include "mem_map.h"
 #include "mmio.h"
 #include "arm9/hardware/ndma.h"
@@ -22,8 +23,8 @@
 #define REGs_LGY_GBA_SAVE_TIMING   ((vu32*)(LGY_REGS_BASE + 0x120))
 
 
-#define MAX_ROM_SIZE    (1024u * 1024u * 32u)
-#define MAX_SAVE_SIZE   (1024u * 128u)
+#define MAX_ROM_SIZE    (1024u * 1024 * 32)
+#define MAX_SAVE_SIZE   (1024u * 128)
 #define ARM7_STUB_LOC   (0x3007E00u)
 #define ARM7_STUB_LOC9  (0x80BFE00u)
 #define ROM_LOC         (0x20000000u)
@@ -48,7 +49,7 @@ void LGY_prepareLegacyMode(bool gbaBios)
 	// Patch swi 0x10 (RegisterRamReset) to swi 0x26 (HardReset).
 	if(gbaBios) *((u8*)(ARM7_STUB_LOC9 + ((u32)_arm7_stub_swi - (u32)_arm7_stub_start))) = 0x26;
 
-	REG_LGY_GBA_SAVE_TYPE = 0xE;
+	REG_LGY_GBA_SAVE_TYPE = SAVE_TYPE_SRAM_256k;
 	static const u32 saveStuff[4] = {0x27C886, 0x8CE35, 0x184, 0x31170};
 	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveStuff, 16);
 
@@ -88,12 +89,46 @@ void LGY_prepareLegacyMode(bool gbaBios)
 		NDMA_fill((u32*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
 }
 
+bool LGY_setGbaRtc(GbaRtc rtc)
+{
+	// Set base time and date.
+	REG_LGY_GBA_RTC_BCD_TIME = rtc.time;
+	REG_LGY_GBA_RTC_BCD_DATE = rtc.date;
+
+	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
+	REG_LGY_GBA_RTC_CNT = 0;
+	REG_LGY_GBA_RTC_HEX_TIME = 1<<15; // Time offset 0 and 24h format.
+	REG_LGY_GBA_RTC_HEX_DATE = 0;     // Date offset 0.
+	REG_LGY_GBA_RTC_CNT = LGY_RTC_CNT_WR;
+	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
+
+	return (REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_WR_ERR ? false : true);
+}
+
+bool LGY_getGbaRtc(GbaRtc *out)
+{
+	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
+	REG_LGY_GBA_RTC_CNT = 0;
+	REG_LGY_GBA_RTC_CNT = LGY_RTC_CNT_RD;
+	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
+
+	if((REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_WR_ERR) == 0u)
+	{
+		out->time = REG_LGY_GBA_RTC_BCD_TIME;
+		out->date = REG_LGY_GBA_RTC_BCD_DATE;
+
+		return true;
+	}
+
+	return false;
+}
+
 void LGY_backupGbaSave(void)
 {
 	if(g_saveSize)
 	{
 		// Enable savegame mem region.
-		REG_LGY_GBA_SAVE_MAP = 1;
+		REG_LGY_GBA_SAVE_MAP = LGY_SAVE_MAP_9;
 
 		u32 newHash[8];
 		sha((u32*)SAVE_LOC, g_saveSize, newHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
@@ -109,7 +144,7 @@ void LGY_backupGbaSave(void)
 		}
 
 		// Disable savegame mem region.
-		REG_LGY_GBA_SAVE_MAP = 0;
+		REG_LGY_GBA_SAVE_MAP = LGY_SAVE_MAP_7;
 	}
 
 	f_mount(NULL, "sdmc:", 0);
