@@ -42,9 +42,6 @@ noreturn void __fb_assert(const char *const str, u32 line)
 	PXI_sendCmd(IPC_CMD11_PANIC, NULL, 0);
 #elif ARM11
 	ee_printf("Assertion failed: %s:%" PRIu32, str, line);
-	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
-	               0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
-	GFX_swapFramebufs();
 	//PXI_sendCmd(IPC_CMD9_PANIC, NULL, 0);
 #endif
 

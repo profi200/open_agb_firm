@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "error_codes.h"
 
 
 // All values in BCD.
@@ -32,9 +33,9 @@ typedef struct
 
 
 
-void LGY_prepareLegacyMode(void);
-bool LGY_setGbaRtc(GbaRtc rtc);
-bool LGY_getGbaRtc(GbaRtc *out);
+Result LGY_prepareLegacyMode(bool gbaBios);
+Result LGY_setGbaRtc(GbaRtc rtc);
+Result LGY_getGbaRtc(GbaRtc *out);
 void LGY_switchMode(void);
 void LGY_handleEvents(void);
 void LGY_deinit(void);

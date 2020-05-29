@@ -222,10 +222,10 @@ alignas(16) static const u8 secondList[448] =
 		list = (u32*)secondList;
 	}
 	GX_processCommandList(listSize, list);
-	GFX_waitForEvent(GFX_EVENT_P3D, false);
+	GFX_waitForP3D();
 	GX_displayTransfer((u32*)(0x18180000 + (16 * 240 * 2)), 368u<<16 | 240u,
 	                   GFX_getFramebuffer(SCREEN_TOP) + (16 * 240 * 2), 368u<<16 | 240u, 3u<<12 | 3u<<8);
-	GFX_waitForEvent(GFX_EVENT_PPF, false);
+	GFX_waitForPPF();
 }
 
 void LGYFB_processFrame(void)

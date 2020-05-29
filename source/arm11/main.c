@@ -28,46 +28,34 @@
 
 
 
-void clearScreens(void)
-{
-	GX_memoryFill((u32*)RENDERBUF_TOP, 1u<<9, SCREEN_SIZE_TOP, 0, (u32*)RENDERBUF_BOT, 1u<<9, SCREEN_SIZE_BOT, 0);
-	GFX_waitForEvent(GFX_EVENT_PSC0, true);
-}
-
-void updateScreens(void)
-{
-	GX_textureCopy(RENDERBUF_TOP, 0, GFX_getFramebuffer(SCREEN_TOP),
-				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
-	GFX_waitForEvent(GFX_EVENT_PPF, true); // Texture copy
-	GFX_swapFramebufs();
-	GFX_waitForEvent(GFX_EVENT_PDC0, true); // VBlank
-}
-
 int main(void)
 {
 	GFX_init(GFX_RGB5A1, GFX_RGB565);
-	GFX_setBrightness(0x30, 0x30);
-	consoleInit(SCREEN_BOT, NULL, false);
+	GFX_setBrightness(DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS);
+	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
 
-	ee_puts("Prepare legacy mode...");
-	updateScreens();
-	LGY_prepareLegacyMode();
-
-	clearScreens();
-	updateScreens();
-	updateScreens(); // Clear both framebuffers.
-	LGY_switchMode();
-
-	do
+	ee_puts("Reading ROM and save...");
+	Result res;
+	if((res = LGY_prepareLegacyMode(false)) == RES_OK)
 	{
-		hidScanInput();
-		if(hidGetExtraKeys(KEY_POWER) & KEY_POWER) break;
+		GFX_setForceBlack(false, true);
+		GFX_setBrightness(DEFAULT_BRIGHTNESS, 0);
+		// Sync LgyFb start with LCD VBlank.
+		GFX_waitForVBlank0();
+		LGY_switchMode();
 
-		LGY_handleEvents();
+		do
+		{
+			hidScanInput();
+			if(hidGetExtraKeys(KEY_POWER) & KEY_POWER) break;
 
-		__wfi();
-	} while(1);
+			LGY_handleEvents();
+
+			__wfi();
+		} while(1);
+	}
+	else printErrorWaitInput(res, 0);
 
 	LGY_deinit();
 	CODEC_deinit();

@@ -34,10 +34,11 @@ static void lgySleepIrqHandler(u32 intSource)
 	}
 }
 
-void LGY_prepareLegacyMode(void)
+Result LGY_prepareLegacyMode(bool gbaBios)
 {
-	const u32 cmdBuf = false;
-	PXI_sendCmd(IPC_CMD9_PREPARE_AGB, &cmdBuf, 1);
+	const u32 cmdBuf = gbaBios;
+	Result res = PXI_sendCmd(IPC_CMD9_PREPARE_AGB, &cmdBuf, 1);
+	if(res != RES_OK) return res;
 
 	GbaRtc rtc;
 	MCU_getRTCTime((u8*)&rtc);
@@ -61,14 +62,16 @@ void LGY_prepareLegacyMode(void)
 	REG_LGY_SLEEP = 1u<<15;
 	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, true, lgySleepIrqHandler);
 	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, true, lgySleepIrqHandler);
+
+	return RES_OK;
 }
 
-bool LGY_setGbaRtc(GbaRtc rtc)
+Result LGY_setGbaRtc(GbaRtc rtc)
 {
 	return PXI_sendCmd(IPC_CMD9_SET_GBA_RTC, (u32*)&rtc, 2);
 }
 
-bool LGY_getGbaRtc(GbaRtc *out)
+Result LGY_getGbaRtc(GbaRtc *out)
 {
 	const u32 cmdBuf[2] = {(u32)out, sizeof(GbaRtc)};
 	return PXI_sendCmd(IPC_CMD9_GET_GBA_RTC, cmdBuf, sizeof(GbaRtc) / 4);
@@ -97,6 +100,11 @@ void LGY_handleEvents(void)
 	}
 	else padSel = 0;
 	REG_LGY_PAD_SEL = padSel;
+	/*if(hidKeysDown() & KEY_X)
+	{
+		GbaRtc rtc; LGY_getGbaRtc(&rtc);
+		ee_printf("RTC: %02X.%02X.%04X %02X:%02X:%02X\n", rtc.d, rtc.mon, rtc.y + 0x2000u, rtc.h, rtc.min, rtc.s);
+	}*/
 
 	LGYFB_processFrame();
 

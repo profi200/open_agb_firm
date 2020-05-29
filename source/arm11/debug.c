@@ -36,11 +36,8 @@ noreturn void panic()
 {
 	enterCriticalSection();
 
-	consoleInit(SCREEN_BOT, NULL, false);
+	consoleInit(SCREEN_BOT, NULL);
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n");
-	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
-	               0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
-	GFX_swapFramebufs();
 
 	//PXI_sendPanicCmd(IPC_CMD9_PANIC);
 
@@ -58,12 +55,9 @@ noreturn void panicMsg(const char *msg)
 {
 	enterCriticalSection();
 
-	consoleInit(SCREEN_BOT, NULL, false);
+	consoleInit(SCREEN_BOT, NULL);
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n\n");
 	ee_printf("\nERROR MESSAGE:\n%s\n", msg);
-	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
-				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
-	GFX_swapFramebufs();
 
 	//PXI_sendPanicCmd(IPC_CMD9_PANIC);
 
@@ -92,7 +86,7 @@ noreturn void guruMeditation(u8 type, const u32 *excStack)
 	if(prevHash != debugHash)
 		codeChanged = true;*/
 
-	consoleInit(SCREEN_BOT, NULL, false);
+	consoleInit(SCREEN_BOT, NULL);
 
 	if(excStack[16] & 0x20) instSize = 2;                 // Processor was in Thumb mode?
 	if(type == 2) realPc = excStack[15] - (instSize * 2); // Data abort
@@ -130,9 +124,6 @@ noreturn void guruMeditation(u8 type, const u32 *excStack)
 	}
 
 	//if(codeChanged) ee_printf("Attention: RO section data changed!!");
-	GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)GFX_getFramebuffer(SCREEN_TOP),
-				   0, SCREEN_SIZE_TOP + SCREEN_SIZE_BOT);
-	GFX_swapFramebufs();
 
 	//PXI_sendPanicCmd(IPC_CMD9_EXCEPTION);
 

@@ -1,6 +1,7 @@
 #include <string.h>
 #include "types.h"
 #include "arm9/hardware/lgy.h"
+#include "error_codes.h"
 #include "mem_map.h"
 #include "mmio.h"
 #include "arm9/hardware/ndma.h"
@@ -37,7 +38,7 @@ static u32 g_saveHash[8] = {0};
 
 
 
-void LGY_prepareLegacyMode(bool gbaBios)
+Result LGY_prepareLegacyMode(bool gbaBios)
 {
 	REG_LGY_MODE = 2; // GBA mode
 
@@ -53,43 +54,77 @@ void LGY_prepareLegacyMode(bool gbaBios)
 	static const u32 saveStuff[4] = {0x27C886, 0x8CE35, 0x184, 0x31170};
 	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveStuff, 16);
 
-	u32 romSize = 0;
-	if(f_mount(&g_sd, "sdmc:", 1) == FR_OK)
+	Result res = RES_OK;
+	do
 	{
-		FIL f;
-		if(f_open(&f, "sdmc:/rom.gba", FA_OPEN_EXISTING | FA_READ) == FR_OK)
+		u32 romSize = 0;
+		if(f_mount(&g_sd, "sdmc:", 1) == FR_OK)
 		{
-			if((romSize = f_size(&f)) > MAX_ROM_SIZE) panic();
+			FIL f;
+			if(f_open(&f, "sdmc:/rom.gba", FA_OPEN_EXISTING | FA_READ) == FR_OK)
+			{
+				if((romSize = f_size(&f)) > MAX_ROM_SIZE)
+				{
+					f_close(&f);
+					res = RES_ROM_TOO_BIG;
+					break;
+				}
 
-			u8 *ptr = (u8*)ROM_LOC;
-			UINT read;
-			FRESULT res;
-			while((res = f_read(&f, ptr, 0x100000u, &read)) == FR_OK && read == 0x100000u)
-				ptr += 0x100000u;
+				u8 *ptr = (u8*)ROM_LOC;
+				UINT read;
+				FRESULT fres;
+				while((fres = f_read(&f, ptr, 0x100000u, &read)) == FR_OK && read == 0x100000u)
+					ptr += 0x100000u;
 
-			if(res != FR_OK) panic();
+				f_close(&f);
 
-			f_close(&f);
+				if(fres != FR_OK)
+				{
+					res = RES_FILE_READ_ERR;
+					break;
+				}
+			}
+			else
+			{
+				res = RES_FILE_OPEN_ERR;
+				break;
+			}
+
+			g_saveSize = 1024 * 32;
+			if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_EXISTING | FA_READ) == FR_OK)
+			{
+				UINT read;
+				FRESULT fres = f_read(&f, (void*)SAVE_LOC, MAX_SAVE_SIZE, &read);
+
+				f_close(&f);
+
+				if(fres != FR_OK)
+				{
+					res = RES_FILE_READ_ERR;
+					break;
+				}
+
+				sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+			}
+			else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
+		}
+		else
+		{
+			res = RES_MOUNT_ERR;
+			break;
 		}
 
-		g_saveSize = 1024 * 32;
-		if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_EXISTING | FA_READ) == FR_OK)
-		{
-			UINT read;
-			if(f_read(&f, (void*)SAVE_LOC, MAX_SAVE_SIZE, &read) != FR_OK) panic();
-			f_close(&f);
+		// Pad ROM area with "open bus" value.
+		if(romSize < MAX_ROM_SIZE)
+			NDMA_fill((u32*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
+	} while(0);
 
-			sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
-		}
-		else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
-	}
+	// Should we unmount on non-mount error here?
 
-	// Pad ROM area with "open bus" value.
-	if(romSize < MAX_ROM_SIZE)
-		NDMA_fill((u32*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
+	return res;
 }
 
-bool LGY_setGbaRtc(GbaRtc rtc)
+Result LGY_setGbaRtc(GbaRtc rtc)
 {
 	// Set base time and date.
 	REG_LGY_GBA_RTC_BCD_TIME = rtc.time;
@@ -102,10 +137,11 @@ bool LGY_setGbaRtc(GbaRtc rtc)
 	REG_LGY_GBA_RTC_CNT = LGY_RTC_CNT_WR;
 	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
 
-	return (REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_WR_ERR ? false : true);
+	if(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_WR_ERR) return RES_GBA_RTC_ERR;
+	else                                         return RES_OK;
 }
 
-bool LGY_getGbaRtc(GbaRtc *out)
+Result LGY_getGbaRtc(GbaRtc *out)
 {
 	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
 	REG_LGY_GBA_RTC_CNT = 0;
@@ -117,15 +153,17 @@ bool LGY_getGbaRtc(GbaRtc *out)
 		out->time = REG_LGY_GBA_RTC_BCD_TIME;
 		out->date = REG_LGY_GBA_RTC_BCD_DATE;
 
-		return true;
+		return RES_OK;
 	}
 
-	return false;
+	return RES_GBA_RTC_ERR;
 }
 
-void LGY_backupGbaSave(void)
+Result LGY_backupGbaSave(void)
 {
-	if(g_saveSize)
+	Result res = RES_OK;
+
+	if(g_saveSize != 0)
 	{
 		// Enable savegame mem region.
 		REG_LGY_GBA_SAVE_MAP = LGY_SAVE_MAP_9;
@@ -138,9 +176,12 @@ void LGY_backupGbaSave(void)
 			if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_ALWAYS | FA_WRITE) == FR_OK)
 			{
 				UINT written;
-				if(f_write(&f, (void*)SAVE_LOC, g_saveSize, &written) != FR_OK) panic();
+				if(f_write(&f, (void*)SAVE_LOC, g_saveSize, &written) != FR_OK)
+					res = RES_FILE_WRITE_ERR;
+
 				f_close(&f);
 			}
+			else res = RES_FILE_OPEN_ERR;
 		}
 
 		// Disable savegame mem region.
@@ -148,4 +189,6 @@ void LGY_backupGbaSave(void)
 	}
 
 	f_mount(NULL, "sdmc:", 0);
+
+	return res;
 }

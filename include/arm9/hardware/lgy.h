@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "error_codes.h"
 
 
 
@@ -92,7 +93,7 @@ typedef struct
 
 
 
-void LGY_prepareLegacyMode(bool gbaBios);
-bool LGY_setGbaRtc(GbaRtc rtc);
-bool LGY_getGbaRtc(GbaRtc *out);
-void LGY_backupGbaSave(void);
+Result LGY_prepareLegacyMode(bool gbaBios);
+Result LGY_setGbaRtc(GbaRtc rtc);
+Result LGY_getGbaRtc(GbaRtc *out);
+Result LGY_backupGbaSave(void);

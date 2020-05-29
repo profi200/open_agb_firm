@@ -39,9 +39,6 @@
 #define FRAMEBUF_TOP_A_2    (FRAMEBUF_BOT_A_1 + SCREEN_SIZE_BOT + SCREEN_SIZE_TOP) // Skip B1
 #define FRAMEBUF_BOT_A_2    (FRAMEBUF_TOP_A_2 + SCREEN_SIZE_TOP)
 
-#define RENDERBUF_TOP       ((void*)VRAM_BASE + 0x200000 - SCREEN_SIZE_TOP - SCREEN_SIZE_BOT)
-#define RENDERBUF_BOT       ((void*)VRAM_BASE + 0x200000 - SCREEN_SIZE_BOT)
-
 #define DEFAULT_BRIGHTNESS  (0x30)
 
 /// Converts packed RGB8 to packed RGB565.
@@ -87,11 +84,21 @@ void GFX_setBrightness(u8 top, u8 bot);
 
 void GFX_setForceBlack(bool top, bool bot);
 
+void GFX_setDoubleBuffering(u8 screen, bool dBuf);
+
 void* GFX_getFramebuffer(u8 screen);
 
 void GFX_swapFramebufs(void);
 
 void GFX_waitForEvent(GfxEvent event, bool discard);
+
+// Helpers
+#define GFX_waitForPSC0()     GFX_waitForEvent(GFX_EVENT_PSC0, false)
+#define GFX_waitForPSC1()     GFX_waitForEvent(GFX_EVENT_PSC1, false)
+#define GFX_waitForVBlank0()  GFX_waitForEvent(GFX_EVENT_PDC0, true)
+//#define GFX_waitForVBlank1()  GFX_waitForEvent(GFX_EVENT_PDC1, true) // Disabled
+#define GFX_waitForPPF()      GFX_waitForEvent(GFX_EVENT_PPF, false)
+#define GFX_waitForP3D()      GFX_waitForEvent(GFX_EVENT_P3D, false)
 
 void GX_memoryFill(u32 *buf0a, u32 buf0v, u32 buf0Sz, u32 val0, u32 *buf1a, u32 buf1v, u32 buf1Sz, u32 val1);
 

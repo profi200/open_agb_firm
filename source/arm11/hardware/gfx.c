@@ -48,6 +48,7 @@ static struct
 	bool events[6];
 	u32 swap;              // Currently active framebuffer.
 	void *framebufs[2][4]; // For each screen A1, A2, B1, B2
+	u8 doubleBuf[2];       // Top, bottom, 1 = enable.
 	u16 strides[2];        // Top, bottom
 	u32 formats[2];        // Top, bottom
 } g_gfxState = {0};
@@ -65,6 +66,8 @@ static void gfxIrqHandler(u32 intSource);
 void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 {
 	setupFramebufs(fmtTop, fmtBot);
+	g_gfxState.doubleBuf[0] = 1;
+	g_gfxState.doubleBuf[1] = 1;
 
 	*((vu32*)0x10140140) = 0; // REG_CFG11_GPUPROT
 
@@ -134,8 +137,8 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	g_gfxState.lcdPower = 0x15; // All on.
 
 	// Make sure the fills finished.
-	GFX_waitForEvent(GFX_EVENT_PSC0, false);
-	GFX_waitForEvent(GFX_EVENT_PSC1, false);
+	GFX_waitForPSC0();
+	GFX_waitForPSC1();
 	REG_LCD_ABL0_FILL = 0;
 	REG_LCD_ABL1_FILL = 0;
 
@@ -411,9 +414,21 @@ void GFX_setForceBlack(bool top, bool bot)
 	REG_LCD_ABL1_FILL = bot<<24; // Force blackscreen
 }
 
+void GFX_setDoubleBuffering(u8 screen, bool dBuf)
+{
+	g_gfxState.doubleBuf[screen] = dBuf;
+
+	if(!dBuf)
+	{
+		if(screen == SCREEN_TOP) REG_LCD_PDC0_SWAP = 0;
+		else                     REG_LCD_PDC1_SWAP = 0;
+	}
+}
+
 void* GFX_getFramebuffer(u8 screen)
 {
-	return g_gfxState.framebufs[screen][g_gfxState.swap ^ 1u];
+	const u32 idx = (g_gfxState.swap ^ 1u) & g_gfxState.doubleBuf[screen];
+	return g_gfxState.framebufs[screen][idx];
 }
 
 void GFX_swapFramebufs(void)
@@ -423,8 +438,8 @@ void GFX_swapFramebufs(void)
 	g_gfxState.swap = swap;
 
 	swap |= PDC_SWAP_I_ALL; // Acknowledge IRQs.
-	REG_LCD_PDC0_SWAP = swap;
-	REG_LCD_PDC1_SWAP = swap;
+	if(g_gfxState.doubleBuf[0]) REG_LCD_PDC0_SWAP = swap;
+	if(g_gfxState.doubleBuf[1]) REG_LCD_PDC1_SWAP = swap;
 }
 
 void GFX_waitForEvent(GfxEvent event, bool discard)

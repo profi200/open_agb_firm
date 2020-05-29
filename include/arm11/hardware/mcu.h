@@ -106,11 +106,11 @@ static inline bool MCU_setPowerLedState(PwLedState state)
 	return MCU_writeReg(MCU_REG_POWER_LED, state);
 }
 
-static inline bool MCU_getRTCTime(u8 *rtc)
+static inline bool MCU_getRTCTime(u8 rtc[7])
 {
 	if(!rtc) return true;
 
-	return MCU_readRegBuf(MCU_REG_RTC_TIME, rtc, 8);
+	return MCU_readRegBuf(MCU_REG_RTC_TIME, rtc, 7);
 }
 
 static inline u8 MCU_getSystemModel(void)

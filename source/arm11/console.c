@@ -513,7 +513,7 @@ ssize_t con_write(UNUSED struct _reent *r,UNUSED void *fd,const char *ptr, size_
 }
 
 //---------------------------------------------------------------------------------
-PrintConsole* consoleInit(int screen, PrintConsole* console, bool clear) {
+PrintConsole* consoleInit(u8 screen, PrintConsole* console) {
 //---------------------------------------------------------------------------------
 
 	if(console) {
@@ -526,15 +526,18 @@ PrintConsole* consoleInit(int screen, PrintConsole* console, bool clear) {
 
 	console->consoleInitialised = 1;
 
-	if(screen==0) {
-		console->frameBuffer = (u16*)RENDERBUF_TOP;
+	//gfxSetScreenFormat(screen,GSP_RGB565_OES);
+	GFX_setDoubleBuffering(screen, false);
+
+	console->frameBuffer = (u16*)GFX_getFramebuffer(screen);
+
+	if(screen==SCREEN_TOP) {
 		console->consoleWidth = 66;
 		console->windowWidth = 66;
 	}
-	else console->frameBuffer = (u16*)RENDERBUF_BOT;
 
 
-	if(clear) consoleCls('2');
+	consoleCls('2');
 
 	return currentConsole;
 
