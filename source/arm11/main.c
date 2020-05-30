@@ -37,7 +37,7 @@ int main(void)
 
 	ee_puts("Reading ROM and save...");
 	Result res;
-	if((res = LGY_prepareLegacyMode(false)) == RES_OK)
+	if((res = LGY_prepareGbaMode(false, SAVE_TYPE_SRAM_256k)) == RES_OK)
 	{
 		GFX_setForceBlack(false, true);
 		GFX_setBrightness(DEFAULT_BRIGHTNESS, 0);

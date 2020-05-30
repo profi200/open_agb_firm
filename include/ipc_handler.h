@@ -33,7 +33,7 @@
 
 typedef enum
 {
-	IPC_CMD9_PREPARE_AGB       = MAKE_CMD(0, 0, 0, 1),
+	IPC_CMD9_PREPARE_GBA       = MAKE_CMD(0, 0, 0, 2),
 	IPC_CMD9_SET_GBA_RTC       = MAKE_CMD(1, 0, 0, 2),
 	IPC_CMD9_GET_GBA_RTC       = MAKE_CMD(2, 0, 1, 0),
 	IPC_CMD9_PREPARE_POWER     = MAKE_CMD(3, 0, 0, 0)

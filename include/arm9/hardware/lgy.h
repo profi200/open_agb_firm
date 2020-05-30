@@ -93,7 +93,7 @@ typedef struct
 
 
 
-Result LGY_prepareLegacyMode(bool gbaBios);
+Result LGY_prepareGbaMode(bool gbaBios, u16 saveType);
 Result LGY_setGbaRtc(GbaRtc rtc);
 Result LGY_getGbaRtc(GbaRtc *out);
 Result LGY_backupGbaSave(void);

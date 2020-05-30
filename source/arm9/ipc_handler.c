@@ -35,8 +35,8 @@ u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, const u32 *const buf)
 	u32 result = 0;
 	switch(cmdId)
 	{
-		case IPC_CMD_ID_MASK(IPC_CMD9_PREPARE_AGB):
-			result = LGY_prepareLegacyMode(*buf);
+		case IPC_CMD_ID_MASK(IPC_CMD9_PREPARE_GBA):
+			result = LGY_prepareGbaMode(buf[0], buf[1]);
 			break;
 		case IPC_CMD_ID_MASK(IPC_CMD9_SET_GBA_RTC):
 			result = LGY_setGbaRtc(*((GbaRtc*)buf));

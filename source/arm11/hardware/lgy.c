@@ -34,10 +34,10 @@ static void lgySleepIrqHandler(u32 intSource)
 	}
 }
 
-Result LGY_prepareLegacyMode(bool gbaBios)
+Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
 {
-	const u32 cmdBuf = gbaBios;
-	Result res = PXI_sendCmd(IPC_CMD9_PREPARE_AGB, &cmdBuf, 1);
+	const u32 cmdBuf[2] = {gbaBios, saveType};
+	Result res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 2);
 	if(res != RES_OK) return res;
 
 	GbaRtc rtc;

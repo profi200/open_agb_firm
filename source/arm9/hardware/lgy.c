@@ -38,21 +38,52 @@ static u32 g_saveHash[8] = {0};
 
 
 
-Result LGY_prepareLegacyMode(bool gbaBios)
+#define STRINGIFY(s) #s
+#define STR(s) STRINGIFY(s)
+NAKED static void _overlayStub(void)
 {
-	REG_LGY_MODE = 2; // GBA mode
+	__asm__("mov r0, #0x4000000\n\t"
+	        "mov r1, #1\n\t"
+	        "strb r1, [r0, #0x300]\n\t"   // "POSTFLG"
+	        "ldr pc, _overlayStubJmp\n\t"
+	        "_overlayStubJmp: .4byte " STR(ARM7_STUB_LOC) "\n\t" : : : );
+}
 
-	// BIOS overlay
-	REGs_LGY_A7_VECTOR[0] = 0xE51FF004; //ldr pc, [pc, #-4]
-	REGs_LGY_A7_VECTOR[1] = ARM7_STUB_LOC;
+static void setupBiosOverlay(bool gbaBios)
+{
+	iomemcpy(REGs_LGY_A7_VECTOR, (u32*)_overlayStub, 20);
+
 	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_end - (u32)_arm7_stub_start);
-	//iomemcpy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_end - (u32)_arm7_stub_start);
 	// Patch swi 0x10 (RegisterRamReset) to swi 0x26 (HardReset).
 	if(gbaBios) *((u8*)(ARM7_STUB_LOC9 + ((u32)_arm7_stub_swi - (u32)_arm7_stub_start))) = 0x26;
+}
 
-	REG_LGY_GBA_SAVE_TYPE = SAVE_TYPE_SRAM_256k;
-	static const u32 saveStuff[4] = {0x27C886, 0x8CE35, 0x184, 0x31170};
-	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveStuff, 16);
+static void setupSaveType(u16 saveType)
+{
+	REG_LGY_GBA_SAVE_TYPE = saveType;
+	static const u8 saveSizeLut[16] = {1, 1, 8, 8, 64, 64, 64, 64, 64, 64, 128, 128, 128, 128, 32, 0};
+	g_saveSize = 1024u * saveSizeLut[saveType & 0xFu];
+
+	// Flash chip erase, flash sector erase, flash program, EEPROM write.
+	static const u32 saveTm512k4k[4] = {0x27C886, 0x8CE35, 0x184, 0x31170}; // Timing 512k/4k.
+	static const u32 saveTm1m64k[4] = {0x17D43E, 0x26206, 0x86, 0x2DD13};   // Timing 1m/64k.
+	const u32 *saveTm;
+	if(saveType < SAVE_TYPE_EEPROM_64k ||
+	   (saveType > SAVE_TYPE_EEPROM_64k_2 && saveType < SAVE_TYPE_FLASH_1m_MRX_RTC) ||
+	   saveType == SAVE_TYPE_SRAM_256k)
+	{
+		saveTm = saveTm512k4k;
+	}
+	else saveTm = saveTm1m64k; // Don't care about save type none.
+	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveTm, 16);
+}
+
+Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
+{
+	REG_LGY_MODE = LGY_MODE_AGB;
+
+	setupBiosOverlay(gbaBios);
+	setupSaveType(saveType);
 
 	Result res = RES_OK;
 	do
@@ -90,23 +121,25 @@ Result LGY_prepareLegacyMode(bool gbaBios)
 				break;
 			}
 
-			g_saveSize = 1024 * 32;
-			if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_EXISTING | FA_READ) == FR_OK)
+			if(g_saveSize != 0)
 			{
-				UINT read;
-				FRESULT fres = f_read(&f, (void*)SAVE_LOC, MAX_SAVE_SIZE, &read);
-
-				f_close(&f);
-
-				if(fres != FR_OK)
+				if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_EXISTING | FA_READ) == FR_OK)
 				{
-					res = RES_FILE_READ_ERR;
-					break;
-				}
+					UINT read;
+					FRESULT fres = f_read(&f, (void*)SAVE_LOC, MAX_SAVE_SIZE, &read);
 
-				sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+					f_close(&f);
+
+					if(fres != FR_OK)
+					{
+						res = RES_FILE_READ_ERR;
+						break;
+					}
+
+					sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+				}
+				else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
 			}
-			else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
 		}
 		else
 		{
