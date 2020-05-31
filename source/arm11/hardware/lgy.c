@@ -1,5 +1,5 @@
 #include "types.h"
-#include "arm11/hardware/lgy.h"
+#include "hardware/lgy.h"
 #include "hardware/pxi.h"
 #include "ipc_handler.h"
 #include "arm11/hardware/hid.h"
@@ -30,7 +30,7 @@ static void lgySleepIrqHandler(u32 intSource)
 	{
 		// TODO: Synchronize with LCD VBlank.
 		REG_HID_PADCNT = 0;
-		REG_LGY_SLEEP |= 1u; // Aknowledge and wakeup.
+		REG_LGY_SLEEP |= 1u; // Acknowledge and wakeup.
 	}
 }
 
@@ -66,12 +66,12 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
 	return RES_OK;
 }
 
-Result LGY_setGbaRtc(GbaRtc rtc)
+Result LGY_setGbaRtc(const GbaRtc rtc)
 {
 	return PXI_sendCmd(IPC_CMD9_SET_GBA_RTC, (u32*)&rtc, 2);
 }
 
-Result LGY_getGbaRtc(GbaRtc *out)
+Result LGY_getGbaRtc(GbaRtc *const out)
 {
 	const u32 cmdBuf[2] = {(u32)out, sizeof(GbaRtc)};
 	return PXI_sendCmd(IPC_CMD9_GET_GBA_RTC, cmdBuf, sizeof(GbaRtc) / 4);
@@ -88,23 +88,37 @@ void LGY_switchMode(void)
 	REG_LGY_MODE = 0x8000u;
 }
 
+#ifndef NDEBUG
+#include "arm11/fmt.h"
+void debugTests(void)
+{
+	const u32 kDown = hidKeysDown();
+
+	// Print GBA RTC date/time.
+	if(kDown & KEY_X)
+	{
+		GbaRtc rtc; LGY_getGbaRtc(&rtc);
+		ee_printf("RTC: %02X.%02X.%04X %02X:%02X:%02X\n", rtc.d, rtc.mon, rtc.y + 0x2000u, rtc.h, rtc.min, rtc.s);
+	}
+}
+#endif
+
 void LGY_handleEvents(void)
 {
 	// Override D-Pad if Circle-Pad is used.
 	const u32 kHeld = hidKeysHeld();
 	u16 padSel;
-	if(kHeld & KEY_CPAD)
+	if(kHeld & KEY_CPAD_MASK)
 	{
-		REG_LGY_PAD_VAL = (kHeld>>24) ^ KEY_DPAD;
-		padSel = KEY_DPAD;
+		REG_LGY_PAD_VAL = (kHeld>>24) ^ KEY_DPAD_MASK;
+		padSel = KEY_DPAD_MASK;
 	}
 	else padSel = 0;
 	REG_LGY_PAD_SEL = padSel;
-	/*if(hidKeysDown() & KEY_X)
-	{
-		GbaRtc rtc; LGY_getGbaRtc(&rtc);
-		ee_printf("RTC: %02X.%02X.%04X %02X:%02X:%02X\n", rtc.d, rtc.mon, rtc.y + 0x2000u, rtc.h, rtc.min, rtc.s);
-	}*/
+
+#ifndef NDEBUG
+	debugTests();
+#endif
 
 	LGYFB_processFrame();
 
@@ -117,7 +131,7 @@ void LGY_deinit(void)
 	//REG_LGY_PAD_VAL = 0x1FFF; // Force all buttons not pressed.
 	//REG_LGY_PAD_SEL = 0x1FFF;
 
-	// TODO: Tell ARM9 to backup the savegame.
+	// TODO: Tell ARM9 to backup the savegame instead of handling it on poweroff.
 	LGYFB_deinit();
 
 	IRQ_unregisterIsr(IRQ_LGY_SLEEP);

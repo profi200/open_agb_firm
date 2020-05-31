@@ -19,7 +19,7 @@
 #include "types.h"
 #include "arm11/hardware/hid.h"
 #include "arm11/hardware/codec.h"
-#include "arm11/hardware/lgy.h"
+#include "hardware/lgy.h"
 #include "arm11/console.h"
 #include "arm11/fmt.h"
 #include "arm11/power.h"
@@ -39,8 +39,10 @@ int main(void)
 	Result res;
 	if((res = LGY_prepareGbaMode(false, SAVE_TYPE_SRAM_256k)) == RES_OK)
 	{
+#ifdef NDEBUG
 		GFX_setForceBlack(false, true);
 		GFX_setBrightness(DEFAULT_BRIGHTNESS, 0);
+#endif
 		// Sync LgyFb start with LCD VBlank.
 		GFX_waitForVBlank0();
 		LGY_switchMode();

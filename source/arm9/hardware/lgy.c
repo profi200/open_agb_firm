@@ -1,6 +1,6 @@
 #include <string.h>
 #include "types.h"
-#include "arm9/hardware/lgy.h"
+#include "hardware/lgy.h"
 #include "error_codes.h"
 #include "mem_map.h"
 #include "mmio.h"
@@ -40,22 +40,24 @@ static u32 g_saveHash[8] = {0};
 
 #define STRINGIFY(s) #s
 #define STR(s) STRINGIFY(s)
-NAKED static void _overlayStub(void)
+NAKED static void _overlay_stub(void)
 {
 	__asm__("mov r0, #0x4000000\n\t"
 	        "mov r1, #1\n\t"
 	        "strb r1, [r0, #0x300]\n\t"   // "POSTFLG"
-	        "ldr pc, _overlayStubJmp\n\t"
-	        "_overlayStubJmp: .4byte " STR(ARM7_STUB_LOC) "\n\t" : : : );
+	        "ldr pc, _overlay_stub_jmp\n\t"
+	        "_overlay_stub_jmp: .4byte " STR(ARM7_STUB_LOC) "\n\t"
+	        "_overlay_stub_size = . - _overlay_stub\n\t" : : : );
 }
+extern const u32 _overlay_stub_size[];
 
 static void setupBiosOverlay(bool gbaBios)
 {
-	iomemcpy(REGs_LGY_A7_VECTOR, (u32*)_overlayStub, 20);
+	iomemcpy(REGs_LGY_A7_VECTOR, (u32*)_overlay_stub, (u32)_overlay_stub_size);
 
-	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_end - (u32)_arm7_stub_start);
+	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_size);
 	// Patch swi 0x10 (RegisterRamReset) to swi 0x26 (HardReset).
-	if(gbaBios) *((u8*)(ARM7_STUB_LOC9 + ((u32)_arm7_stub_swi - (u32)_arm7_stub_start))) = 0x26;
+	if(gbaBios) *((u8*)_arm7_stub_swi) = 0x26;
 }
 
 static void setupSaveType(u16 saveType)
@@ -157,16 +159,16 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
 	return res;
 }
 
-Result LGY_setGbaRtc(GbaRtc rtc)
+Result LGY_setGbaRtc(const GbaRtc rtc)
 {
 	// Set base time and date.
 	REG_LGY_GBA_RTC_BCD_TIME = rtc.time;
 	REG_LGY_GBA_RTC_BCD_DATE = rtc.date;
 
 	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
-	REG_LGY_GBA_RTC_CNT = 0;
-	REG_LGY_GBA_RTC_HEX_TIME = 1<<15; // Time offset 0 and 24h format.
-	REG_LGY_GBA_RTC_HEX_DATE = 0;     // Date offset 0.
+	//REG_LGY_GBA_RTC_CNT = 0; // Legacy P9 does this. Useless?
+	REG_LGY_GBA_RTC_HEX_TIME = 1u<<15; // Time offset 0 and 24h format.
+	REG_LGY_GBA_RTC_HEX_DATE = 0;      // Date offset 0.
 	REG_LGY_GBA_RTC_CNT = LGY_RTC_CNT_WR;
 	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
 
@@ -174,10 +176,10 @@ Result LGY_setGbaRtc(GbaRtc rtc)
 	else                                         return RES_OK;
 }
 
-Result LGY_getGbaRtc(GbaRtc *out)
+Result LGY_getGbaRtc(GbaRtc *const out)
 {
 	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
-	REG_LGY_GBA_RTC_CNT = 0;
+	//REG_LGY_GBA_RTC_CNT = 0; // Legacy P9 does this. Useless?
 	REG_LGY_GBA_RTC_CNT = LGY_RTC_CNT_RD;
 	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
 

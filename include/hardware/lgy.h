@@ -4,7 +4,6 @@
 #include "error_codes.h"
 
 
-
 // REG_LGY_MODE
 #define LGY_MODE_TWL  (1u)
 #define LGY_MODE_AGB  (2u)
@@ -27,7 +26,9 @@ enum
 	SAVE_TYPE_FLASH_1m_SNO_RTC   = 0xCu, // "FLASH ID=1362h, Sanyo"
 	SAVE_TYPE_FLASH_1m_SNO       = 0xDu, // "FLASH ID=1362h, Sanyo"
 	SAVE_TYPE_SRAM_256k          = 0xEu,
-	SAVE_TYPE_NONE               = 0xFu
+	SAVE_TYPE_NONE               = 0xFu,
+
+	SAVE_TYPE_MASK               = SAVE_TYPE_NONE
 };
 
 // REG_LGY_GBA_SAVE_MAP
@@ -87,13 +88,19 @@ typedef struct
 		};
 		u32 date;
 	};
-} GbaRtc;
+} ALIGN(8) GbaRtc; // Workaround: Poor optimization on pass by value.
 
 // REGs_LGY_GBA_SAVE_TIMING
 
 
 
 Result LGY_prepareGbaMode(bool gbaBios, u16 saveType);
-Result LGY_setGbaRtc(GbaRtc rtc);
-Result LGY_getGbaRtc(GbaRtc *out);
+Result LGY_setGbaRtc(const GbaRtc rtc);
+Result LGY_getGbaRtc(GbaRtc *const out);
+#ifdef ARM11
+void LGY_switchMode(void);
+void LGY_handleEvents(void);
+void LGY_deinit(void);
+#elif ARM9
 Result LGY_backupGbaSave(void);
+#endif

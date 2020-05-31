@@ -28,13 +28,14 @@
 
 
 
-#define PACKED        __attribute__((packed))
-#define USED          __attribute__((used))
-#define UNUSED        __attribute__((unused))
+#define ALIGN(a)      __attribute__((aligned(a))) // Use alignas() instead.
 #define NAKED         __attribute__((naked))
-#define WEAK          __attribute__((weak))
+#define PACKED        __attribute__((packed))
 #define TARGET_ARM    __attribute__((target("arm")))
 #define TARGET_THUMB  __attribute__((target("thumb")))
+#define UNUSED        __attribute__((unused))
+#define USED          __attribute__((used))
+#define WEAK          __attribute__((weak))
 
 
 typedef uint8_t  u8;

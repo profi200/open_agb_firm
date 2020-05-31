@@ -19,7 +19,7 @@
 #include "types.h"
 #include "ipc_handler.h"
 #include "hardware/cache.h"
-#include "arm9/hardware/lgy.h"
+#include "hardware/lgy.h"
 #include "arm9/debug.h"
 
 

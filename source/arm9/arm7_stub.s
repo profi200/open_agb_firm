@@ -38,15 +38,14 @@ wait_vcount_160_lp:
 	mov  r0, #0xFF
 
 .global _arm7_stub_swi
-_arm7_stub_swi:
+_arm7_stub_swi = . - _arm7_stub_start + 0x80BFE00 @ Final ARM9 mem location.
 	swi  0x10       @ RegisterRamReset
-	@swi  0x26       @ HardReset (BIOS animation)
 	mov  r0, #0xBC
 	mov  r2, #0
 	bx   r0
 
 .pool
 .align 2
-.global _arm7_stub_end
-_arm7_stub_end:
+.global _arm7_stub_size
+_arm7_stub_size = . - _arm7_stub_start
 END_ASM_FUNC

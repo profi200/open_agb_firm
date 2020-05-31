@@ -31,8 +31,6 @@
 #define REG_HID_PADCNT     *((vu16*)(HID_REGS_BASE + 0x2))
 
 
-#define HID_KEY_MASK_ALL  ((1u<<12) - 1)
-
 enum
 {
 	KEY_A            = 1u<<0,  // A
@@ -66,9 +64,9 @@ enum
 	KEY_RIGHT = KEY_DRIGHT | KEY_CPAD_RIGHT, // D-Pad Right or Circle Pad Right
 
 	// Masks
-	KEY_DPAD   = KEY_DDOWN       | KEY_DUP       | KEY_DLEFT       | KEY_DRIGHT,
-	KEY_CSTICK = KEY_CSTICK_DOWN | KEY_CSTICK_UP | KEY_CSTICK_LEFT | KEY_CSTICK_RIGHT,
-	KEY_CPAD   = KEY_CPAD_DOWN   | KEY_CPAD_UP   | KEY_CPAD_LEFT   | KEY_CPAD_RIGHT
+	KEY_DPAD_MASK   = KEY_DDOWN       | KEY_DUP       | KEY_DLEFT       | KEY_DRIGHT,
+	KEY_CSTICK_MASK = KEY_CSTICK_DOWN | KEY_CSTICK_UP | KEY_CSTICK_LEFT | KEY_CSTICK_RIGHT,
+	KEY_CPAD_MASK   = KEY_CPAD_DOWN   | KEY_CPAD_UP   | KEY_CPAD_LEFT   | KEY_CPAD_RIGHT
 };
 
 // Extra keys use with hidGetExtraKeys()
