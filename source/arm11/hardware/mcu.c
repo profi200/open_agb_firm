@@ -43,8 +43,8 @@ void MCU_init(void)
 
 	MCU_setEventMask(0xC0BF3F80);
 	// Configure GPIO for MCU event IRQs
-	GPIO_config(GPIO_4_MCU, GPIO_INPUT | GPIO_EDGE_FALLING | GPIO_IRQ_ENABLE);
-	IRQ_registerIsr(IRQ_CTR_MCU, 14, 0, true, mcuIrqHandler);
+	GPIO_config(GPIO_3_MCU, GPIO_INPUT | GPIO_EDGE_FALLING | GPIO_IRQ_ENABLE);
+	IRQ_registerIsr(IRQ_CTR_MCU, 14, 0, mcuIrqHandler);
 }
 
 static void mcuIrqHandler(UNUSED u32 intSource)

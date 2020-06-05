@@ -60,8 +60,8 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
 	while(*((vu8*)0x10141210) & 4u); // Wait for acknowledge?
 
 	REG_LGY_SLEEP = 1u<<15;
-	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, true, lgySleepIrqHandler);
-	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, true, lgySleepIrqHandler);
+	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, lgySleepIrqHandler);
+	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, lgySleepIrqHandler);
 
 	return RES_OK;
 }

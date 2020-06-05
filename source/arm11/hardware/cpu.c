@@ -30,7 +30,7 @@
 static void NAKED core23Entry(void)
 {
 	__cpsid(aif);
-	REG_CPU_II_CNT = 1;
+	REG_GIC_CPU_CTRL = 1;
 
 	const u32 cpuId = __getCpuId();
 	// Tell core 0 we are here
@@ -42,8 +42,8 @@ static void NAKED core23Entry(void)
 	do
 	{
 		__wfi();
-		tmp = REG_CPU_II_AKN;
-		REG_CPU_II_EOI = tmp;
+		tmp = REG_GIC_CPU_INTACK;
+		REG_GIC_CPU_EOI = tmp;
 	} while(tmp != cpuId);
 
 	// Jump to real entrypoint
@@ -55,12 +55,12 @@ void core123Init(void)
 {
 	if(REG_CFG11_SOCINFO & 2)
 	{
-		REG_CPU_II_CNT = 1;
-		for(u32 i = 0; i < 4; i++) REGs_GID_ENA_CLR[i] = 0xFFFFFFFFu;
-		REGs_GID_PEN_CLR[2] = 0x1000000; // Interrupt ID 88
-		REGs_GID_IPRIO[22] = 0;
-		REGs_GID_ITARG[22] = 1;
-		REGs_GID_ENA_SET[2] = 0x1000000;
+		REG_GIC_CPU_CTRL = 1;
+		for(u32 i = 0; i < 4; i++) REGs_GIC_DIST_ENABLE_CLEAR[i] = 0xFFFFFFFFu;
+		REGs_GIC_DIST_PENDING_CLEAR[2] = 0x1000000; // Interrupt ID 88
+		REGs_GIC_DIST_PRI[22] = 0;
+		REGs_GIC_DIST_TARGET[22] = 1;
+		REGs_GIC_DIST_ENABLE_SET[2] = 0x1000000;
 
 #ifdef CORE123_INIT
 		u16 clkCnt;
@@ -78,7 +78,7 @@ void core123Init(void)
 			wait(403);
 
 			CPU_setClock(clkCnt);
-			REGs_GID_PEN_CLR[2] = 0x1000000;
+			REGs_GIC_DIST_PENDING_CLEAR[2] = 0x1000000;
 			REG_UNK_10140400 = 3;   // Clock related?
 		}
 		REG_UNK_10140410 = 0x3FFFF; // Clock related?
@@ -96,7 +96,7 @@ void core123Init(void)
 			if(clkCnt != tmpClkCnt)
 			{
 				CPU_setClock(tmpClkCnt);
-				REGs_GID_PEN_CLR[2] = 0x1000000;
+				REGs_GIC_DIST_PENDING_CLEAR[2] = 0x1000000;
 			}
 
 			REG_CFG11_BOOTROM_OVERLAY_CNT = 1;
@@ -113,7 +113,7 @@ void core123Init(void)
 			if(clkCnt != tmpClkCnt) CPU_setClock(clkCnt);
 		}
 
-		REGs_GID_ENA_CLR[2] = 0x1000000;
+		REGs_GIC_DIST_ENABLE_CLEAR[2] = 0x1000000;
 
 		// Wakeup core 2/3 and let them jump to their entrypoint.
 		IRQ_softwareInterrupt(2, 0b0100);
@@ -122,7 +122,7 @@ void core123Init(void)
 		// Just enables the New 3DS FCRAM extension (if not already done)
 		if((REG_CFG11_MPCORE_CLKCNT & 7) != 1) CPU_setClock(1);
 
-		REGs_GID_ENA_CLR[2] = 0x1000000;
+		REGs_GIC_DIST_ENABLE_CLEAR[2] = 0x1000000;
 #endif
 	}
 

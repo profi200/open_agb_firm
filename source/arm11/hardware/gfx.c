@@ -98,12 +98,12 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_UNK00C = 0x10001;
 
 	// Register IRQ handlers.
-	IRQ_registerIsr(IRQ_PSC0, 14, 0, true, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_PSC1, 14, 0, true, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_PDC0, 14, 0, true, gfxIrqHandler);
-	//IRQ_registerIsr(IRQ_PDC1, 14, 0, true, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_PPF, 14, 0, true, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_P3D, 14, 0, true, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PSC0, 14, 0, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PSC1, 14, 0, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PDC0, 14, 0, gfxIrqHandler);
+	//IRQ_registerIsr(IRQ_PDC1, 14, 0, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_PPF, 14, 0, gfxIrqHandler);
+	IRQ_registerIsr(IRQ_P3D, 14, 0, gfxIrqHandler);
 
 	// Clear entire VRAM.
 	GX_memoryFill((u32*)VRAM_BANK0, 1u<<9, VRAM_SIZE / 2, 0,

@@ -127,9 +127,9 @@ void I2C_init(void)
 	regs->I2C_CNTEX = I2C_CLK_STRETCH;
 	regs->I2C_SCL = I2C_DELAYS(5u, 0u);
 
-	IRQ_registerIsr(IRQ_I2C1, 14, 0, true, NULL);
-	IRQ_registerIsr(IRQ_I2C2, 14, 0, true, NULL);
-	IRQ_registerIsr(IRQ_I2C3, 14, 0, true, NULL);
+	IRQ_registerIsr(IRQ_I2C1, 14, 0, NULL);
+	IRQ_registerIsr(IRQ_I2C2, 14, 0, NULL);
+	IRQ_registerIsr(IRQ_I2C3, 14, 0, NULL);
 }
 
 static bool i2cStartTransfer(u8 devAddr, u8 regAddr, bool read, I2cRegs *const regs)

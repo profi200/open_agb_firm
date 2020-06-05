@@ -72,7 +72,7 @@ void PXI_init(void)
 	while(pxiRecvWord() != 0x99);
 	pxiSendWord(0x11);
 
-	IRQ_registerIsr(IRQ_PXI_SYNC, 13, 0, true, pxiIrqHandler);
+	IRQ_registerIsr(IRQ_PXI_SYNC, 13, 0, pxiIrqHandler);
 #endif
 }
 

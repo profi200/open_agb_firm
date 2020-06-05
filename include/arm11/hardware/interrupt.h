@@ -23,100 +23,113 @@
 #include "arm.h"
 
 
-#define CPU_II_REGS_BASE     (MPCORE_PRIV_REG_BASE + 0x100)
-#define REG_CPU_II_CNT       *((vu32*)(CPU_II_REGS_BASE + 0x00))
-#define REG_CPU_II_MASK      *((vu32*)(CPU_II_REGS_BASE + 0x04))
-#define REG_CPU_II_BIN_POI   *((vu32*)(CPU_II_REGS_BASE + 0x08))
-#define REG_CPU_II_AKN       *((vu32*)(CPU_II_REGS_BASE + 0x0C))
-#define REG_CPU_II_EOI       *((vu32*)(CPU_II_REGS_BASE + 0x10))
-#define REG_CPU_II_RUN_PRIO  *((vu32*)(CPU_II_REGS_BASE + 0x14))
-#define REG_CPU_II_HIGH_PEN  *((vu32*)(CPU_II_REGS_BASE + 0x18))
+// Most register names from: https://github.com/torvalds/linux/blob/master/include/linux/irqchip/arm-gic.h
+#define GIC_CPU_REGS_BASE            (MPCORE_PRIV_REG_BASE + 0x100)
+#define REG_GIC_CPU_CTRL             *((      vu32*)(GIC_CPU_REGS_BASE + 0x00)) // Control Register.
+#define REG_GIC_CPU_PRIMASK          *((      vu32*)(GIC_CPU_REGS_BASE + 0x04)) // Priority Mask Register.
+#define REG_GIC_CPU_BINPOINT         *((      vu32*)(GIC_CPU_REGS_BASE + 0x08)) // Binary Point Register.
+#define REG_GIC_CPU_INTACK           *((const vu32*)(GIC_CPU_REGS_BASE + 0x0C)) // Interrupt Acknowledge Register.
+#define REG_GIC_CPU_EOI              *((      vu32*)(GIC_CPU_REGS_BASE + 0x10)) // End of Interrupt Register.
+#define REG_GIC_CPU_RUNNINGPRI       *((const vu32*)(GIC_CPU_REGS_BASE + 0x14)) // Running Priority Register.
+#define REG_GIC_CPU_HIGHPRI          *((const vu32*)(GIC_CPU_REGS_BASE + 0x18)) // Highest Pending Interrupt Register.
 
-#define GID_REGS_BASE        (MPCORE_PRIV_REG_BASE + 0x1000)
-#define REG_GID_CNT          *((vu32*)(GID_REGS_BASE + 0x000))
-#define REG_GID_CONTR_TYPE   *((vu32*)(GID_REGS_BASE + 0x004))
-#define REGs_GID_ENA_SET      ((vu32*)(GID_REGS_BASE + 0x100))
-#define REGs_GID_ENA_CLR      ((vu32*)(GID_REGS_BASE + 0x180))
-#define REGs_GID_PEN_SET      ((vu32*)(GID_REGS_BASE + 0x200))
-#define REGs_GID_PEN_CLR      ((vu32*)(GID_REGS_BASE + 0x280))
-#define REGs_GID_ACTIVE_BIT   ((vu32*)(GID_REGS_BASE + 0x300))
-#define REGs_GID_IPRIO        ((vu32*)(GID_REGS_BASE + 0x400))
-#define REGs_GID_ITARG        ((vu32*)(GID_REGS_BASE + 0x800))
-#define REGs_GID_ICONF        ((vu32*)(GID_REGS_BASE + 0xC00))
-#define REGs_GID_LINE_LEV     ((vu32*)(GID_REGS_BASE + 0xD00))
-#define REG_GID_SW_INT       *((vu32*)(GID_REGS_BASE + 0xF00))
-#define REG_GID_PERI_INFO0   *((vu32*)(GID_REGS_BASE + 0xFE0))
-#define REG_GID_PERI_INFO1   *((vu32*)(GID_REGS_BASE + 0xFE4))
-#define REG_GID_PERI_INFO2   *((vu32*)(GID_REGS_BASE + 0xFE8))
-#define REG_GID_PERI_INFO3   *((vu32*)(GID_REGS_BASE + 0xFEC))
-#define REG_GID_PRIME_CELL0  *((vu32*)(GID_REGS_BASE + 0xFF0))
-#define REG_GID_PRIME_CELL1  *((vu32*)(GID_REGS_BASE + 0xFF4))
-#define REG_GID_PRIME_CELL2  *((vu32*)(GID_REGS_BASE + 0xFF8))
-#define REG_GID_PRIME_CELL3  *((vu32*)(GID_REGS_BASE + 0xFFC))
+#define GIC_DIST_REGS_BASE           (MPCORE_PRIV_REG_BASE + 0x1000)
+#define REG_GIC_DIST_CTRL            *((      vu32*)(GIC_DIST_REGS_BASE + 0x000)) // Interrupt Distributor Control Register.
+#define REG_GIC_DIST_CTR             *((const vu32*)(GIC_DIST_REGS_BASE + 0x004)) // Interrupt Controller Type Register.
+#define REGs_GIC_DIST_ENABLE_SET      ((      vu32*)(GIC_DIST_REGS_BASE + 0x100)) // Interrupt Enable set Registers.
+#define REGs_GIC_DIST_ENABLE_CLEAR    ((      vu32*)(GIC_DIST_REGS_BASE + 0x180)) // Interrupt Enable clear Registers.
+#define REGs_GIC_DIST_PENDING_SET     ((      vu32*)(GIC_DIST_REGS_BASE + 0x200)) // Interrupt Pending set Registers.
+#define REGs_GIC_DIST_PENDING_CLEAR   ((      vu32*)(GIC_DIST_REGS_BASE + 0x280)) // Interrupt Pending clear Registers.
+#define REGs_GIC_DIST_ACTIVE_SET      ((const vu32*)(GIC_DIST_REGS_BASE + 0x300)) // Interrupt Active Bit Registers.
+#define REGs_GIC_DIST_PRI             ((      vu32*)(GIC_DIST_REGS_BASE + 0x400)) // Interrupt Priority Registers.
+#define REGs_GIC_DIST_TARGET          ((      vu32*)(GIC_DIST_REGS_BASE + 0x800)) // Interrupt CPU targets Registers.
+#define REGs_GIC_DIST_CONFIG          ((      vu32*)(GIC_DIST_REGS_BASE + 0xC00)) // Interrupt Configuration Registers.
+#define REGs_GIC_DIST_LINE_LEVEL      ((const vu32*)(GIC_DIST_REGS_BASE + 0xD00)) // Interrupt Line Level Registers.
+#define REG_GIC_DIST_SOFTINT         *((      vu32*)(GIC_DIST_REGS_BASE + 0xF00)) // Software Interrupt Register.
+#define REG_GIC_DIST_PERIPH_IDENT0   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFE0)) // Periphal Identification Register 0.
+#define REG_GIC_DIST_PERIPH_IDENT1   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFE4)) // Periphal Identification Register 1.
+#define REG_GIC_DIST_PERIPH_IDENT2   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFE8)) // Periphal Identification Register 2.
+#define REG_GIC_DIST_PERIPH_IDENT3   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFEC)) // Periphal Identification Register 3.
+#define REG_GIC_DIST_PRIMECELL0      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFF0)) // PrimeCell Identification Register 0.
+#define REG_GIC_DIST_PRIMECELL1      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFF4)) // PrimeCell Identification Register 0.
+#define REG_GIC_DIST_PRIMECELL2      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFF8)) // PrimeCell Identification Register 0.
+#define REG_GIC_DIST_PRIMECELL3      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFFC)) // PrimeCell Identification Register 0.
 
 
 typedef enum
 {
-	IRQ_MPCORE_SW0    =   0u,
-	IRQ_MPCORE_SW1    =   1u,
-	IRQ_MPCORE_SW2    =   2u,
-	IRQ_MPCORE_SW3    =   3u,
-	IRQ_MPCORE_SW4    =   4u,
-	IRQ_MPCORE_SW5    =   5u,
-	IRQ_MPCORE_SW6    =   6u,
-	IRQ_MPCORE_SW7    =   7u,
-	IRQ_MPCORE_SW8    =   8u,
-	IRQ_MPCORE_SW9    =   9u,
-	IRQ_MPCORE_SW10   =  10u,
-	IRQ_MPCORE_SW11   =  11u,
-	IRQ_MPCORE_SW12   =  12u,
-	IRQ_MPCORE_SW13   =  13u,
-	IRQ_MPCORE_SW14   =  14u,
-	IRQ_MPCORE_SW15   =  15u,
-	IRQ_TIMER         =  29u, // MPCore timer
-	IRQ_WATCHDOG      =  30u, // MPCore watchdog
-	IRQ_SPI2          =  36u, // SPI bus 2 interrupt status update
+	IRQ_IPI0          =   0u,
+	IRQ_IPI1          =   1u,
+	IRQ_IPI2          =   2u,
+	IRQ_IPI3          =   3u,
+	IRQ_IPI4          =   4u,
+	IRQ_IPI5          =   5u,
+	IRQ_IPI6          =   6u,
+	IRQ_IPI7          =   7u,
+	IRQ_IPI8          =   8u,
+	IRQ_IPI9          =   9u,
+	IRQ_IPI10         =  10u,
+	IRQ_IPI11         =  11u,
+	IRQ_IPI12         =  12u,
+	IRQ_IPI13         =  13u,
+	IRQ_IPI14         =  14u,
+	IRQ_IPI15         =  15u,
+	IRQ_TIMER         =  29u, // MPCore timer.
+	IRQ_WATCHDOG      =  30u, // MPCore watchdog.
+	IRQ_SPI2          =  36u, // SPI bus 2 interrupt status update.
+	IRQ_UART          =  37u, // New3DS-only UART?
 	IRQ_PSC0          =  40u,
 	IRQ_PSC1          =  41u,
-	IRQ_PDC0          =  42u, // aka VBlank0
-	IRQ_PDC1          =  43u, // aka VBlank1
+	IRQ_PDC0          =  42u, // PDC0 topscreen H-/VBlank and errors.
+	IRQ_PDC1          =  43u, // PDC1 bottom screen H-/VBlank and errors.
 	IRQ_PPF           =  44u,
 	IRQ_P3D           =  45u,
-	IRQ_CDMA_EVENT0   =  48u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT1   =  49u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT2   =  50u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT3   =  51u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT4   =  52u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT5   =  53u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT6   =  54u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT7   =  55u, // Old 3DS CDMA
-	IRQ_CDMA_EVENT8   =  56u, // Old 3DS CDMA
-	IRQ_CDMA_FAULT    =  57u, // Old 3DS CDMA
-	IRQ_CDMA2_EVENT   =  58u, // New 3DS CDMA
-	IRQ_CDMA2_FAULT   =  59u, // New 3DS CDMA
-	IRQ_SDIO          =  64u, // SDIO controller (WiFi)
-	IRQ_SDIO_IRQ      =  65u, // SDIO IRQ pin (WiFi)
-	IRQ_CAM0          =  72u, // Camera 0 (DSi)
-	IRQ_CAM1          =  73u, // Camera 1 (left eye)
-	IRQ_LGYFB_BOT     =  76u, // Legacy framebuffer bottom screen
-	IRQ_LGYFB_TOP     =  77u, // Legacy framebuffer top screen
+	IRQ_CDMA_EVENT0   =  48u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT1   =  49u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT2   =  50u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT3   =  51u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT4   =  52u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT5   =  53u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT6   =  54u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT7   =  55u, // Old3DS CDMA.
+	IRQ_CDMA_EVENT8   =  56u, // Old3DS CDMA.
+	IRQ_CDMA_FAULT    =  57u, // Old3DS CDMA.
+	IRQ_CDMA2_EVENT   =  58u, // New3DS-only CDMA event 0-31.
+	IRQ_CDMA2_FAULT   =  59u, // New3DS-only CDMA.
+	IRQ_SDIO2         =  64u, // SDIO2 controller (WiFi).
+	IRQ_SDIO2_IRQ     =  65u, // SDIO2 IRQ pin (WiFi).
+	IRQ_SDIO3         =  66u, // SDIO3 controller.
+	IRQ_SDIO3_IRQ     =  67u, // SDIO3 IRQ pin.
+	IRQ_NTRCARD       =  68u, // NTRCARD controller.
+	IRQ_L2B1          =  69u, // New3DS-only first L2B converter.
+	IRQ_L2B2          =  70u, // New3DS-only second L2B converter.
+	IRQ_CAM1          =  72u, // Camera 1 (DSi).
+	IRQ_CAM2          =  73u, // Camera 2 (left eye).
+	IRQ_DSP           =  74u,
+	IRQ_Y2R1          =  75u,
+	IRQ_LGYFB_BOT     =  76u, // Legacy framebuffer bottom screen.
+	IRQ_LGYFB_TOP     =  77u, // Legacy framebuffer top screen.
+	IRQ_Y2R2          =  78u, // New3DS-only.
+	IRQ_G1            =  79u, // New3DS-only Hantro G1 decoder.
 	IRQ_PXI_SYNC      =  80u,
 	IRQ_PXI_SYNC2     =  81u,
 	IRQ_PXI_NOT_FULL  =  82u,
 	IRQ_PXI_NOT_EMPTY =  83u,
 	IRQ_I2C1          =  84u,
 	IRQ_I2C2          =  85u,
-	IRQ_SPI3          =  86u, // SPI bus 3 interrupt status update
-	IRQ_SPI1          =  87u, // SPI bus 1 interrupt status update
+	IRQ_SPI3          =  86u, // SPI bus 3 interrupt status update.
+	IRQ_SPI1          =  87u, // SPI bus 1 interrupt status update.
 	IRQ_PDN           =  88u,
 	IRQ_LGY_SLEEP     =  89u, // Triggers if legacy mode enters sleep.
+	IRQ_MIC           =  90u,
 	IRQ_HID_PADCNT    =  91u,
 	IRQ_I2C3          =  92u,
-	IRQ_GPIO_1_2      =  96u,
-	IRQ_SHELL_CLOSED  =  98u, // GPIO_1_0?
+	IRQ_DS_WIFI       =  95u,
+	IRQ_GPIO_1_2_HIGH =  96u,
+	IRQ_GPIO_1_2_LOW  =  98u,
 	IRQ_GPIO_1_1      =  99u,
 	IRQ_GPIO_2_0      = 100u,
-	IRQ_GPIO_2_1      = 102u,
+	IRQ_GPIO_2_2      = 102u,
 	IRQ_GPIO_4_0      = 104u,
 	IRQ_GPIO_4_1      = 105u,
 	IRQ_GPIO_4_2      = 106u,
@@ -129,17 +142,21 @@ typedef enum
 	IRQ_GPIO_4_9      = 113u,
 	IRQ_GPIO_4_10     = 114u,
 	IRQ_GPIO_4_11     = 115u,
-	IRQ_GAMECARD      = 117u, // Gamecard inserted
-	IRQ_PERF_MONITOR0 = 120u, // Core 0 performance monitor. Triggers on any counter overflow
-	IRQ_PERF_MONITOR1 = 121u, // Core 1 performance monitor. Triggers on any counter overflow
-	IRQ_PERF_MONITOR2 = 122u, // Unconfirmed. Core 2 performance monitor. Triggers on any counter overflow
-	IRQ_PERF_MONITOR3 = 123u, // Unconfirmed. Core 3 performance monitor. Triggers on any counter overflow
+	IRQ_GAMECARD_OFF  = 116u, // Gamecard poweroff.
+	IRQ_GAMECARD_INS  = 117u, // Gamecard inserted.
+	IRQ_L2C           = 118u, // New3DS-only L2C-310 Level 2 Cache Controller.
+	IRQ_UNK119        = 119u,
+	IRQ_PERF_MONITOR0 = 120u, // Core 0 performance monitor. Triggers on any counter overflow.
+	IRQ_PERF_MONITOR1 = 121u, // Core 1 performance monitor. Triggers on any counter overflow.
+	IRQ_PERF_MONITOR2 = 122u, // Unconfirmed. Core 2 performance monitor. Triggers on any counter overflow.
+	IRQ_PERF_MONITOR3 = 123u, // Unconfirmed. Core 3 performance monitor. Triggers on any counter overflow.
 
 	// Aliases
-	IRQ_SHELL_OPENED  = IRQ_GPIO_1_2,
-	IRQ_TOUCHSCREEN   = IRQ_GPIO_1_1, // Triggers on touchscreen pen down.
-	IRQ_HEADPH_JACK   = IRQ_GPIO_2_0, // Headphone jack. Triggers on both plugging in and out?
-	IRQ_CTR_MCU       = IRQ_GPIO_4_9  // Various MCU events trigger this. See MCU interrupt mask.
+	IRQ_SHELL_OPENED  = IRQ_GPIO_1_2_HIGH,
+	IRQ_SHELL_CLOSED  = IRQ_GPIO_1_2_LOW,  // Triggers on GPIO_1_2 low?
+	IRQ_TOUCHSCREEN   = IRQ_GPIO_1_1,      // Triggers on touchscreen pen down.
+	IRQ_HEADPH_JACK   = IRQ_GPIO_2_0,      // Headphone jack. Triggers on both plugging in and out?
+	IRQ_CTR_MCU       = IRQ_GPIO_4_9       // Various MCU events trigger this. See MCU interrupt mask.
 } Interrupt;
 
 
@@ -158,20 +175,13 @@ void IRQ_init(void);
 /**
  * @brief      Registers a interrupt service routine and enables the specified interrupt.
  *
- * @param[in]  id             The interrupt ID. Must be <128.
- * @param[in]  prio           The priority. 0 = highest, 14 = lowest, 15 = disabled
- * @param[in]  cpuMask        The CPU mask. Each of the 4 bits stands for 1 core. 0 means current CPU.
- * @param[in]  edgeTriggered  Set to true to make the interrupt edge triggered. false is level triggered.
- * @param[in]  isr            The interrupt service routine to call.
+ * @param[in]  id       The interrupt ID. Must be <128.
+ * @param[in]  prio     The priority. 0 = highest, 14 = lowest, 15 = disabled.
+ * @param[in]  cpuMask  The CPU mask. Each of the 4 bits stands for 1 core.
+ *                      0 means current CPU.
+ * @param[in]  isr      The interrupt service routine to call.
  */
-void IRQ_registerIsr(Interrupt id, u8 prio, u8 cpuMask, bool edgeTriggered, IrqIsr isr);
-
-/**
- * @brief      Unregisters the interrupt service routine and disables the specified interrupt.
- *
- * @param[in]  id    The interrupt ID. Must be <128.
- */
-void IRQ_unregisterIsr(Interrupt id);
+void IRQ_registerIsr(Interrupt id, u8 prio, u8 cpuMask, IrqIsr isr);
 
 /**
  * @brief      Reenables a previously disabled but registered interrupt.
@@ -188,6 +198,14 @@ void IRQ_enable(Interrupt id);
 void IRQ_disable(Interrupt id);
 
 /**
+ * @brief      Triggers a software interrupt for the specified CPUs.
+ *
+ * @param[in]  id       The interrupt ID. Must be <16.
+ * @param[in]  cpuMask  The CPU mask. Each of the 4 bits stands for 1 core.
+ */
+void IRQ_softwareInterrupt(Interrupt id, u8 cpuMask);
+
+/**
  * @brief      Sets the priority of an interrupt.
  *
  * @param[in]  id    The interrupt ID. Must be <128.
@@ -196,12 +214,11 @@ void IRQ_disable(Interrupt id);
 void IRQ_setPriority(Interrupt id, u8 prio);
 
 /**
- * @brief      Triggers a software interrupt for the specified CPUs.
+ * @brief      Unregisters the interrupt service routine and disables the specified interrupt.
  *
- * @param[in]  id       The interrupt ID. Must be <16.
- * @param[in]  cpuMask  The CPU mask. Each of the 4 bits stands for 1 core.
+ * @param[in]  id    The interrupt ID. Must be <128.
  */
-void IRQ_softwareInterrupt(Interrupt id, u8 cpuMask);
+void IRQ_unregisterIsr(Interrupt id);
 
 
 #if !__thumb__

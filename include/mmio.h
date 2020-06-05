@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  *   This file is part of fastboot 3DS
  *   Copyright (C) 2019 Aurora Wright, TuxSH, derrek, profi200

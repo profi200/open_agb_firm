@@ -249,7 +249,7 @@ void CODEC_init(void)
 	codecMaskReg(0, 0x39, 0x66, 0x66);
 	codecWriteReg(0x65, 0x7A, 1);
 	codecMaskReg(0x64, 0x22, 0x18, 0x18);
-	GPIO_config(GPIO_2_0, GPIO_IRQ_ENABLE | GPIO_EDGE_RISING | GPIO_INPUT); // Headphone jack IRQ
+	GPIO_config(GPIO_2_HEADPH_JACK, GPIO_IRQ_ENABLE | GPIO_EDGE_RISING | GPIO_INPUT); // Headphone jack IRQ.
 	//codecMaskReg(0x64, 0x45, (*((vu8*)0x10147010) & 1u)<<4 | 1u<<5, 0x30); // GPIO bitmask 8.
 	codecMaskReg(0x64, 0x45, 0, 0x30); // With automatic output switching
 	codecMaskReg(0x64, 0x43, 0, 0x80);
@@ -276,8 +276,9 @@ void CODEC_init(void)
 	codecWriteReg(0x64, 0x7B, cal->shutterVolume[1]);
 
 	// Sound stuff starts here
-	GPIO_config(GPIO_4_0, GPIO_OUTPUT);
-	GPIO_write(GPIO_4_0, 1); // GPIO bitmask 0x40
+	// Speaker "depop circuit"? Whatever that is. Not existent on retail?
+	GPIO_config(GPIO_3_0, GPIO_OUTPUT);
+	GPIO_write(GPIO_3_0, 1); // GPIO bitmask 0x40
 	TIMER_sleepMs(10); // Fixed 10 ms delay when setting this GPIO.
 	*((vu16*)0x10145000) = 0xC800u | 0x20u<<6;
 	*((vu16*)0x10145002) = 0xE000u;
@@ -354,7 +355,7 @@ void CODEC_init(void)
 	codecWriteReg(0x65, 0x1B, cal->analogVolumeSP);
 	codecWriteReg(0x65, 0x1C, cal->analogVolumeSP);
 	TIMER_sleepMs(38);
-	GPIO_write(GPIO_4_0, 0); // GPIO bitmask 0x40
+	GPIO_write(GPIO_3_0, 0); // GPIO bitmask 0x40
 	TIMER_sleepMs(18); // Fixed 18 ms delay when unsetting this GPIO.
 
 
@@ -382,7 +383,7 @@ bool legacySwitchState = false;
 
 void CODEC_deinit(void)
 {
-	GPIO_write(GPIO_4_0, 1); // GPIO bitmask 0x40
+	GPIO_write(GPIO_3_0, 1); // GPIO bitmask 0x40
 	TIMER_sleepMs(10); // Fixed 10 ms delay when setting this GPIO.
 	legacySwitchState = (codecReadReg(0x67, 0x25) & 0x40u) != 0;
 	if(!legacySwitchState) codecLegacyStuff(true);
@@ -406,13 +407,13 @@ void CODEC_deinit(void)
 	*((vu16*)0x10145000) &= ~0x8000u;
 	*((vu16*)0x10145002) &= ~0x8000u;
 	*((vu8* )0x10141220) = 0;
-	GPIO_write(GPIO_4_0, 0); // GPIO bitmask 0x40
+	GPIO_write(GPIO_3_0, 0); // GPIO bitmask 0x40
 	TIMER_sleepMs(18); // Fixed 18 ms delay when unsetting this GPIO.
 }
 
 void CODEC_wakeup(void)
 {
-	GPIO_write(GPIO_4_0, 1); // GPIO bitmask 0x40
+	GPIO_write(GPIO_3_0, 1); // GPIO bitmask 0x40
 	TIMER_sleepMs(10); // Fixed 10 ms delay when setting this GPIO.
 	*((vu8* )0x10141220) = 2u;
 	*((vu16*)0x10145000) |= 0x8000u;
@@ -437,7 +438,7 @@ void CODEC_wakeup(void)
 	codecMaskReg(0x67, 0x25, 3, 3);
 	codecLegacyStuff(legacySwitchState);
 	if(touchscreenState) codecEnableTouchscreen();
-	GPIO_write(GPIO_4_0, 0); // GPIO bitmask 0x40
+	GPIO_write(GPIO_3_0, 0); // GPIO bitmask 0x40
 	TIMER_sleepMs(18); // Fixed 18 ms delay when unsetting this GPIO.
 }
 

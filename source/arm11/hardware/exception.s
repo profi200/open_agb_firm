@@ -68,7 +68,7 @@ BEGIN_ASM_FUNC irqHandler
 	stmfd sp!, {r0-r3, r12, lr}
 	ldr r12, =MPCORE_PRIV_REG_BASE
 	ldr r2, =irqIsrTable
-	ldr r0, [r12, #0x10C]        @ REG_CPU_II_AKN
+	ldr r0, [r12, #0x10C]        @ REG_GIC_CPU_INTACK
 	and r1, r0, #0x7F
 	cmp r1, #32
 	mrclo p15, 0, r3, c0, c0, 5  @ Get CPU ID
@@ -85,7 +85,7 @@ BEGIN_ASM_FUNC irqHandler
 	ldr r12, =MPCORE_PRIV_REG_BASE
 	cpsid i
 irqHandler_skip_processing:
-	str r0, [r12, #0x110]        @ REG_CPU_II_EOI
+	str r0, [r12, #0x110]        @ REG_GIC_CPU_EOI
 	ldmfd sp!, {r0-r3, r12, lr}
 	rfefd sp!                    @ Restore lr (pc) and spsr (cpsr)
 END_ASM_FUNC

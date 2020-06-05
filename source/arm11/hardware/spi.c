@@ -126,9 +126,9 @@ void NSPI_init(void)
 	regs->NSPI_INT_MASK = NSPI_INT_TRANSF_END;
 	regs->NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END;
 
-	IRQ_registerIsr(IRQ_SPI2, 14, 0, true, NULL);
-	IRQ_registerIsr(IRQ_SPI3, 14, 0, true, NULL);
-	IRQ_registerIsr(IRQ_SPI1, 14, 0, true, NULL);
+	IRQ_registerIsr(IRQ_SPI2, 14, 0, NULL);
+	IRQ_registerIsr(IRQ_SPI3, 14, 0, NULL);
+	IRQ_registerIsr(IRQ_SPI1, 14, 0, NULL);
 }
 
 bool _NSPI_autoPollBit(SpiDevice dev, u32 params)

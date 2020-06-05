@@ -29,7 +29,7 @@
 #define ARM7_STUB_LOC   (0x3007E00u)
 #define ARM7_STUB_LOC9  (0x80BFE00u)
 #define ROM_LOC         (0x20000000u)
-#define SAVE_LOC        (0x08080000u)
+#define SAVE_LOC        (0x8080000u)
 
 
 static FATFS g_sd = {0};
@@ -165,7 +165,7 @@ Result LGY_setGbaRtc(const GbaRtc rtc)
 	REG_LGY_GBA_RTC_BCD_TIME = rtc.time;
 	REG_LGY_GBA_RTC_BCD_DATE = rtc.date;
 
-	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
+	//while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
 	//REG_LGY_GBA_RTC_CNT = 0; // Legacy P9 does this. Useless?
 	REG_LGY_GBA_RTC_HEX_TIME = 1u<<15; // Time offset 0 and 24h format.
 	REG_LGY_GBA_RTC_HEX_DATE = 0;      // Date offset 0.
@@ -178,7 +178,7 @@ Result LGY_setGbaRtc(const GbaRtc rtc)
 
 Result LGY_getGbaRtc(GbaRtc *const out)
 {
-	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
+	//while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);
 	//REG_LGY_GBA_RTC_CNT = 0; // Legacy P9 does this. Useless?
 	REG_LGY_GBA_RTC_CNT = LGY_RTC_CNT_RD;
 	while(REG_LGY_GBA_RTC_CNT & LGY_RTC_CNT_BUSY);

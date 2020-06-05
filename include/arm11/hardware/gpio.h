@@ -28,39 +28,44 @@
 #define GPIO_IRQ_ENABLE    (1u<<2)
 
 
+// bits 3-7 pin number, bits 0-3 reg index.
+#define MAKE_GPIO(pin, reg) ((pin)<<3 | (reg))
+
 typedef enum
 {
-	GPIO_1_0           =  0u<<3 | 0u,
-	GPIO_1_1           =  1u<<3 | 0u,
-	GPIO_1_2           =  2u<<3 | 0u,
+	GPIO_1_0           =  MAKE_GPIO(0u, 0u),
+	GPIO_1_1           =  MAKE_GPIO(1u, 0u),
+	GPIO_1_2           =  MAKE_GPIO(2u, 0u),
 
-	GPIO_2_0           =  0u<<3 | 1u,
-	GPIO_2_1           =  1u<<3 | 1u,
+	GPIO_2_0           =  MAKE_GPIO(0u, 1u),
+	GPIO_2_1           =  MAKE_GPIO(1u, 1u),
+	GPIO_2_2           =  MAKE_GPIO(0u, 2u), // REG_GPIO2_DAT2
 
-	GPIO_3_0           =  0u<<3 | 2u,
-
-	GPIO_4_0           =  0u<<3 | 3u,
-	GPIO_4_1           =  1u<<3 | 3u,
-	GPIO_4_2           =  2u<<3 | 3u,
-	GPIO_4_3           =  3u<<3 | 3u,
-	GPIO_4_4           =  4u<<3 | 3u,
-	GPIO_4_5           =  5u<<3 | 3u,
-	GPIO_4_6           =  6u<<3 | 3u,
-	GPIO_4_7           =  7u<<3 | 3u,
-	GPIO_4_8           =  8u<<3 | 3u,
-	GPIO_4_9           =  9u<<3 | 3u,
-	GPIO_4_10          = 10u<<3 | 3u,
-	GPIO_4_11          = 11u<<3 | 3u,
-
-	GPIO_5_0           =  0u<<3 | 4u,
+	GPIO_3_0           =  MAKE_GPIO(0u, 3u),
+	GPIO_3_1           =  MAKE_GPIO(1u, 3u),
+	GPIO_3_2           =  MAKE_GPIO(2u, 3u),
+	GPIO_3_3           =  MAKE_GPIO(3u, 3u),
+	GPIO_3_4           =  MAKE_GPIO(4u, 3u),
+	GPIO_3_5           =  MAKE_GPIO(5u, 3u),
+	GPIO_3_6           =  MAKE_GPIO(6u, 3u),
+	GPIO_3_7           =  MAKE_GPIO(7u, 3u),
+	GPIO_3_8           =  MAKE_GPIO(8u, 3u),
+	GPIO_3_9           =  MAKE_GPIO(9u, 3u),
+	GPIO_3_10          = MAKE_GPIO(10u, 3u),
+	GPIO_3_11          = MAKE_GPIO(11u, 3u),
+	GPIO_3_12          =  MAKE_GPIO(0u, 4u), // REG_GPIO3_DAT2
 
 	// Aliases
-	GPIO_1_TOUCHSCREEN = GPIO_1_1, // Unset while touchscreen pen down
-	GPIO_1_SHELL       = GPIO_1_2, // 1 when closed
+	GPIO_1_TOUCHSCREEN = GPIO_1_1, // Unset while touchscreen pen down. Unused after CODEC init.
+	GPIO_1_SHELL       = GPIO_1_2, // 1 when closed.
 
-	GPIO_4_HEADPH_JACK = GPIO_4_8, // Unset while headphones are plugged in
-	GPIO_4_MCU         = GPIO_4_9
+	GPIO_2_HEADPH_JACK = GPIO_2_0, // Used after CODEC init.
+
+	GPIO_3_HEADPH_JACK = GPIO_3_8, // Unused/other function after CODEC init.
+	GPIO_3_MCU         = GPIO_3_9
 } Gpio;
+
+#undef MAKE_GPIO
 
 
 
@@ -79,12 +84,12 @@ void GPIO_config(Gpio gpio, u8 cfg);
  *
  * @return     The state. Either 0 or 1.
  */
-u8 GPIO_read(Gpio gpio);
+bool GPIO_read(Gpio gpio);
 
 /**
  * @brief      Writes a GPIO pin.
  *
  * @param[in]  gpio  The gpio.
- * @param[in]  val   The value.
+ * @param[in]  val   The value. Must be 0 or 1.
  */
-void GPIO_write(Gpio gpio, u8 val);
+void GPIO_write(Gpio gpio, bool val);

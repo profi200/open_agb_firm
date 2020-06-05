@@ -19,6 +19,7 @@
 #include "types.h"
 #include "arm9/hardware/interrupt.h"
 #include "arm9/hardware/ndma.h"
+#include "hardware/corelink_dma-330.h"
 #include "arm9/hardware/timer.h"
 #include "hardware/pxi.h"
 #include "arm9/hardware/crypto.h"
@@ -31,6 +32,7 @@ void WEAK __systemInit(void)
 	leaveCriticalSection(0); // Enables interrupts
 	TIMER_init();
 	NDMA_init();
+	//DMA330_init();
 	//AES_init();
 	//RSA_init();
 	PXI_init();
