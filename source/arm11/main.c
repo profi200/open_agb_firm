@@ -41,7 +41,7 @@ int main(void)
 	{
 #ifdef NDEBUG
 		GFX_setForceBlack(false, true);
-		GFX_setBrightness(DEFAULT_BRIGHTNESS, 0);
+		GFX_powerOffBacklights(GFX_BLIGHT_BOT);
 #endif
 		// Sync LgyFb start with LCD VBlank.
 		GFX_waitForVBlank0();

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdatomic.h>
 #include "types.h"
+#include "fb_assert.h"
 #include "hardware/gfx.h"
 #include "arm11/hardware/lcd.h"
 #include "arm11/hardware/gx.h"
@@ -163,7 +164,7 @@ void GFX_deinit(void)
 	if(power & ~1u) // Poweroff backlights if on.
 	{
 		MCU_controlLCDPower(power & ~1u);
-		if(MCU_waitEvents(0x3Fu<<24) != (power & ~1u)<<24) panic();
+		if(MCU_waitEvents(0x3Fu<<24) != (u32)(power & ~1u)<<24) panic();
 	}
 	if(power & 1u) // Poweroff LCDs if on.
 	{
@@ -245,8 +246,8 @@ static void setupFramebufs(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	g_gfxState.strides[0] = 240u * topPixSize; // No gap.
 	g_gfxState.strides[1] = 240u * botPixSize; // No gap.
 
-	const u32 topSize = 400 * 240 * topPixSize;
-	const u32 botSize = 320 * 240 * botPixSize;
+	const u32 topSize = 400u * 240 * topPixSize;
+	const u32 botSize = 320u * 240 * botPixSize;
 	g_gfxState.framebufs[0][0] = vramAlloc(topSize); // Top A1 (3D left eye)
 	void *botPtr = vramAlloc(botSize);
 	g_gfxState.framebufs[1][0] = botPtr;             // Bottom A1
@@ -398,6 +399,25 @@ static void waitLcdsReady(void)
 	}
 }
 
+void GFX_powerOnBacklights(GfxBlight mask)
+{
+	fb_assert((mask & ~GFX_BLIGHT_BOTH) == 0u);
+	g_gfxState.lcdPower |= mask;
+
+	mask <<= 1;
+	MCU_controlLCDPower(mask); // Power on backlights.
+	if(MCU_waitEvents(0x3Fu<<24) != (u32)mask<<24) panic();
+}
+
+void GFX_powerOffBacklights(GfxBlight mask)
+{
+	fb_assert((mask & ~GFX_BLIGHT_BOTH) == 0u);
+	g_gfxState.lcdPower &= ~mask;
+
+	MCU_controlLCDPower(mask); // Power off backlights.
+	if(MCU_waitEvents(0x3Fu<<24) != (u32)mask<<24) panic();
+}
+
 void GFX_setBrightness(u8 top, u8 bot)
 {
 	if(top > 64 || bot > 64) return;
@@ -410,8 +430,8 @@ void GFX_setBrightness(u8 top, u8 bot)
 
 void GFX_setForceBlack(bool top, bool bot)
 {
-	REG_LCD_ABL0_FILL = top<<24; // Force blackscreen
-	REG_LCD_ABL1_FILL = bot<<24; // Force blackscreen
+	REG_LCD_ABL0_FILL = (u32)top<<24; // Force blackscreen
+	REG_LCD_ABL1_FILL = (u32)bot<<24; // Force blackscreen
 }
 
 void GFX_setDoubleBuffering(u8 screen, bool dBuf)

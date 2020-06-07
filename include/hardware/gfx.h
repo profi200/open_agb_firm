@@ -67,6 +67,13 @@ typedef enum
 	GFX_EVENT_P3D    = 5u
 } GfxEvent;
 
+typedef enum
+{
+	GFX_BLIGHT_BOT   = 1u<<2,
+	GFX_BLIGHT_TOP   = 1u<<4,
+	GFX_BLIGHT_BOTH  = GFX_BLIGHT_TOP | GFX_BLIGHT_BOT
+} GfxBlight;
+
 
 
 void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
@@ -79,6 +86,10 @@ static inline void GFX_initDefault(void)
 void GFX_deinit(void);
 
 void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
+
+void GFX_powerOnBacklights(GfxBlight mask);
+
+void GFX_powerOffBacklights(GfxBlight mask);
 
 void GFX_setBrightness(u8 top, u8 bot);
 

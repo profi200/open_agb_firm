@@ -29,24 +29,30 @@
 #define IPC_CMD_PARAMS_MASK(cmd)    ((cmd) & 15u)   // Max 15
 
 
-#define MAKE_CMD(id, inBufs, outBufs, params)  ((id)<<8 | (inBufs)<<6 | (outBufs)<<4 | params)
+// https://stackoverflow.com/a/52770279
+// Note: __COUNTER__ is non standard.
+#define MAKE_CMD9(inBufs, outBufs, params) ((__COUNTER__ - _CMD9_C_BASE)<<8 | (inBufs)<<6 | (outBufs)<<4 | params)
+#define MAKE_CMD11(inBufs, outBufs, params) ((__COUNTER__ - _CMD11_C_BASE)<<8 | (inBufs)<<6 | (outBufs)<<4 | params)
 
+enum {_CMD9_C_BASE = __COUNTER__ + 1}; // Start at 0.
 typedef enum
 {
-	IPC_CMD9_PREPARE_GBA       = MAKE_CMD(0, 0, 0, 2),
-	IPC_CMD9_SET_GBA_RTC       = MAKE_CMD(1, 0, 0, 2),
-	IPC_CMD9_GET_GBA_RTC       = MAKE_CMD(2, 0, 1, 0),
-	IPC_CMD9_PREPARE_POWER     = MAKE_CMD(3, 0, 0, 0)
+	IPC_CMD9_PREPARE_GBA       = MAKE_CMD9(0, 0, 2),
+	IPC_CMD9_SET_GBA_RTC       = MAKE_CMD9(0, 0, 2),
+	IPC_CMD9_GET_GBA_RTC       = MAKE_CMD9(0, 1, 0),
+	IPC_CMD9_PREPARE_POWER     = MAKE_CMD9(0, 0, 0)
 } IpcCmd9;
 
+enum {_CMD11_C_BASE = __COUNTER__ + 1}; // Start at 0.
 typedef enum
 {
-	IPC_CMD11_PRINT_MSG        = MAKE_CMD(0, 0, 0, 0), // Invalid on purpose. Will be decided later.
-	IPC_CMD11_PANIC            = MAKE_CMD(1, 0, 0, 0),
-	IPC_CMD11_EXCEPTION        = MAKE_CMD(2, 0, 0, 0)
+	IPC_CMD11_PRINT_MSG        = MAKE_CMD11(0, 0, 0), // Invalid on purpose. Will be decided later.
+	IPC_CMD11_PANIC            = MAKE_CMD11(0, 0, 0),
+	IPC_CMD11_EXCEPTION        = MAKE_CMD11(0, 0, 0)
 } IpcCmd11;
 
-#undef MAKE_CMD
+#undef MAKE_CMD9
+#undef MAKE_CMD11
 
 
 typedef struct
