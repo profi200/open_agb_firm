@@ -16,7 +16,7 @@ LPFE
 	# LgyFb sometimes (at the end of each scanline?) sends
 	# single requests. Since we can transfer all 8 scanlines
 	# with bursts only we will ignore them.
-	LP 31
+	LP 47
 		LDB
 		STB
 	LPENDB

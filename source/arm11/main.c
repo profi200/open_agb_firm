@@ -30,7 +30,7 @@
 
 int main(void)
 {
-	GFX_init(GFX_RGB5A1, GFX_RGB565);
+	GFX_init(GFX_BGR8, GFX_RGB565);
 	GFX_setBrightness(DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS);
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
