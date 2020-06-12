@@ -37,15 +37,40 @@
 enum {_CMD9_C_BASE = __COUNTER__ + 1}; // Start at 0.
 typedef enum
 {
-	IPC_CMD9_PREPARE_GBA       = MAKE_CMD9(0, 0, 2),
+	// Filesystem API.
+	IPC_CMD9_FMOUNT            = MAKE_CMD9(0, 0, 1),
+	IPC_CMD9_FUNMOUNT          = MAKE_CMD9(0, 0, 1),
+	IPC_CMD9_FGETFREE          = MAKE_CMD9(0, 1, 1),
+	IPC_CMD9_FOPEN             = MAKE_CMD9(1, 1, 1),
+	IPC_CMD9_FREAD             = MAKE_CMD9(0, 2, 1),
+	IPC_CMD9_FWRITE            = MAKE_CMD9(1, 1, 1),
+	IPC_CMD9_FSYNC             = MAKE_CMD9(0, 0, 1),
+	IPC_CMD9_FLSEEK            = MAKE_CMD9(0, 0, 2),
+	IPC_CMD9_FTELL             = MAKE_CMD9(0, 0, 1),
+	IPC_CMD9_FSIZE             = MAKE_CMD9(0, 0, 1),
+	IPC_CMD9_FCLOSE            = MAKE_CMD9(0, 0, 1),
+	IPC_CMD9_FSTAT             = MAKE_CMD9(1, 1, 0),
+	IPC_CMD9_FOPEN_DIR         = MAKE_CMD9(1, 1, 0),
+	IPC_CMD9_FREAD_DIR         = MAKE_CMD9(0, 2, 2),
+	IPC_CMD9_FCLOSE_DIR        = MAKE_CMD9(0, 0, 1),
+	IPC_CMD9_FMKDIR            = MAKE_CMD9(1, 0, 0),
+	IPC_CMD9_FRENAME           = MAKE_CMD9(2, 0, 0),
+	IPC_CMD9_FUNLINK           = MAKE_CMD9(1, 0, 0),
+
+	// open_agb_firm specific API.
+	IPC_CMD9_PREPARE_GBA       = MAKE_CMD9(1, 0, 2),
 	IPC_CMD9_SET_GBA_RTC       = MAKE_CMD9(0, 0, 2),
 	IPC_CMD9_GET_GBA_RTC       = MAKE_CMD9(0, 1, 0),
+	IPC_CMD9_BACKUP_GBA_SAVE   = MAKE_CMD9(0, 0, 0),
+
+	// Miscellaneous API.
 	IPC_CMD9_PREPARE_POWER     = MAKE_CMD9(0, 0, 0)
 } IpcCmd9;
 
 enum {_CMD11_C_BASE = __COUNTER__ + 1}; // Start at 0.
 typedef enum
 {
+	// Miscellaneous API.
 	IPC_CMD11_PRINT_MSG        = MAKE_CMD11(0, 0, 0), // Invalid on purpose. Will be decided later.
 	IPC_CMD11_PANIC            = MAKE_CMD11(0, 0, 0),
 	IPC_CMD11_EXCEPTION        = MAKE_CMD11(0, 0, 0)

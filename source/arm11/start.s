@@ -125,7 +125,7 @@ BEGIN_ASM_FUNC _start
 	ldr r1, =fake_heap_end
 	str r0, [r1]
 	blx __libc_init_array       @ Initialize ctors and dtors
-	blx core123Init
+	blx PDN_core123Init
 _start_skip_bss_init_array:
 	ldrh r2, =0x706             @ Disable + reset all counters. Cycle counter divider 1. IRQs disabled.
 	mcr p15, 0, r2, c15, c12, 0 @ Write Performance Monitor Control Register

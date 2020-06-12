@@ -2,7 +2,7 @@
 
 /*
  *   This file is part of fastboot 3DS
- *   Copyright (C) 2017 derrek, profi200
+ *   Copyright (C) 2020 derrek, profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@
  */
 
 #include "types.h"
+#include "error_codes.h"
 
 
 
-void CPU_setClock(u16 clk);
-void CPU_poweroffCore23(void);
+Result fsQuickRead(const char *const path, u32 off, void *buf, u32 size);

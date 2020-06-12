@@ -21,6 +21,8 @@
 #include "types.h"
 #include "fb_assert.h"
 #include "hardware/gfx.h"
+#include "arm11/hardware/cfg11.h"
+#include "arm11/hardware/pdn.h"
 #include "arm11/hardware/lcd.h"
 #include "arm11/hardware/gx.h"
 #include "arm11/hardware/gpu_regs.h"
@@ -34,10 +36,6 @@
 #include "arm.h"
 #include "util.h"
 #include "arm11/allocator/vram.h"
-
-
-#define PDN_REGS_BASE            (IO_MEM_ARM9_ARM11 + 0x40000)
-#define REG_PDN_GPU_CNT          *((vu32*)(PDN_REGS_BASE + 0x1200))
 
 
 static struct
@@ -70,12 +68,12 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	g_gfxState.doubleBuf[0] = 1;
 	g_gfxState.doubleBuf[1] = 1;
 
-	*((vu32*)0x10140140) = 0; // REG_CFG11_GPUPROT
+	REG_CFG11_GPUPROT = 0;
 
 	// Reset
-	REG_PDN_GPU_CNT = 0x10000;
+	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E;
 	wait(12);
-	REG_PDN_GPU_CNT = 0x1007F;
+	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E | PDN_GPU_CNT_RST_ALL;
 	REG_GX_GPU_CLK = 0x100;
 	REG_GX_PSC_VRAM = 0;
 	REG_GX_PSC_FILL0_CNT = 0;
@@ -178,7 +176,7 @@ void GFX_deinit(void)
 	REG_LCD_RST = 0;
 	REG_GX_PSC_VRAM = 0xF00;
 	REG_GX_GPU_CLK = 0;
-	REG_PDN_GPU_CNT = 0x10001;
+	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E | PDN_GPU_CNT_RST_REGS;
 
 	deallocFramebufs();
 
@@ -551,12 +549,12 @@ void GX_processCommandList(u32 size, const u32 *const cmdList)
 	REG_LCD_PDC1_SWAP = 0x70100;
 
 	REG_GX_PSC_VRAM = 0xF00;
-	REG_PDN_GPU_CNT = 0x7F;
+	REG_PDN_GPU_CNT = PDN_GPU_CNT_RST_ALL;
 }
 
 void GFX_returnFromLowPowerState(void)
 {
-	REG_PDN_GPU_CNT = 0x1007F;
+	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E | PDN_GPU_CNT_RST_ALL;
 	REG_GX_PSC_VRAM = 0;
 	//REG_GX_GPU_CLK = 0x70100;
 	REG_GX_PSC_FILL0_CNT = 0;

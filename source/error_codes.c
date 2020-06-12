@@ -15,10 +15,28 @@ void printError(Result res)
 	{
 		"OK",
 		"SD card removed",
-		"Failed to mount drive",
-		"Failed to open file",
-		"Failed to read file",
-		"Failed to write file"
+		"Invalid argument",
+
+		// fatfs errors.
+		"fatfs disk error",
+		"fatfs assertion failed",
+		"fatfs disk not ready",
+		"fatfs file not found",
+		"fatfs path not found",
+		"fatfs invalid path name",
+		"fatfs access denied",
+		"fatfs already exists",
+		"fatfs invalid file/directory object",
+		"fatfs drive write protected",
+		"fatfs invalid drive",
+		"fatfs drive not mounted",
+		"fatfs no filesystem",
+		"fatfs f_mkfs() aborted",
+		"fatfs thread lock timeout",
+		"fatfs file locked",
+		"fatfs not enough memory",
+		"fatfs too many open objects",
+		"fatfs invalid parameter"
 	};
 	static const char *const custom[] =
 	{

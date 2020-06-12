@@ -6,9 +6,10 @@
 #include "mmio.h"
 #include "arm9/hardware/ndma.h"
 #include "arm9/arm7_stub.h"
-#include "fatfs/ff.h"
+#include "fs.h"
 #include "arm9/debug.h"
 #include "arm9/hardware/crypto.h"
+#include "util.h"
 
 
 #define LGY_REGS_BASE             (IO_MEM_ARM9_ONLY + 0x18000)
@@ -24,17 +25,9 @@
 #define REGs_LGY_GBA_SAVE_TIMING   ((vu32*)(LGY_REGS_BASE + 0x120))
 
 
-#define MAX_ROM_SIZE    (1024u * 1024 * 32)
-#define MAX_SAVE_SIZE   (1024u * 128)
-#define ARM7_STUB_LOC   (0x3007E00u)
-#define ARM7_STUB_LOC9  (0x80BFE00u)
-#define ROM_LOC         (0x20000000u)
-#define SAVE_LOC        (0x8080000u)
-
-
-static FATFS g_sd = {0};
 static u32 g_saveSize = 0;
 static u32 g_saveHash[8] = {0};
+static char g_savePath[256] = {0};
 
 
 
@@ -80,7 +73,7 @@ static void setupSaveType(u16 saveType)
 	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveTm, 16);
 }
 
-Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
+Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const savePath)
 {
 	REG_LGY_MODE = LGY_MODE_AGB;
 
@@ -88,73 +81,23 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
 	setupSaveType(saveType);
 
 	Result res = RES_OK;
-	do
+	if(g_saveSize != 0)
 	{
-		u32 romSize = 0;
-		if(f_mount(&g_sd, "sdmc:", 1) == FR_OK)
+		FHandle f;
+		if(fOpen(&f, savePath, FA_OPEN_EXISTING | FA_READ) == RES_OK)
 		{
-			FIL f;
-			if(f_open(&f, "sdmc:/rom.gba", FA_OPEN_EXISTING | FA_READ) == FR_OK)
+			// TODO: Should we handle 0 byte files?
+			res = fRead(f, (void*)SAVE_LOC, MAX_SAVE_SIZE, NULL);
+			fClose(f);
+
+			if(res == RES_OK)
 			{
-				if((romSize = f_size(&f)) > MAX_ROM_SIZE)
-				{
-					f_close(&f);
-					res = RES_ROM_TOO_BIG;
-					break;
-				}
-
-				u8 *ptr = (u8*)ROM_LOC;
-				UINT read;
-				FRESULT fres;
-				while((fres = f_read(&f, ptr, 0x100000u, &read)) == FR_OK && read == 0x100000u)
-					ptr += 0x100000u;
-
-				f_close(&f);
-
-				if(fres != FR_OK)
-				{
-					res = RES_FILE_READ_ERR;
-					break;
-				}
-			}
-			else
-			{
-				res = RES_FILE_OPEN_ERR;
-				break;
-			}
-
-			if(g_saveSize != 0)
-			{
-				if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_EXISTING | FA_READ) == FR_OK)
-				{
-					UINT read;
-					FRESULT fres = f_read(&f, (void*)SAVE_LOC, MAX_SAVE_SIZE, &read);
-
-					f_close(&f);
-
-					if(fres != FR_OK)
-					{
-						res = RES_FILE_READ_ERR;
-						break;
-					}
-
-					sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
-				}
-				else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
+				sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+				strncpy_s(g_savePath, savePath, 255, 256);
 			}
 		}
-		else
-		{
-			res = RES_MOUNT_ERR;
-			break;
-		}
-
-		// Pad ROM area with "open bus" value.
-		if(romSize < MAX_ROM_SIZE)
-			NDMA_fill((u32*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
-	} while(0);
-
-	// Should we unmount on non-mount error here?
+		else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
+	}
 
 	return res;
 }
@@ -197,7 +140,6 @@ Result LGY_getGbaRtc(GbaRtc *const out)
 Result LGY_backupGbaSave(void)
 {
 	Result res = RES_OK;
-
 	if(g_saveSize != 0)
 	{
 		// Enable savegame mem region.
@@ -205,25 +147,19 @@ Result LGY_backupGbaSave(void)
 
 		u32 newHash[8];
 		sha((u32*)SAVE_LOC, g_saveSize, newHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
-		if(memcmp(g_saveHash, newHash, 32) != 0) // Backup save if it changed.
+		if(memcmp(g_saveHash, newHash, 32) != 0) // Backup save if changed.
 		{
-			FIL f;
-			if(f_open(&f, "sdmc:/rom.sav", FA_OPEN_ALWAYS | FA_WRITE) == FR_OK)
+			FHandle f;
+			if((res = fOpen(&f, g_savePath, FA_OPEN_ALWAYS | FA_WRITE)) == RES_OK)
 			{
-				UINT written;
-				if(f_write(&f, (void*)SAVE_LOC, g_saveSize, &written) != FR_OK)
-					res = RES_FILE_WRITE_ERR;
-
-				f_close(&f);
+				res = fWrite(f, (void*)SAVE_LOC, g_saveSize, NULL);
+				fClose(f);
 			}
-			else res = RES_FILE_OPEN_ERR;
 		}
 
 		// Disable savegame mem region.
 		REG_LGY_GBA_SAVE_MAP = LGY_SAVE_MAP_7;
 	}
-
-	f_mount(NULL, "sdmc:", 0);
 
 	return res;
 }

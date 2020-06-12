@@ -114,6 +114,10 @@ u32 PXI_sendCmd(u32 cmd, const u32 *buf, u32 words)
 		const IpcBuffer *const inBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];
 		if(inBuf->ptr && inBuf->size) cleanDCacheRange(inBuf->ptr, inBuf->size);
 	}
+	// Edge case:
+	// memset() 256 bytes string buffer, fRead() 256 bytes from 10 bytes file and fWrite() them to another
+	// file. The buffer will be filled with garbage where it wasn't overwritten because of the invalidate.
+	// TODO: Should we flush here instead?
 	for(u32 i = inBufs; i < inBufs + outBufs; i++)
 	{
 		const IpcBuffer *const outBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];
@@ -132,7 +136,7 @@ u32 PXI_sendCmd(u32 cmd, const u32 *buf, u32 words)
 
 #ifdef ARM11
 	// The CPU may do speculative prefetches of data after the first invalidation
-	// so we need to do it again. Not sure if this is a ARMv6+ thing.
+	// so we need to do it again.
 	for(u32 i = inBufs; i < inBufs + outBufs; i++)
 	{
 		const IpcBuffer *const outBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];

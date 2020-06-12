@@ -112,7 +112,7 @@ void NSPI_init(void)
 	inited = true;
 
 	// Switch all 3 buses to the new interface
-	REG_CFG11_SPI_CNT = 1u<<2 | 1u<<1 | 1u;
+	REG_CFG11_SPI_CNT = SPI_CNT_SPI3_NEW_IF | SPI_CNT_SPI2_NEW_IF | SPI_CNT_SPI1_NEW_IF;
 
 	SpiRegs *regs = nspiGetBusRegsBase(SPI_BUS1);
 	regs->NSPI_INT_MASK = NSPI_INT_TRANSF_END; // Disable interrupt 1

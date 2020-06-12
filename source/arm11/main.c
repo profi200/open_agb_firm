@@ -24,6 +24,7 @@
 #include "arm11/fmt.h"
 #include "arm11/power.h"
 #include "hardware/gfx.h"
+#include "fs.h"
 #include "arm.h"
 
 
@@ -34,10 +35,11 @@ int main(void)
 	GFX_setBrightness(DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS);
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
+	fMount(FS_DRIVE_SDMC);
 
 	ee_puts("Reading ROM and save...");
 	Result res;
-	if((res = LGY_prepareGbaMode(false, SAVE_TYPE_SRAM_256k)) == RES_OK)
+	if((res = LGY_prepareGbaMode(false, SAVE_TYPE_SRAM_256k, "sdmc:/rom.gba", "sdmc:/rom.sav")) == RES_OK)
 	{
 #ifdef NDEBUG
 		GFX_setForceBlack(false, true);
@@ -60,6 +62,7 @@ int main(void)
 	else printErrorWaitInput(res, 0);
 
 	LGY_deinit();
+	fUnmount(FS_DRIVE_SDMC);
 	CODEC_deinit();
 	GFX_deinit();
 	power_off();

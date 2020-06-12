@@ -214,8 +214,8 @@ void setupMmu(void)
 		            L1_TO_L2(ATTR_NORM_WRITE_BACK_ALLOC));
 
 		// FCRAM with New 3DS extension
-		//mmuMapSupersections(FCRAM_BASE, FCRAM_BASE, 16, PERM_PRIV_RW_USR_NA, true,
-		//                    ATTR_NORM_WRITE_BACK_ALLOC);
+		mmuMapSupersections(FCRAM_BASE, FCRAM_BASE, 16, PERM_PRIV_RW_USR_NA, true,
+		                    ATTR_NORM_WRITE_BACK_ALLOC);
 
 		// Map fastboot executable start to boot11 mirror (exception vectors)
 		mmuMapPages(BOOT11_MIRROR2, (u32)__start__, 1, mmuTables->l2Boot11, true,

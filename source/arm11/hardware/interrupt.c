@@ -180,7 +180,7 @@ void IRQ_init(void)
 	REG_GIC_CPU_BINPOINT = 3;    // All priority bits are compared for pre-emption.
 	REG_GIC_CPU_CTRL     = 1;    // Enable the interrupt interface for this CPU.
 
-	REG_CFG11_FIQ_CNT = 2; // Disable FIQs.
+	REG_CFG11_FIQ_MASK = FIQ_MASK_CPU3 | FIQ_MASK_CPU2 | FIQ_MASK_CPU1 | FIQ_MASK_CPU0; // Disable FIQs.
 }
 
 void IRQ_registerIsr(Interrupt id, u8 prio, u8 cpuMask, IrqIsr isr)

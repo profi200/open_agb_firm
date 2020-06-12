@@ -21,6 +21,7 @@
 #include "types.h"
 #include "arm11/hardware/codec.h"
 #include "arm11/hardware/spi.h"
+#include "arm11/hardware/pdn.h"
 #include "arm11/hardware/timer.h"
 #include "arm11/hardware/gpio.h"
 
@@ -240,7 +241,7 @@ void CODEC_init(void)
 	codecSwapCalibrationData(cal); // Come the fuck on. Why is this not stored in the correct endianness?
 
 	// General codec reset + init?
-	*((vu8*)0x10141220) = 2;
+	REG_PDN_I2S_CNT = PDN_I2S_CNT_I2S_CLK2_E;
 	codecWriteReg(0x64, 1, 1);
 	TIMER_sleepMs(40);
 	codecSwitchBank(0); // What? Dummy switch after reset?
@@ -406,7 +407,7 @@ void CODEC_deinit(void)
 	}
 	*((vu16*)0x10145000) &= ~0x8000u;
 	*((vu16*)0x10145002) &= ~0x8000u;
-	*((vu8* )0x10141220) = 0;
+	REG_PDN_I2S_CNT = 0;
 	GPIO_write(GPIO_3_0, 0); // GPIO bitmask 0x40
 	TIMER_sleepMs(18); // Fixed 18 ms delay when unsetting this GPIO.
 }
@@ -415,7 +416,7 @@ void CODEC_wakeup(void)
 {
 	GPIO_write(GPIO_3_0, 1); // GPIO bitmask 0x40
 	TIMER_sleepMs(10); // Fixed 10 ms delay when setting this GPIO.
-	*((vu8* )0x10141220) = 2u;
+	REG_PDN_I2S_CNT = PDN_I2S_CNT_I2S_CLK2_E;
 	*((vu16*)0x10145000) |= 0x8000u;
 	*((vu16*)0x10145002) |= 0x8000u;
 	//codecMaskReg(0x64, 0x45, 0, 0x30); // Output select automatic

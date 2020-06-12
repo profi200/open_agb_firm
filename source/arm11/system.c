@@ -25,7 +25,6 @@
 #include "arm11/hardware/i2c.h"
 #include "arm11/hardware/mcu.h"
 #include "arm11/hardware/hid.h"
-#include "arm11/hardware/cpu.h"
 #include "arm.h"
 
 

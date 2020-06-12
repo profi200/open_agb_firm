@@ -4,9 +4,18 @@
 #include "error_codes.h"
 
 
+#define MAX_ROM_SIZE    (1024u * 1024 * 32)
+#define MAX_SAVE_SIZE   (1024u * 128)
+#define ARM7_STUB_LOC   (0x3007E00u)
+#define ARM7_STUB_LOC9  (0x80BFE00u)
+#define ROM_LOC         (0x20000000u)
+#define SAVE_LOC        (0x8080000u)
+
+
 // REG_LGY_MODE
-#define LGY_MODE_TWL  (1u)
-#define LGY_MODE_AGB  (2u)
+#define LGY_MODE_TWL           (1u)
+#define LGY_MODE_AGB           (2u)
+#define LGY_MODE_START         (1u<<15)
 
 // REG_LGY_GBA_SAVE_TYPE
 enum
@@ -94,13 +103,14 @@ typedef struct
 
 
 
-Result LGY_prepareGbaMode(bool gbaBios, u16 saveType);
 Result LGY_setGbaRtc(const GbaRtc rtc);
 Result LGY_getGbaRtc(GbaRtc *const out);
+Result LGY_backupGbaSave(void);
 #ifdef ARM11
+Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const romPath, const char *const savePath);
 void LGY_switchMode(void);
 void LGY_handleEvents(void);
 void LGY_deinit(void);
 #elif ARM9
-Result LGY_backupGbaSave(void);
+Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const savePath);
 #endif

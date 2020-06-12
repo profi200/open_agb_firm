@@ -1,9 +1,13 @@
+#include <string.h>
 #include "types.h"
 #include "hardware/lgy.h"
 #include "hardware/pxi.h"
 #include "ipc_handler.h"
 #include "arm11/hardware/hid.h"
 #include "arm11/hardware/interrupt.h"
+#include "fs.h"
+#include "hardware/cache.h"
+#include "arm11/hardware/pdn.h"
 #include "arm11/hardware/mcu.h"
 #include "arm11/hardware/lgyfb.h"
 
@@ -34,12 +38,62 @@ static void lgySleepIrqHandler(u32 intSource)
 	}
 }
 
-Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
+static Result loadRom(const char *const path)
 {
-	const u32 cmdBuf[2] = {gbaBios, saveType};
-	Result res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 2);
+	Result res;
+	FHandle f;
+	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	{
+		u32 romSize;
+		if((romSize = fSize(f)) <= MAX_ROM_SIZE)
+		{
+			u8 *ptr = (u8*)ROM_LOC;
+			u32 read;
+			while((res = fRead(f, ptr, 0x100000u, &read)) == RES_OK && read == 0x100000u)
+				ptr += 0x100000u;
+
+			if(res == RES_OK)
+			{
+				// Pad ROM area with "open bus" value.
+				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, romSize);
+			}
+		}
+		else res = RES_ROM_TOO_BIG;
+
+		fClose(f);
+	}
+
+	return res;
+}
+
+static void setupFcramForGbaMode(void)
+{
+	// FCRAM reset and clock disable.
+	flushDCache();
+	// TODO: Unmap FCRAM.
+	while(!REG_LGY_MODE); // Wait until legacy mode is ready.
+	*((vu32*)0x10201000) &= ~1u;                        // Some kind of bug fix for the GBA cart emu?
+	REG_PDN_FCRAM_CNT = 0;                              // Set reset low (active).
+	REG_PDN_FCRAM_CNT = PDN_FCRAM_CNT_RST;              // Take it out of reset.
+	while(REG_PDN_FCRAM_CNT & PDN_FCRAM_CNT_CLK_E_ACK); // Wait until clock is disabled.
+}
+
+Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const romPath, const char *const savePath)
+{
+	// Load the ROM image.
+	Result res = loadRom(romPath);
 	if(res != RES_OK) return res;
 
+	// Prepare ARM9 for GBA mode + settings and save loading.
+	u32 cmdBuf[2];
+	cmdBuf[0] = (u32)savePath;
+	cmdBuf[1] = strlen(savePath) + 1;
+	cmdBuf[2] = gbaBios;
+	cmdBuf[3] = saveType;
+	res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 4);
+	if(res != RES_OK) return res;
+
+	// Setup GBA Real-Time Clock.
 	GbaRtc rtc;
 	MCU_getRTCTime((u8*)&rtc);
 	rtc.time = __builtin_bswap32(rtc.time)>>8;
@@ -47,18 +101,13 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType)
 	// TODO: Do we need to set day of week?
 	LGY_setGbaRtc(rtc);
 
+	// Setup Legacy Framebuffer.
 	LGYFB_init();
 
-	//flushInvalidateDCache();
-	// Unmap FCRAM if mapped.
+	// Setup FCRAM for GBA mode.
+	setupFcramForGbaMode();
 
-	while(!REG_LGY_MODE); // Wait until legacy mode is ready.
-	// FCRAM reset and disable.
-	*((vu32*)0x10201000) &= ~1u;     // Disable DRAM controller? If bit 0 set below reg pokes do nothing.
-	*((vu8*)0x10141210) = 0;         // Set reset low (active).
-	*((vu8*)0x10141210) = 1;         // Take it out of reset.
-	while(*((vu8*)0x10141210) & 4u); // Wait for acknowledge?
-
+	// Setup IRQ handlers and sleep mode handling.
 	REG_LGY_SLEEP = 1u<<15;
 	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, lgySleepIrqHandler);
 	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, lgySleepIrqHandler);
@@ -79,13 +128,7 @@ Result LGY_getGbaRtc(GbaRtc *const out)
 
 void LGY_switchMode(void)
 {
-	//ee_puts("Done. Doing final switch...");
-	//updateScreens();
-	/*do
-	{
-		while(*((vu16*)0x10008004) & 0x100u); // ARM9 reg pokes
-	} while(*((vu32*)0x1000800C) != 0x...);*/
-	REG_LGY_MODE = 0x8000u;
+	REG_LGY_MODE = LGY_MODE_START;
 }
 
 #ifndef NDEBUG
@@ -126,12 +169,17 @@ void LGY_handleEvents(void)
 	//if(REG_LGY_SLEEP & 2u) REG_HID_PADCNT = REG_LGY_PADCNT;
 }
 
+Result LGY_backupGbaSave(void)
+{
+	return PXI_sendCmd(IPC_CMD9_BACKUP_GBA_SAVE, NULL, 0);
+}
+
 void LGY_deinit(void)
 {
 	//REG_LGY_PAD_VAL = 0x1FFF; // Force all buttons not pressed.
 	//REG_LGY_PAD_SEL = 0x1FFF;
 
-	// TODO: Tell ARM9 to backup the savegame instead of handling it on poweroff.
+	LGY_backupGbaSave();
 	LGYFB_deinit();
 
 	IRQ_unregisterIsr(IRQ_LGY_SLEEP);
