@@ -107,7 +107,7 @@ Result LGY_setGbaRtc(const GbaRtc rtc);
 Result LGY_getGbaRtc(GbaRtc *const out);
 Result LGY_backupGbaSave(void);
 #ifdef ARM11
-Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const romPath, const char *const savePath);
+Result LGY_prepareGbaMode(bool gbaBios, const char *const romPath, const char *const savePath);
 void LGY_switchMode(void);
 void LGY_handleEvents(void);
 void LGY_deinit(void);

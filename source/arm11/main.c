@@ -39,7 +39,7 @@ int main(void)
 
 	ee_puts("Reading ROM and save...");
 	Result res;
-	if((res = LGY_prepareGbaMode(false, SAVE_TYPE_SRAM_256k, "sdmc:/rom.gba", "sdmc:/rom.sav")) == RES_OK)
+	if((res = LGY_prepareGbaMode(false, "sdmc:/rom.gba", "sdmc:/rom.sav")) == RES_OK)
 	{
 #ifdef NDEBUG
 		GFX_setForceBlack(false, true);
