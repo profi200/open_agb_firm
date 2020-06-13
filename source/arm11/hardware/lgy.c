@@ -71,7 +71,7 @@ static Result loadRom(const char *const path, u32 *const rsOut)
 }
 
 // Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
-static void tryDetectSaveType(u32 romSize, u16 *const stOut)
+static u16 tryDetectSaveType(u32 romSize)
 {
 #ifndef NDEBUG
 	ee_puts("Trying to detect save type...");
@@ -158,13 +158,17 @@ static void tryDetectSaveType(u32 romSize, u16 *const stOut)
 #ifndef NDEBUG
 				ee_printf("Found save type %s.", str);
 #endif
-				*stOut = saveType;
+				return saveType;
 			}
 		}
 	}
+	else
+	{
 #ifndef NDEBUG
-	else ee_puts("Could not identify save type. Using none.");
+		ee_puts("Could not identify save type. Using none.");
 #endif
+		return SAVE_TYPE_NONE;
+	}
 }
 
 static void setupFcramForGbaMode(void)
@@ -187,11 +191,10 @@ Result LGY_prepareGbaMode(bool gbaBios, const char *const romPath, const char *c
 	if(res != RES_OK) return res;
 
 	// Try to detect the save type.
-	u16 saveType = SAVE_TYPE_NONE;
-	tryDetectSaveType(romSize, &saveType);
+	const u16 saveType = tryDetectSaveType(romSize);
 
 	// Prepare ARM9 for GBA mode + settings and save loading.
-	u32 cmdBuf[2];
+	u32 cmdBuf[4];
 	cmdBuf[0] = (u32)savePath;
 	cmdBuf[1] = strlen(savePath) + 1;
 	cmdBuf[2] = gbaBios;
@@ -223,13 +226,13 @@ Result LGY_prepareGbaMode(bool gbaBios, const char *const romPath, const char *c
 
 Result LGY_setGbaRtc(const GbaRtc rtc)
 {
-	return PXI_sendCmd(IPC_CMD9_SET_GBA_RTC, (u32*)&rtc, 2);
+	return PXI_sendCmd(IPC_CMD9_SET_GBA_RTC, (u32*)&rtc, sizeof(GbaRtc) / 4);
 }
 
 Result LGY_getGbaRtc(GbaRtc *const out)
 {
 	const u32 cmdBuf[2] = {(u32)out, sizeof(GbaRtc)};
-	return PXI_sendCmd(IPC_CMD9_GET_GBA_RTC, cmdBuf, sizeof(GbaRtc) / 4);
+	return PXI_sendCmd(IPC_CMD9_GET_GBA_RTC, cmdBuf, 2);
 }
 
 void LGY_switchMode(void)
