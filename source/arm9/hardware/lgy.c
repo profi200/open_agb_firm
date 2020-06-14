@@ -79,6 +79,7 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const savePath
 
 	setupBiosOverlay(gbaBios);
 	setupSaveType(saveType);
+	strncpy_s(g_savePath, savePath, 255, 256);
 
 	Result res = RES_OK;
 	if(g_saveSize != 0)
@@ -93,7 +94,6 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const savePath
 			if(res == RES_OK)
 			{
 				sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
-				strncpy_s(g_savePath, savePath, 255, 256);
 			}
 		}
 		else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
@@ -149,6 +149,9 @@ Result LGY_backupGbaSave(void)
 		sha((u32*)SAVE_LOC, g_saveSize, newHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
 		if(memcmp(g_saveHash, newHash, 32) != 0) // Backup save if changed.
 		{
+			// Update hash.
+			memcpy(g_saveHash, newHash, 32);
+
 			FHandle f;
 			if((res = fOpen(&f, g_savePath, FA_OPEN_ALWAYS | FA_WRITE)) == RES_OK)
 			{

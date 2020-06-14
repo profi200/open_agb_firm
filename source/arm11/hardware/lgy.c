@@ -70,105 +70,80 @@ static Result loadRom(const char *const path, u32 *const rsOut)
 	return res;
 }
 
-// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 static u16 tryDetectSaveType(u32 romSize)
 {
 #ifndef NDEBUG
 	ee_puts("Trying to detect save type...");
 #endif
 
-	u8 saveChipKind = 0; // 0 = none, 1 = EEPROM, 2 = Flash, 3 = SRAM.
+	u16 saveType = SAVE_TYPE_NONE;
 	const u32 *romPtr = (u32*)(ROM_LOC + 0xE4u); // Skip headers.
 	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
 	{
 		u32 tmp = *romPtr;
 
-		// "EEPR"
-		if(tmp == 0x52504545u)
+		// "EEPR" "FLAS" "SRAM"
+		if(tmp == 0x52504545u || tmp == 0x53414C46u || tmp == 0x4D415253u)
 		{
-			saveChipKind = 1;
-			break;
-		}
-
-		// "FLAS"
-		if(tmp == 0x53414C46u)
-		{
-			saveChipKind = 2;
-			break;
-		}
-
-		// "SRAM"
-		if(tmp == 0x4D415253u)
-		{
-			saveChipKind = 3;
-			break;
-		}
-	}
-
-	if(saveChipKind != 0)
-	{
-		static const struct
-		{
-			char *str;
-			u16 saveType;
-		} saveTypeLut[25] =
-		{
-			// EEPROM
-			// TODO: Which ones are SAVE_TYPE_EEPROM_64k_2?
-			{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},  // 512 bytes.
-			{"EEPROM_V120", SAVE_TYPE_EEPROM_64k},
-			{"EEPROM_V121", SAVE_TYPE_EEPROM_64k},
-			{"EEPROM_V122", SAVE_TYPE_EEPROM_64k},
-			{"EEPROM_V124", SAVE_TYPE_EEPROM_64k},
-			{"EEPROM_V125", SAVE_TYPE_EEPROM_64k},
-			{"EEPROM_V126", SAVE_TYPE_EEPROM_64k},
-
-			// FLASH
-			// Assume they all have RTC.
-			{"FLASH_V120",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH_V121",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH_V123",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH_V124",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH_V125",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH_V126",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH512_V130", SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH512_V131", SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH512_V133", SAVE_TYPE_FLASH_512k_PSC_RTC},
-			{"FLASH1M_V102",  SAVE_TYPE_FLASH_1m_MRX_RTC},
-			{"FLASH1M_V103",  SAVE_TYPE_FLASH_1m_MRX_RTC},
-
-			// FRAM & SRAM
-			{"SRAM_F_V100", SAVE_TYPE_SRAM_256k},
-			{"SRAM_F_V102", SAVE_TYPE_SRAM_256k},
-			{"SRAM_F_V103", SAVE_TYPE_SRAM_256k},
-
-			{"SRAM_V110",   SAVE_TYPE_SRAM_256k},
-			{"SRAM_V111",   SAVE_TYPE_SRAM_256k},
-			{"SRAM_V112",   SAVE_TYPE_SRAM_256k},
-			{"SRAM_V113",   SAVE_TYPE_SRAM_256k}
-		};
-
-		for(u32 i = 0; i < 25; i++)
-		{
-			const char *const str = saveTypeLut[i].str;
-			const u16 saveType = saveTypeLut[i].saveType;
-
-			if(memcmp(romPtr, str, strlen(str)) == 0)
+			static const struct
 			{
+				char *str;
+				u16 saveType;
+			} saveTypeLut[25] =
+			{
+				// EEPROM
+				// TODO: Which ones are SAVE_TYPE_EEPROM_64k_2?
+				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},  // 512 bytes.
+				{"EEPROM_V120", SAVE_TYPE_EEPROM_64k},
+				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k},
+				{"EEPROM_V122", SAVE_TYPE_EEPROM_64k}, // Confirmed.
+				{"EEPROM_V124", SAVE_TYPE_EEPROM_64k}, // Confirmed.
+				{"EEPROM_V125", SAVE_TYPE_EEPROM_64k},
+				{"EEPROM_V126", SAVE_TYPE_EEPROM_64k},
+
+				// FLASH
+				// Assume they all have RTC.
+				{"FLASH_V120",    SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH_V121",    SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH_V123",    SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH_V124",    SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH_V125",    SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH_V126",    SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH512_V130", SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH512_V131", SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH512_V133", SAVE_TYPE_FLASH_512k_PSC_RTC},
+				{"FLASH1M_V102",  SAVE_TYPE_FLASH_1m_MRX_RTC},
+				{"FLASH1M_V103",  SAVE_TYPE_FLASH_1m_MRX_RTC},
+
+				// FRAM & SRAM
+				{"SRAM_F_V100", SAVE_TYPE_SRAM_256k},
+				{"SRAM_F_V102", SAVE_TYPE_SRAM_256k},
+				{"SRAM_F_V103", SAVE_TYPE_SRAM_256k},
+
+				{"SRAM_V110",   SAVE_TYPE_SRAM_256k},
+				{"SRAM_V111",   SAVE_TYPE_SRAM_256k},
+				{"SRAM_V112",   SAVE_TYPE_SRAM_256k},
+				{"SRAM_V113",   SAVE_TYPE_SRAM_256k}
+			};
+
+			for(u32 i = 0; i < 25; i++)
+			{
+				const char *const str = saveTypeLut[i].str;
+				const u16 tmpSaveType = saveTypeLut[i].saveType;
+
+				if(memcmp(romPtr, str, strlen(str)) == 0)
+				{
 #ifndef NDEBUG
-				ee_printf("Found save type %s.", str);
+					ee_printf("Found save type %s.", str);
 #endif
-				return saveType;
+					saveType = tmpSaveType;
+					break;
+				}
 			}
 		}
 	}
-	else
-	{
-#ifndef NDEBUG
-		ee_puts("Could not identify save type. Using none.");
-#endif
-		return SAVE_TYPE_NONE;
-	}
+
+	return saveType;
 }
 
 static void setupFcramForGbaMode(void)
