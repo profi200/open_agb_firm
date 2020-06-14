@@ -70,6 +70,7 @@ static Result loadRom(const char *const path, u32 *const rsOut)
 	return res;
 }
 
+// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 static u16 tryDetectSaveType(u32 romSize)
 {
 #ifndef NDEBUG
