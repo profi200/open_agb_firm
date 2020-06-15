@@ -30,6 +30,7 @@
 
 #define ALIGN(a)      __attribute__((aligned(a))) // Use alignas() instead.
 #define NAKED         __attribute__((naked))
+#define NOINLINE      __attribute__((noinline))
 #define PACKED        __attribute__((packed))
 #define TARGET_ARM    __attribute__((target("arm")))
 #define TARGET_THUMB  __attribute__((target("thumb")))

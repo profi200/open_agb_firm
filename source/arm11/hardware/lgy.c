@@ -39,7 +39,7 @@ static void lgySleepIrqHandler(u32 intSource)
 	}
 }
 
-static Result loadRom(const char *const path, u32 *const rsOut)
+static Result loadGbaRom(const char *const path, u32 *const rsOut)
 {
 	Result res;
 	FHandle f;
@@ -57,7 +57,7 @@ static Result loadRom(const char *const path, u32 *const rsOut)
 			{
 				*rsOut = romSize;
 				// Pad ROM area with "open bus" value.
-				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, romSize);
+				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
 			}
 		}
 		else res = RES_ROM_TOO_BIG;
@@ -71,9 +71,15 @@ static Result loadRom(const char *const path, u32 *const rsOut)
 // Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 static u16 tryDetectSaveType(u32 romSize)
 {
-	// TODO: Homebrew detection (always SRAM).
+	const u32 *romPtr = (u32*)ROM_LOC;
+	if(romPtr[0xAC / 4] == 0) // If Game Code all zeros --> Homebrew.
+	{
+		debug_printf("Detected homebrew. Using SRAM save type.\n");
+		return SAVE_TYPE_SRAM_256k;
+	}
+
+	romPtr += 0xE4 / 4; // Skip headers.
 	u16 saveType = SAVE_TYPE_NONE;
-	const u32 *romPtr = (u32*)(ROM_LOC + 0xE4u); // Skip headers.
 	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
 	{
 		u32 tmp = *romPtr;
@@ -129,13 +135,15 @@ static u16 tryDetectSaveType(u32 romSize)
 
 				if(memcmp(romPtr, str, strlen(str)) == 0)
 				{
-					debug_printf("Detected save type '%s'.\n", str);
 					saveType = tmpSaveType;
-					break;
+					debug_printf("Detected save type '%s'.\n", str);
+					goto saveTypeFound;
 				}
 			}
 		}
 	}
+
+saveTypeFound:
 
 	return saveType;
 }
@@ -156,7 +164,7 @@ Result LGY_prepareGbaMode(bool gbaBios, const char *const romPath, const char *c
 {
 	// Load the ROM image.
 	u32 romSize;
-	Result res = loadRom(romPath, &romSize);
+	Result res = loadGbaRom(romPath, &romSize);
 	if(res != RES_OK) return res;
 
 	// Try to detect the save type.

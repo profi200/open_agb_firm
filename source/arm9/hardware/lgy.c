@@ -49,7 +49,7 @@ static void setupBiosOverlay(bool gbaBios)
 	iomemcpy(REGs_LGY_A7_VECTOR, (u32*)_overlay_stub, (u32)_overlay_stub_size);
 
 	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_size);
-	// Patch swi 0x10 (RegisterRamReset) to swi 0x26 (HardReset).
+	// Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
 	if(gbaBios) *((u8*)_arm7_stub_swi) = 0x26;
 }
 
