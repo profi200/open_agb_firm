@@ -10,9 +10,7 @@
 #include "arm11/hardware/pdn.h"
 #include "arm11/hardware/mcu.h"
 #include "arm11/hardware/lgyfb.h"
-#ifndef NDEBUG
 #include "arm11/fmt.h"
-#endif
 
 
 #define LGY_REGS_BASE     (IO_MEM_ARM9_ARM11 + 0x41100)
@@ -73,10 +71,7 @@ static Result loadRom(const char *const path, u32 *const rsOut)
 // Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 static u16 tryDetectSaveType(u32 romSize)
 {
-#ifndef NDEBUG
-	ee_puts("Trying to detect save type...");
-#endif
-
+	// TODO: Homebrew detection (always SRAM).
 	u16 saveType = SAVE_TYPE_NONE;
 	const u32 *romPtr = (u32*)(ROM_LOC + 0xE4u); // Skip headers.
 	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
@@ -134,9 +129,7 @@ static u16 tryDetectSaveType(u32 romSize)
 
 				if(memcmp(romPtr, str, strlen(str)) == 0)
 				{
-#ifndef NDEBUG
-					ee_printf("Found save type %s.", str);
-#endif
+					debug_printf("Detected save type '%s'.\n", str);
 					saveType = tmpSaveType;
 					break;
 				}

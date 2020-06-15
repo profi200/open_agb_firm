@@ -1,3 +1,4 @@
+#include "arm.h"
 #include "asm_macros.h"
 
 .cpu arm7tdmi
@@ -7,13 +8,13 @@
 
 @ Must be located at 0x3007E00.
 BEGIN_ASM_FUNC _arm7_stub_start
-	mov r0, #0xD3
+	mov r0, #PSR_INT_OFF | PSR_SVC_MODE
 	adr r1, _arm7_stub_start + 0x200  @ 0x3008000
 	msr CPSR_cxsf, r0
-	mov r0, #0xD2
+	mov r0, #PSR_INT_OFF | PSR_IRQ_MODE
 	mov sp, r1
 	msr CPSR_cxsf, r0
-	mov r0, #0xDF
+	mov r0, #PSR_INT_OFF | PSR_SYS_MODE
 	sub sp, r1, #0x60  @ 0x3007FA0
 	msr CPSR_cxsf, r0
 	mov r3, #0x4700000
@@ -34,13 +35,14 @@ wait_vcount_160_lp:
 	cmp  r0, #160      @ Wait for REG_VCOUNT == 160.
 	bne  wait_vcount_160_lp
 
-	mov  r4, r3     @ Needed for function call 0xBC below.
-	mov  r0, #0xFF
+	mov  r4, r3     @ Needed for "function" call 0xBC below.
+	mov  r0, #0xFF  @ Clear WRAM, iWRAM, palette RAM, VRAM, OAM
+	                @ + reset SIO, sound and all other registers.
 
 .global _arm7_stub_swi
 _arm7_stub_swi = . - _arm7_stub_start + 0x80BFE00 @ Final ARM9 mem location.
-	swi  0x10       @ RegisterRamReset
-	mov  r0, #0xBC
+	swi  0x01       @ RegisterRamReset
+	mov  r0, #0xBC  @ Function 0xB4 but skipping r2 & r4 loading.
 	mov  r2, #0
 	bx   r0
 

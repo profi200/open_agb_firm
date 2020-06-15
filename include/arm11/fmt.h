@@ -37,3 +37,12 @@ __attribute__ ((format (printf, 2, 3))) u32 ee_sprintf(char *const buf, const ch
 __attribute__ ((format (printf, 3, 4))) u32 ee_snprintf(char *const buf, u32 size, const char *const fmt, ...);
 __attribute__ ((format (printf, 1, 2))) u32 ee_printf(const char *const fmt, ...);
 u32 ee_puts(const char *const str);
+
+
+#ifdef NDEBUG
+#define debug_printf(fmt, ...) ((void)0)
+#define debug_puts(str) ((void)0)
+#else
+#define debug_printf(fmt, ...) ee_printf(fmt, ##__VA_ARGS__)
+#define debug_puts(str) ee_puts(str)
+#endif
