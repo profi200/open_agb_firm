@@ -71,11 +71,17 @@ static Result loadGbaRom(const char *const path, u32 *const rsOut)
 // Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 static u16 tryDetectSaveType(u32 romSize)
 {
+	// TODO: Make a proper override list instead of if/else.
 	const u32 *romPtr = (u32*)ROM_LOC;
 	if(romPtr[0xAC / 4] == 0) // If Game Code all zeros --> Homebrew.
 	{
 		debug_printf("Detected homebrew. Using SRAM save type.\n");
 		return SAVE_TYPE_SRAM_256k;
+	}
+	else if((romPtr[0xAC / 4] & 0xFFu) == 'F') // Classic NES Series.
+	{
+		debug_printf("Detected Classic NES Series game. Using EEPROM 8k save type.\n");
+		return SAVE_TYPE_EEPROM_8k;
 	}
 
 	romPtr += 0xE4 / 4; // Skip headers.
