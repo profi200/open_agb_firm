@@ -68,24 +68,48 @@ static Result loadGbaRom(const char *const path, u32 *const rsOut)
 	return res;
 }
 
-// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
-static u16 tryDetectSaveType(u32 romSize)
+static u16 checkSaveOverride(u32 gameCode)
 {
-	// TODO: Make a proper override list instead of if/else.
-	const u32 *romPtr = (u32*)ROM_LOC;
-	if(romPtr[0xAC / 4] == 0) // If Game Code all zeros --> Homebrew.
+	if((gameCode & 0xFFu) == 'F') // Classic NES Series.
 	{
-		debug_printf("Detected homebrew. Using SRAM save type.\n");
-		return SAVE_TYPE_SRAM_256k;
-	}
-	else if((romPtr[0xAC / 4] & 0xFFu) == 'F') // Classic NES Series.
-	{
-		debug_printf("Detected Classic NES Series game. Using EEPROM 8k save type.\n");
 		return SAVE_TYPE_EEPROM_8k;
 	}
 
+	static const struct
+	{
+		alignas(4) char gameCode[4];
+		u16 saveType;
+	} overrideLut[] =
+	{
+		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew.
+		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2.
+	};
+
+	for(u32 i = 0; i < sizeof(overrideLut) / sizeof(*overrideLut); i++)
+	{
+		// Compare Game Code without region.
+		if((gameCode & 0xFFFFFFu) == *((u32*)overrideLut[i].gameCode))
+		{
+			return overrideLut[i].saveType;
+		}
+	}
+
+	return 0xFF;
+}
+
+// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
+static u16 tryDetectSaveType(u32 romSize)
+{
+	const u32 *romPtr = (u32*)ROM_LOC;
+	u16 saveType;
+	if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
+	{
+		debug_printf("Game Code in override list. Using save type %" PRIu16 ".\n", saveType);
+		return saveType;
+	}
+
 	romPtr += 0xE4 / 4; // Skip headers.
-	u16 saveType = SAVE_TYPE_NONE;
+	saveType = SAVE_TYPE_NONE;
 	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
 	{
 		u32 tmp = *romPtr;
@@ -100,14 +124,13 @@ static u16 tryDetectSaveType(u32 romSize)
 			} saveTypeLut[25] =
 			{
 				// EEPROM
-				// TODO: Which ones are SAVE_TYPE_EEPROM_64k_2?
-				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},  // 512 bytes.
-				{"EEPROM_V120", SAVE_TYPE_EEPROM_64k},
-				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k},
-				{"EEPROM_V122", SAVE_TYPE_EEPROM_64k}, // Confirmed.
+				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},  // Actually EEPROM 4k.
+				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},  // Confirmed.
+				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k}, // Confirmed.
+				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},  // Confirmed. Except Super Mario Advance 2.
 				{"EEPROM_V124", SAVE_TYPE_EEPROM_64k}, // Confirmed.
-				{"EEPROM_V125", SAVE_TYPE_EEPROM_64k},
-				{"EEPROM_V126", SAVE_TYPE_EEPROM_64k},
+				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},  // Confirmed.
+				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},  // Confirmed.
 
 				// FLASH
 				// Assume they all have RTC.
@@ -137,12 +160,17 @@ static u16 tryDetectSaveType(u32 romSize)
 			for(u32 i = 0; i < 25; i++)
 			{
 				const char *const str = saveTypeLut[i].str;
-				const u16 tmpSaveType = saveTypeLut[i].saveType;
+				u16 tmpSaveType = saveTypeLut[i].saveType;
 
 				if(memcmp(romPtr, str, strlen(str)) == 0)
 				{
+					if(tmpSaveType == SAVE_TYPE_EEPROM_8k || tmpSaveType == SAVE_TYPE_EEPROM_64k)
+					{
+						// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
+						if(romSize > 0x1000000) tmpSaveType++;
+					}
 					saveType = tmpSaveType;
-					debug_printf("Detected save type '%s'.\n", str);
+					debug_printf("Detected SDK save type '%s'.\n", str);
 					goto saveTypeFound;
 				}
 			}
