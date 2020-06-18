@@ -82,6 +82,7 @@ static u16 checkSaveOverride(u32 gameCode)
 	} overrideLut[] =
 	{
 		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew.
+		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color (Homebrew).
 		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2.
 	};
 
@@ -119,7 +120,7 @@ static u16 tryDetectSaveType(u32 romSize)
 		{
 			static const struct
 			{
-				char *str;
+				const char *str;
 				u16 saveType;
 			} saveTypeLut[25] =
 			{
