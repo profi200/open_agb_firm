@@ -14,13 +14,13 @@
 
 #define LGY_REGS_BASE             (IO_MEM_ARM9_ONLY + 0x18000)
 #define REG_LGY_MODE              *((vu16*)(LGY_REGS_BASE + 0x000))
-#define REGs_LGY_A7_VECTOR         ((vu32*)(LGY_REGS_BASE + 0x080)) // ARM7 vector override 32 bytes.
+#define REGs_LGY_A7_VECTOR         ((vu32*)(LGY_REGS_BASE + 0x080)) // ARM7 vector override 32 bytes. Writable at runtime.
 #define REG_LGY_GBA_SAVE_TYPE     *((vu16*)(LGY_REGS_BASE + 0x100))
 #define REG_LGY_GBA_SAVE_MAP      *((vu8* )(LGY_REGS_BASE + 0x104)) // Remaps the GBA save to ARM9 if set to 1.
 #define REG_LGY_GBA_RTC_CNT       *((vu16*)(LGY_REGS_BASE + 0x108))
 #define REG_LGY_GBA_RTC_BCD_DATE  *((vu32*)(LGY_REGS_BASE + 0x110))
 #define REG_LGY_GBA_RTC_BCD_TIME  *((vu32*)(LGY_REGS_BASE + 0x114))
-#define REG_LGY_GBA_RTC_HEX_TIME  *((vu32*)(LGY_REGS_BASE + 0x118))
+#define REG_LGY_GBA_RTC_HEX_TIME  *((vu32*)(LGY_REGS_BASE + 0x118)) // Writing bit 7 at runtime completely deadlocks the ARM7.
 #define REG_LGY_GBA_RTC_HEX_DATE  *((vu32*)(LGY_REGS_BASE + 0x11C))
 #define REGs_LGY_GBA_SAVE_TIMING   ((vu32*)(LGY_REGS_BASE + 0x120))
 
@@ -44,13 +44,16 @@ NAKED static void _overlay_stub(void)
 }
 extern const u32 _overlay_stub_size[];
 
-static void setupBiosOverlay(bool gbaBios)
+static void setupBiosOverlay(bool biosIntro)
 {
 	iomemcpy(REGs_LGY_A7_VECTOR, (u32*)_overlay_stub, (u32)_overlay_stub_size);
+	//static const u32 biosVectors[8] = {0xEA000018, 0xEA000004, 0xEA00004C, 0xEA000002,
+	//                                   0xEA000001, 0xEA000000, 0xEA000042, 0xE59FD1A0};
+	//iomemcpy(REGs_LGY_A7_VECTOR, biosVectors, 32);
 
 	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_size);
 	// Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
-	if(gbaBios) *((u8*)_arm7_stub_swi) = 0x26;
+	if(biosIntro) *((u8*)_arm7_stub_swi) = 0x26;
 }
 
 static void setupSaveType(u16 saveType)
@@ -73,11 +76,11 @@ static void setupSaveType(u16 saveType)
 	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveTm, 16);
 }
 
-Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const savePath)
+Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePath)
 {
 	REG_LGY_MODE = LGY_MODE_AGB;
 
-	setupBiosOverlay(gbaBios);
+	setupBiosOverlay(biosIntro);
 	setupSaveType(saveType);
 	strncpy_s(g_savePath, savePath, 255, 256);
 
@@ -87,16 +90,13 @@ Result LGY_prepareGbaMode(bool gbaBios, u16 saveType, const char *const savePath
 		FHandle f;
 		if(fOpen(&f, savePath, FA_OPEN_EXISTING | FA_READ) == RES_OK)
 		{
-			// TODO: Should we handle 0 byte files?
 			res = fRead(f, (void*)SAVE_LOC, MAX_SAVE_SIZE, NULL);
 			fClose(f);
-
-			if(res == RES_OK)
-			{
-				sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
-			}
 		}
 		else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
+
+		// Hash the savegame so it's only backed up when changed.
+		sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
 	}
 
 	return res;
@@ -136,6 +136,17 @@ Result LGY_getGbaRtc(GbaRtc *const out)
 
 	return RES_GBA_RTC_ERR;
 }
+
+/*#include "arm9/hardware/timer.h"
+void LGY_gbaReset(void)
+{
+	// Hook the SVC vector for 17 ms and hope it jumps to the
+	// BIOS reset function skipping the "POSTFLG" check.
+	REGs_LGY_A7_VECTOR[2] = 0xEA00001F; // SVC_vector: b 0x8C @ resetHandler
+	TIMER_sleep(17); // Wait 17 ms.
+	// Restore vector.
+	REGs_LGY_A7_VECTOR[2] = 0xEA00004C; // SVC_vector: b 0x140 @ svcHandler
+}*/
 
 Result LGY_backupGbaSave(void)
 {

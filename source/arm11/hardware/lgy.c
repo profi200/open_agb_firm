@@ -14,14 +14,17 @@
 
 
 #define LGY_REGS_BASE     (IO_MEM_ARM9_ARM11 + 0x41100)
-#define REG_LGY_MODE      *((vu16*)(LGY_REGS_BASE + 0x00))
-#define REG_LGY_SLEEP     *((vu16*)(LGY_REGS_BASE + 0x04))
-#define REG_LGY_UNK       *((vu16*)(LGY_REGS_BASE + 0x08)) // IRQ related?
-#define REG_LGY_PADCNT    *((vu16*)(LGY_REGS_BASE + 0x0A)) // ARM7 "KEYCNT"
-#define REG_LGY_PAD_SEL   *((vu16*)(LGY_REGS_BASE + 0x10)) // Select which keys to override.
-#define REG_LGY_PAD_VAL   *((vu16*)(LGY_REGS_BASE + 0x12)) // Override value.
-#define REG_LGY_GPIO_SEL  *((vu16*)(LGY_REGS_BASE + 0x14)) // Select which GPIOs to override.
-#define REG_LGY_GPIO_VAL  *((vu16*)(LGY_REGS_BASE + 0x16)) // Override value.
+#define REG_LGY_MODE      *((      vu16*)(LGY_REGS_BASE + 0x00))
+#define REG_LGY_SLEEP     *((      vu16*)(LGY_REGS_BASE + 0x04))
+#define REG_LGY_UNK       *((const vu16*)(LGY_REGS_BASE + 0x08)) // IRQ related?
+#define REG_LGY_PADCNT    *((const vu16*)(LGY_REGS_BASE + 0x0A)) // ARM7 "KEYCNT"
+#define REG_LGY_PAD_SEL   *((      vu16*)(LGY_REGS_BASE + 0x10)) // Select which keys to override.
+#define REG_LGY_PAD_VAL   *((      vu16*)(LGY_REGS_BASE + 0x12)) // Override value.
+#define REG_LGY_GPIO_SEL  *((      vu16*)(LGY_REGS_BASE + 0x14)) // Select which GPIOs to override.
+#define REG_LGY_GPIO_VAL  *((      vu16*)(LGY_REGS_BASE + 0x16)) // Override value.
+#define REG_LGY_UNK2      *((       vu8*)(LGY_REGS_BASE + 0x18)) // DSi gamecard detection select?
+#define REG_LGY_UNK3      *((       vu8*)(LGY_REGS_BASE + 0x19)) // DSi gamecard detection value?
+#define REG_LGY_UNK4      *((const  vu8*)(LGY_REGS_BASE + 0x20)) // Some legacy status bits?
 
 
 
@@ -195,7 +198,7 @@ static void setupFcramForGbaMode(void)
 	while(REG_PDN_FCRAM_CNT & PDN_FCRAM_CNT_CLK_E_ACK); // Wait until clock is disabled.
 }
 
-Result LGY_prepareGbaMode(bool gbaBios, const char *const romPath, const char *const savePath)
+Result LGY_prepareGbaMode(bool biosIntro, const char *const romPath, const char *const savePath)
 {
 	// Load the ROM image.
 	u32 romSize;
@@ -209,7 +212,7 @@ Result LGY_prepareGbaMode(bool gbaBios, const char *const romPath, const char *c
 	u32 cmdBuf[4];
 	cmdBuf[0] = (u32)savePath;
 	cmdBuf[1] = strlen(savePath) + 1;
-	cmdBuf[2] = gbaBios;
+	cmdBuf[2] = biosIntro;
 	cmdBuf[3] = saveType;
 	res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 4);
 	if(res != RES_OK) return res;
