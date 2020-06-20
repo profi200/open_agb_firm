@@ -21,26 +21,28 @@
 #include "fs.h"
 
 
-#define BLOCK_SIZE (1024u * 1024)
 
-
-
-Result fsQuickRead(const char *const path, u32 off, void *buf, u32 size)
+Result fsQuickRead(void *const buf, const char *const path, u32 size)
 {
 	Result res;
 	FHandle f;
 	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
 	{
-		if((res = fLseek(f, off)) == RES_OK)
-		{
-			u32 totalRead = 0;
-			u32 read;
-			while(size > totalRead && (res = fRead(f, buf, BLOCK_SIZE, &read)) == RES_OK && read == BLOCK_SIZE)
-			{
-				buf += read;
-				totalRead += read;
-			}
-		}
+		res = fRead(f, buf, size, NULL);
+
+		fClose(f);
+	}
+
+	return res;
+}
+
+Result fsQuickWrite(void *const buf, const char *const path, u32 size)
+{
+	Result res;
+	FHandle f;
+	if((res = fOpen(&f, path, FA_OPEN_ALWAYS | FA_WRITE)) == RES_OK)
+	{
+		res = fWrite(f, buf, size, NULL);
 
 		fClose(f);
 	}

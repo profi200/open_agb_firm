@@ -23,4 +23,5 @@
 
 
 
-Result fsQuickRead(const char *const path, u32 off, void *buf, u32 size);
+Result fsQuickRead(void *const buf, const char *const path, u32 size);
+Result fsQuickWrite(void *const buf, const char *const path, u32 size);

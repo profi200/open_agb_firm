@@ -6,7 +6,7 @@
 #include "mmio.h"
 #include "arm9/hardware/ndma.h"
 #include "arm9/arm7_stub.h"
-#include "fs.h"
+#include "fsutil.h"
 #include "arm9/debug.h"
 #include "arm9/hardware/crypto.h"
 #include "util.h"
@@ -20,7 +20,7 @@
 #define REG_LGY_GBA_RTC_CNT       *((vu16*)(LGY_REGS_BASE + 0x108))
 #define REG_LGY_GBA_RTC_BCD_DATE  *((vu32*)(LGY_REGS_BASE + 0x110))
 #define REG_LGY_GBA_RTC_BCD_TIME  *((vu32*)(LGY_REGS_BASE + 0x114))
-#define REG_LGY_GBA_RTC_HEX_TIME  *((vu32*)(LGY_REGS_BASE + 0x118)) // Writing bit 7 at runtime completely deadlocks the ARM7.
+#define REG_LGY_GBA_RTC_HEX_TIME  *((vu32*)(LGY_REGS_BASE + 0x118)) // Writing bit 7 completely hangs all(?) GBA hardware.
 #define REG_LGY_GBA_RTC_HEX_DATE  *((vu32*)(LGY_REGS_BASE + 0x11C))
 #define REGs_LGY_GBA_SAVE_TIMING   ((vu32*)(LGY_REGS_BASE + 0x120))
 
@@ -87,13 +87,12 @@ Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePa
 	Result res = RES_OK;
 	if(g_saveSize != 0)
 	{
-		FHandle f;
-		if(fOpen(&f, savePath, FA_OPEN_EXISTING | FA_READ) == RES_OK)
+		res = fsQuickRead((void*)SAVE_LOC, savePath, MAX_SAVE_SIZE);
+		if(res == RES_FR_NO_FILE)
 		{
-			res = fRead(f, (void*)SAVE_LOC, MAX_SAVE_SIZE, NULL);
-			fClose(f);
+			res = RES_OK; // Ignore a missing save file.
+			NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
 		}
-		else NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
 
 		// Hash the savegame so it's only backed up when changed.
 		sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
@@ -163,12 +162,7 @@ Result LGY_backupGbaSave(void)
 			// Update hash.
 			memcpy(g_saveHash, newHash, 32);
 
-			FHandle f;
-			if((res = fOpen(&f, g_savePath, FA_OPEN_ALWAYS | FA_WRITE)) == RES_OK)
-			{
-				res = fWrite(f, (void*)SAVE_LOC, g_saveSize, NULL);
-				fClose(f);
-			}
+			res = fsQuickWrite((void*)SAVE_LOC, g_savePath, g_saveSize);
 		}
 
 		// Disable savegame mem region.
