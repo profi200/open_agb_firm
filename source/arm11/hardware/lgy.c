@@ -84,9 +84,10 @@ static u16 checkSaveOverride(u32 gameCode)
 		u16 saveType;
 	} overrideLut[] =
 	{
-		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew.
+		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew. TODO: Set WAITCNT to 0x4014?
 		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color (Homebrew).
 		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2.
+		{"A3A\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 3.
 	};
 
 	for(u32 i = 0; i < sizeof(overrideLut) / sizeof(*overrideLut); i++)
@@ -131,7 +132,7 @@ static u16 tryDetectSaveType(u32 romSize)
 				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},  // Actually EEPROM 4k.
 				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},  // Confirmed.
 				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k}, // Confirmed.
-				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},  // Confirmed. Except Super Mario Advance 2.
+				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},  // Confirmed. Except Super Mario Advance 2/3.
 				{"EEPROM_V124", SAVE_TYPE_EEPROM_64k}, // Confirmed.
 				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},  // Confirmed.
 				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},  // Confirmed.
@@ -198,7 +199,7 @@ static void setupFcramForGbaMode(void)
 	while(REG_PDN_FCRAM_CNT & PDN_FCRAM_CNT_CLK_E_ACK); // Wait until clock is disabled.
 }
 
-Result LGY_prepareGbaMode(bool biosIntro, const char *const romPath, const char *const savePath)
+Result LGY_prepareGbaMode(bool biosIntro, char *const romPath)
 {
 	// Load the ROM image.
 	u32 romSize;
@@ -209,9 +210,12 @@ Result LGY_prepareGbaMode(bool biosIntro, const char *const romPath, const char 
 	const u16 saveType = tryDetectSaveType(romSize);
 
 	// Prepare ARM9 for GBA mode + settings and save loading.
+	const u32 romPathLen = strlen(romPath);
+	strcpy(romPath + romPathLen - 4, ".sav");
+
 	u32 cmdBuf[4];
-	cmdBuf[0] = (u32)savePath;
-	cmdBuf[1] = strlen(savePath) + 1;
+	cmdBuf[0] = (u32)romPath;
+	cmdBuf[1] = romPathLen + 1;
 	cmdBuf[2] = biosIntro;
 	cmdBuf[3] = saveType;
 	res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 4);
@@ -256,6 +260,8 @@ void LGY_switchMode(void)
 }
 
 #ifndef NDEBUG
+#include "arm11/hardware/gx.h"
+#include "arm11/hardware/gpu_regs.h"
 void debugTests(void)
 {
 	const u32 kDown = hidKeysDown();
@@ -265,7 +271,20 @@ void debugTests(void)
 	{
 		GbaRtc rtc; LGY_getGbaRtc(&rtc);
 		ee_printf("RTC: %02X.%02X.%04X %02X:%02X:%02X\n", rtc.d, rtc.mon, rtc.y + 0x2000u, rtc.h, rtc.min, rtc.s);
+
+		/*static u8 filter = 1;
+		filter ^= 1;
+		u32 texEnvSource = 0x000F000F;
+		u32 texEnvCombiner = 0x00000000;
+		if(filter == 1)
+		{
+			texEnvSource = 0x00FF00FFu;
+			texEnvCombiner = 0x00010001u;
+		}
+		REG_GX_P3D(GPUREG_TEXENV1_SOURCE) = texEnvSource;
+		REG_GX_P3D(GPUREG_TEXENV1_COMBINER) = texEnvCombiner;*/
 	}
+	if(kDown & KEY_Y) LGYFB_dbgDumpFrame();
 }
 #endif
 

@@ -63,13 +63,20 @@ void LGYFB_init(void)
 	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(256u, 160u);
 	REG_LGYFB_TOP_STAT  = LGYFB_IRQ_MASK;
 	REG_LGYFB_TOP_IRQ   = 0;
+	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.
+	// So either the hardware uses RGB565 internally or RGB666 with different conversion for green.
+	// Some results:
+	// RGBA8:   Same as RGB8 but with useless alpha component.
+	// RGB8:    Observed best format. No dithering and best color accuracy (if we ignore the lazy conversion).
+	// RGB565:  A little dithering. Good color accuracy.
+	// RGB5551: Lots of dithering. Good color accuracy (a little worse than 565).
 	REG_LGYFB_TOP_ALPHA = 0xFF;
 	REG_LGYFB_TOP_CNT   = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_8880 | LGYFB_ENABLE;
 
 	IRQ_registerIsr(IRQ_CDMA_EVENT0, 13, 0, lgyFbDmaIrqHandler);
 }
 
-void rotateFrame(void)
+static void rotateFrame(void)
 {
 // With dark filter.
 alignas(16) static const u8 firstList[1136] =
@@ -122,7 +129,7 @@ alignas(16) static const u8 firstList[1136] =
 	0x18, 0x01, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x61, 0x00, 0x01, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x6A, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x81, 0x00, 0x4F, 0x80, 0x00, 0x01, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x01, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x01, 0x00, 0x00, 0x00, // Last 4 bytes: Texture format.
 	0x8E, 0x00, 0x0F, 0x00, 0x01, 0x10, 0x01, 0x00, 0x80, 0x00, 0x0B, 0x00,
 	0x00, 0x00, 0x01, 0x00, 0x80, 0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00,
 	0x8B, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0x00, 0x07, 0x00,
@@ -397,3 +404,13 @@ void LGYFB_deinit(void)
 
 	IRQ_unregisterIsr(IRQ_CDMA_EVENT0);
 }
+
+#ifndef NDEBUG
+#include "fsutil.h"
+void LGYFB_dbgDumpFrame(void)
+{
+	GX_displayTransfer((u32*)0x18200000, 160u<<16 | 256u, (u32*)0x18400000, 160u<<16 | 256u, 1u<<12 | 1u<<8);
+	GFX_waitForEvent(GFX_EVENT_PPF, false);
+	fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 256 * 160 * 3);
+}
+#endif

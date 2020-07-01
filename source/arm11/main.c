@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
 #include "types.h"
 #include "arm11/hardware/hid.h"
 #include "arm11/hardware/codec.h"
@@ -25,6 +26,7 @@
 #include "arm11/power.h"
 #include "hardware/gfx.h"
 #include "fs.h"
+#include "arm11/filebrowser.h"
 #include "arm.h"
 
 
@@ -35,11 +37,15 @@ int main(void)
 	GFX_setBrightness(DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS);
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
-	fMount(FS_DRIVE_SDMC);
+
+	Result res;
+	char *romPath = (char*)malloc(512);
+	*romPath = '\0';
+	if((res = fMount(FS_DRIVE_SDMC)) != RES_OK || (res = browseFiles("sdmc:/", romPath)) != RES_OK || *romPath == '\0')
+		goto end;
 
 	ee_puts("Reading ROM and save...");
-	Result res;
-	if((res = LGY_prepareGbaMode(false, "sdmc:/rom.gba", "sdmc:/rom.sav")) == RES_OK)
+	if((res = LGY_prepareGbaMode(false, romPath)) == RES_OK)
 	{
 #ifdef NDEBUG
 		GFX_setForceBlack(false, true);
@@ -59,7 +65,10 @@ int main(void)
 			__wfi();
 		} while(1);
 	}
-	else printErrorWaitInput(res, 0);
+
+end:
+	free(romPath);
+	if(res != RES_OK) printErrorWaitInput(res, 0);
 
 	LGY_deinit();
 	fUnmount(FS_DRIVE_SDMC);

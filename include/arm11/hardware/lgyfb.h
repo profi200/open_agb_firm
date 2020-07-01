@@ -34,3 +34,7 @@
 void LGYFB_init(void);
 void LGYFB_processFrame(void);
 void LGYFB_deinit(void);
+
+#ifndef NDEBUG
+void LGYFB_dbgDumpFrame(void);
+#endif

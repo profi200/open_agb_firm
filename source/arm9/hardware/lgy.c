@@ -27,7 +27,7 @@
 
 static u32 g_saveSize = 0;
 static u32 g_saveHash[8] = {0};
-static char g_savePath[256] = {0};
+static char g_savePath[512] = {0};
 
 
 
@@ -82,7 +82,7 @@ Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePa
 
 	setupBiosOverlay(biosIntro);
 	setupSaveType(saveType);
-	strncpy_s(g_savePath, savePath, 255, 256);
+	strncpy_s(g_savePath, savePath, 511, 512);
 
 	Result res = RES_OK;
 	if(g_saveSize != 0)

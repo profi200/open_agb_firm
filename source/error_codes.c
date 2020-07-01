@@ -16,6 +16,7 @@ void printError(Result res)
 		"OK",
 		"SD card removed",
 		"Invalid argument",
+		"Out of memory",
 
 		// fatfs errors.
 		"fatfs disk error",

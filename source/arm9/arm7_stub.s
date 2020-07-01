@@ -11,11 +11,11 @@ BEGIN_ASM_FUNC _arm7_stub_start
 	mov r0, #PSR_INT_OFF | PSR_SVC_MODE
 	adr r1, _arm7_stub_start + 0x200  @ 0x3008000
 	msr CPSR_cxsf, r0
-	mov r0, #PSR_INT_OFF | PSR_IRQ_MODE
+	@mov r0, #PSR_INT_OFF | PSR_IRQ_MODE
 	mov sp, r1
-	msr CPSR_cxsf, r0
+	@msr CPSR_cxsf, r0
 	mov r0, #PSR_INT_OFF | PSR_SYS_MODE
-	sub sp, r1, #0x60  @ 0x3007FA0
+	@sub sp, r1, #0x60  @ 0x3007FA0
 	msr CPSR_cxsf, r0
 	mov r3, #0x4700000
 	adr r2, _arm7_stub_16 + 1
