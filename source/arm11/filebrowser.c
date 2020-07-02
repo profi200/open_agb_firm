@@ -10,7 +10,7 @@
 
 #define MAX_DIR_ENTRIES  (510u)
 #define DIR_READ_BLOCKS  (10u)
-#define SCREEN_COLS      (52u)
+#define SCREEN_COLS      (53u - 1) // - 1 because the console inserts a newline after the last line otherwise.
 #define SCREEN_ROWS      (24u)
 
 
@@ -25,7 +25,7 @@ typedef struct
 
 
 // num including null terminator.
-size_t safeStrcpy(char *const dst, const char *const src, size_t num)
+static size_t safeStrcpy(char *const dst, const char *const src, size_t num)
 {
 	if(num == 0) return 0;
 
@@ -130,11 +130,14 @@ Result browseFiles(const char *const basePath, char selected[512])
 			kDown = hidKeysDown();
 		} while(kDown == 0);
 
-		oldCursorPos = cursorPos;
-		if(kDown & KEY_DRIGHT) cursorPos += SCREEN_ROWS;
-		if(kDown & KEY_DLEFT)  cursorPos -= SCREEN_ROWS;
-		if(kDown & KEY_DUP)    cursorPos -= 1;
-		if(kDown & KEY_DDOWN)  cursorPos += 1;
+		if(dList->num != 0)
+		{
+			oldCursorPos = cursorPos;
+			if(kDown & KEY_DRIGHT) cursorPos += SCREEN_ROWS;
+			if(kDown & KEY_DLEFT)  cursorPos -= SCREEN_ROWS;
+			if(kDown & KEY_DUP)    cursorPos -= 1;
+			if(kDown & KEY_DDOWN)  cursorPos += 1;
+		}
 
 		if(cursorPos < 0)                     cursorPos = dList->num - 1; // Wrap to end of list.
 		if((u32)cursorPos > (dList->num - 1)) cursorPos = 0;              // Wrap to start of list.
@@ -152,12 +155,13 @@ Result browseFiles(const char *const basePath, char selected[512])
 
 		if(kDown & (KEY_A | KEY_B))
 		{
-			if(kDown & KEY_A)
+			u32 pathLen = strlen(curDir);
+
+			if(kDown & KEY_A && dList->num != 0)
 			{
-				u32 pathLen = strlen(curDir);
 				// TODO: !!! Insecure !!!
 				if(curDir[pathLen - 1] != '/') curDir[pathLen++] = '/';
-				safeStrcpy(curDir + pathLen, dList->strPtrs[cursorPos], 512);
+				safeStrcpy(curDir + pathLen, dList->strPtrs[cursorPos], 256);
 
 				if(dList->entTypes[cursorPos] == 0)
 				{
@@ -167,11 +171,10 @@ Result browseFiles(const char *const basePath, char selected[512])
 			}
 			if(kDown & KEY_B)
 			{
-				const u32 pathLen = strlen(curDir);
 				if(curDir[pathLen - 2] != ':')
 				{
 					char *tmpPathPtr = curDir + pathLen;
-					while(*--tmpPathPtr != '/');
+					while(tmpPathPtr > curDir && *--tmpPathPtr != '/');
 					*tmpPathPtr = '\0';
 				}
 			}
