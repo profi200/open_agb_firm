@@ -58,7 +58,7 @@ int main(void)
 		do
 		{
 			hidScanInput();
-			if(hidGetExtraKeys(KEY_POWER) & KEY_POWER) break;
+			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
 
 			LGY_handleEvents();
 
