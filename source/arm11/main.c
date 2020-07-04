@@ -23,6 +23,7 @@
 #include "hardware/lgy.h"
 #include "arm11/console.h"
 #include "arm11/fmt.h"
+#include "arm11/hardware/mcu.h"
 #include "arm11/power.h"
 #include "hardware/gfx.h"
 #include "fs.h"
@@ -49,7 +50,8 @@ int main(void)
 	{
 #ifdef NDEBUG
 		GFX_setForceBlack(false, true);
-		GFX_powerOffBacklights(GFX_BLIGHT_BOT);
+		// Don't turn the backlight off on 2DS.
+		if(MCU_getSystemModel() != 3) GFX_powerOffBacklights(GFX_BLIGHT_BOT);
 #endif
 		// Sync LgyFb start with LCD VBlank.
 		GFX_waitForVBlank0();
