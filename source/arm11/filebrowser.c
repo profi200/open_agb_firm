@@ -40,38 +40,42 @@ static size_t safeStrcpy(char *const dst, const char *const src, size_t num)
 	return len;
 }
 
-static Result scanDir(const char *const path, DirList *const dList)
+static Result scanDir(const char *const path, DirList *const dList, const char *const filter)
 {
-	FILINFO *const fi = (FILINFO*)malloc(DIR_READ_BLOCKS * sizeof(FILINFO));
+	FILINFO *const fi = (FILINFO*)malloc(sizeof(FILINFO) * DIR_READ_BLOCKS);
 	if(fi == NULL) return RES_OUT_OF_MEM;
 
-	memset(dList, 0, sizeof(DirList));
+	dList->num = 0;
 
 	Result res;
 	DHandle dh;
 	if((res = fOpenDir(&dh, path)) == RES_OK)
 	{
 		u32 read;
-		u32 totalRead = 0;
+		u32 dListPos = 0;
+		const u32 filterLen = strlen(filter);
 		do
 		{
 			if((res = fReadDir(dh, fi, DIR_READ_BLOCKS, &read)) != RES_OK) break;
-			if(totalRead + read > MAX_DIR_ENTRIES) break;
+			if(dListPos + read > MAX_DIR_ENTRIES) break;
 
 			for(u32 i = 0; i < read; i++)
 			{
-				const u32 dListPos = totalRead + i;
+				const u8 isDir = (fi[i].fattrib & AM_DIR ? 1u : 0u);
+				if(isDir == 0) // File
+				{
+					const u32 entLen = strlen(fi[i].fname);
+					if(entLen <= filterLen || strcmp(filter, fi[i].fname + entLen - filterLen) != 0)
+						continue;
+				}
+
 				dList->strPtrs[dListPos] = dList->strBufs[dListPos];
-
-				// Mark as dir.
-				if(fi[i].fattrib & AM_DIR) dList->entTypes[dListPos] = 1;
-
+				dList->entTypes[dListPos] = isDir;
 				safeStrcpy(dList->strBufs[dListPos], fi[i].fname, 256);
+				dListPos++;
 			}
-
-			totalRead += read;
 		} while(read == DIR_READ_BLOCKS);
-		dList->num = totalRead;
+		dList->num = dListPos;
 
 		fCloseDir(dh);
 	}
@@ -109,7 +113,7 @@ Result browseFiles(const char *const basePath, char selected[512])
 	if(dList == NULL) return RES_OUT_OF_MEM;
 
 	Result res;
-	if((res = scanDir(curDir, dList)) != RES_OK) goto end;
+	if((res = scanDir(curDir, dList, ".gba")) != RES_OK) goto end;
 	showDirList(dList, 0);
 
 	s32 cursorPos = 0; // Within the entire list.
@@ -179,7 +183,7 @@ Result browseFiles(const char *const basePath, char selected[512])
 				}
 			}
 
-			if((res = scanDir(curDir, dList)) != RES_OK) break;
+			if((res = scanDir(curDir, dList, ".gba")) != RES_OK) break;
 			cursorPos = 0;
 			windowPos = 0;
 			showDirList(dList, 0);
