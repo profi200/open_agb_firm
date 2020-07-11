@@ -16,7 +16,7 @@ installed in your system. Additionally you need 7-Zip or on Linux p7z installed 
 ## Known issues
 This section is reserved for a listing of known issues. At present only this remains:
 * Sleep mode is not fully implemented.
-* Save type detection may still fail for certain EEPROM save types.
+* Save type detection may still fail for certain games using EEPROM.
 * No settings (including brightness control), no cheats and other enhancements.
 
 If you happen to stumble over another bug, please open an issue in the [official open_agb_firm repo on GitHub](https://github.com/profi200/open_agb_firm/issues) or contact me via other platforms.
@@ -28,12 +28,14 @@ This is a list of limitations we can't solve in software or are very hard to wor
 * GBA Serial port (aka. Link Cable).
 * 64 KiB (512 kbit) SRAM (homebrew games/emulators). Not possible to support.
 * Can't switch back to 3DS mode from GBA mode requiring a reboot for booting a different game.
+* Savestates. Very difficult to implement because no direct hardware access.
 
 ## Troubleshooting
 Known problems and the solution.
 
 Problem: The game crashes/shows white or blackscreens or shows a savegame corrupt message.\
-Solution: Try to delete the savegame file. If this doesn't help report the issue.
+Solution: Try to delete the savegame file. If this doesn't help report the issue.\
+Note: EEPROM saves made by some emulators are incompatible because they have every 8 bytes block endian swapped.
 
 ## License
 You may use this under the terms of the GNU General Public License GPL v3 or under the terms of any later revisions of the GPL. Refer to the provided `LICENSE.txt` file for further information.
