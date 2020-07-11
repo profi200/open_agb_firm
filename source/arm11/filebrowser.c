@@ -82,6 +82,9 @@ static Result scanDir(const char *const path, DirList *const dList, const char *
 
 	free(fi);
 
+	// Hacky casting of function pointers. But they are compatible.
+	qsort(dList->strPtrs, dList->num, sizeof(char*), (int (*)(const void *, const void *))strcmp);
+
 	return res;
 }
 
