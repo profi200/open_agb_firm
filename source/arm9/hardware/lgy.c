@@ -56,11 +56,15 @@ static void setupBiosOverlay(bool biosIntro)
 	if(biosIntro) *((u8*)_arm7_stub_swi) = 0x26;
 }
 
-static void setupSaveType(u16 saveType)
+static u32 setupSaveType(u16 saveType)
 {
 	REG_LGY_GBA_SAVE_TYPE = saveType;
-	static const u8 saveSizeLut[16] = {1, 1, 8, 8, 64, 64, 64, 64, 64, 64, 128, 128, 128, 128, 32, 0};
-	g_saveSize = 1024u * saveSizeLut[saveType & 0xFu];
+	// The last shift in the table is technically undefined behavior (C standard)
+	// but on ARM this will always result in 0.
+	// https://developer.arm.com/documentation/dui0489/h/arm-and-thumb-instructions/shift-operations
+	static const u8 saveSizeShiftLut[16] = {9, 9, 13, 13, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 15, 32};
+	const u32 saveSize = 1u<<saveSizeShiftLut[saveType & 0xFu];
+	g_saveSize = saveSize;
 
 	// Flash chip erase, flash sector erase, flash program, EEPROM write.
 	static const u32 saveTm512k4k[4] = {0x27C886, 0x8CE35, 0x184, 0x31170}; // Timing 512k/4k.
@@ -74,6 +78,8 @@ static void setupSaveType(u16 saveType)
 	}
 	else saveTm = saveTm1m64k; // Don't care about save type none.
 	iomemcpy(REGs_LGY_GBA_SAVE_TIMING, saveTm, 16);
+
+	return saveSize;
 }
 
 Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePath)
@@ -81,21 +87,21 @@ Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePa
 	REG_LGY_MODE = LGY_MODE_AGB;
 
 	setupBiosOverlay(biosIntro);
-	setupSaveType(saveType);
+	const u32 saveSize = setupSaveType(saveType);
 	strncpy_s(g_savePath, savePath, 511, 512);
 
 	Result res = RES_OK;
-	if(g_saveSize != 0)
+	if(saveSize != 0)
 	{
 		res = fsQuickRead((void*)SAVE_LOC, savePath, MAX_SAVE_SIZE);
 		if(res == RES_FR_NO_FILE)
 		{
 			res = RES_OK; // Ignore a missing save file.
-			NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, g_saveSize);
+			NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, saveSize);
 		}
 
 		// Hash the savegame so it's only backed up when changed.
-		sha((u32*)SAVE_LOC, g_saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+		sha((u32*)SAVE_LOC, saveSize, g_saveHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
 	}
 
 	return res;
@@ -150,19 +156,20 @@ void LGY_gbaReset(void)
 Result LGY_backupGbaSave(void)
 {
 	Result res = RES_OK;
-	if(g_saveSize != 0)
+	const u32 saveSize = g_saveSize;
+	if(saveSize != 0)
 	{
 		// Enable savegame mem region.
 		REG_LGY_GBA_SAVE_MAP = LGY_SAVE_MAP_9;
 
 		u32 newHash[8];
-		sha((u32*)SAVE_LOC, g_saveSize, newHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+		sha((u32*)SAVE_LOC, saveSize, newHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
 		if(memcmp(g_saveHash, newHash, 32) != 0) // Backup save if changed.
 		{
 			// Update hash.
 			memcpy(g_saveHash, newHash, 32);
 
-			res = fsQuickWrite((void*)SAVE_LOC, g_savePath, g_saveSize);
+			res = fsQuickWrite((void*)SAVE_LOC, g_savePath, saveSize);
 		}
 
 		// Disable savegame mem region.
