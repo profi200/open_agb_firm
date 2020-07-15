@@ -103,10 +103,10 @@ static void showDirList(const DirList *const dList, u32 start)
 	}
 }
 
-// TODO: Handle empty dirs.
 Result browseFiles(const char *const basePath, char selected[512])
 {
 	if(basePath == NULL || selected == NULL) return RES_INVALID_ARG;
+	// TODO: Check if the base path is empty.
 
 	char *curDir = (char*)malloc(512);
 	if(curDir == NULL) return RES_OUT_OF_MEM;
@@ -140,8 +140,16 @@ Result browseFiles(const char *const basePath, char selected[512])
 		if(dList->num != 0)
 		{
 			oldCursorPos = cursorPos;
-			if(kDown & KEY_DRIGHT) cursorPos += SCREEN_ROWS;
-			if(kDown & KEY_DLEFT)  cursorPos -= SCREEN_ROWS;
+			if(kDown & KEY_DRIGHT)
+			{
+				cursorPos += SCREEN_ROWS;
+				if((u32)cursorPos > dList->num) cursorPos = dList->num - 1;
+			}
+			if(kDown & KEY_DLEFT)
+			{
+				cursorPos -= SCREEN_ROWS;
+				if(cursorPos < -1) cursorPos = 0;
+			}
 			if(kDown & KEY_DUP)    cursorPos -= 1;
 			if(kDown & KEY_DDOWN)  cursorPos += 1;
 		}
@@ -178,12 +186,10 @@ Result browseFiles(const char *const basePath, char selected[512])
 			}
 			if(kDown & KEY_B)
 			{
-				if(curDir[pathLen - 2] != ':')
-				{
-					char *tmpPathPtr = curDir + pathLen;
-					while(tmpPathPtr > curDir && *--tmpPathPtr != '/');
-					*tmpPathPtr = '\0';
-				}
+				char *tmpPathPtr = curDir + pathLen;
+				while(*--tmpPathPtr != '/');
+				if(*(tmpPathPtr - 1) == ':') tmpPathPtr++;
+				*tmpPathPtr = '\0';
 			}
 
 			if((res = scanDir(curDir, dList, ".gba")) != RES_OK) break;
