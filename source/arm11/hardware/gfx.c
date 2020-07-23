@@ -40,8 +40,6 @@
 
 static struct
 {
-	u16 lcdIds;            // Bits 0-7 top screen, 8-15 bottom screen.
-	bool lcdIdsRead;
 	u8 lcdPower;           // 1 = on. Bit 4 top light, bit 2 bottom light, bit 0 LCDs.
 	u8 lcdLights[2];       // LCD backlight brightness. Top, bottom.
 	bool events[6];
@@ -58,8 +56,6 @@ static u8 fmt2PixSize(GfxFbFmt fmt);
 static void setupFramebufs(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
 static void deallocFramebufs(void);
 static void setupDislayController(u8 lcd);
-static void resetLcdsMaybe(void);
-static void waitLcdsReady(void);
 static void gfxIrqHandler(u32 intSource);
 
 void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
@@ -119,7 +115,7 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_RST = 1;
 	REG_LCD_UNK00C = 0;
 	TIMER_sleepMs(10);
-	resetLcdsMaybe();
+	LCDI2C_init();
 	MCU_controlLCDPower(2u); // Power on LCDs.
 	if(MCU_waitEvents(0x3Fu<<24) != 2u<<24) panic();
 
@@ -128,7 +124,7 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	// TODO: Proper fix.
 	//GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)RENDERBUF_BOT, 0, 16);
 
-	waitLcdsReady();
+	LCDI2C_waitBacklightsOn();
 	REG_LCD_ABL0_LIGHT_PWM = 0x1023E;
 	REG_LCD_ABL1_LIGHT_PWM = 0x1023E;
 	MCU_controlLCDPower(0x28u); // Power on backlights.
@@ -323,78 +319,6 @@ static void setupDislayController(u8 lcd)
 
 	regs[32] = 0; // Gamma table index 0.
 	for(u32 i = 0; i < 256; i++) regs[33] = 0x10101u * i;
-}
-
-static u16 getLcdIds(void)
-{
-	u16 ids;
-
-	if(!g_gfxState.lcdIdsRead)
-	{
-		g_gfxState.lcdIdsRead = true;
-
-		u16 top, bot;
-		I2C_writeReg(I2C_DEV_LCD0, 0x40, 0xFF);
-		I2C_readRegBuf(I2C_DEV_LCD0, 0x40, (u8*)&top, 2);
-		I2C_writeReg(I2C_DEV_LCD1, 0x40, 0xFF);
-		I2C_readRegBuf(I2C_DEV_LCD1, 0x40, (u8*)&bot, 2);
-
-		ids = top>>8;
-		ids |= bot & 0xFF00u;
-		g_gfxState.lcdIds = ids;
-	}
-	else ids = g_gfxState.lcdIds;
-
-	return ids;
-}
-
-static void resetLcdsMaybe(void)
-{
-	const u16 ids = getLcdIds();
-
-	// Top screen
-	if(ids & 0xFFu) I2C_writeReg(I2C_DEV_LCD0, 0xFE, 0xAA);
-	else
-	{
-		I2C_writeReg(I2C_DEV_LCD0, 0x11, 0x10);
-		I2C_writeReg(I2C_DEV_LCD0, 0x50, 1);
-	}
-
-	// Bottom screen
-	if(ids>>8) I2C_writeReg(I2C_DEV_LCD1, 0xFE, 0xAA);
-	else       I2C_writeReg(I2C_DEV_LCD1, 0x11, 0x10);
-
-	I2C_writeReg(I2C_DEV_LCD0, 0x60, 0);
-	I2C_writeReg(I2C_DEV_LCD1, 0x60, 0);
-	I2C_writeReg(I2C_DEV_LCD0, 1, 0x10);
-	I2C_writeReg(I2C_DEV_LCD1, 1, 0x10);
-}
-
-static void waitLcdsReady(void)
-{
-	const u16 ids = getLcdIds();
-
-	if((ids & 0xFFu) == 0 || (ids>>8) == 0) // Unknown LCD?
-	{
-		TIMER_sleepMs(150);
-	}
-	else
-	{
-		u32 i = 0;
-		do
-		{
-			u16 top, bot;
-			I2C_writeReg(I2C_DEV_LCD0, 0x40, 0x62);
-			I2C_readRegBuf(I2C_DEV_LCD0, 0x40, (u8*)&top, 2);
-			I2C_writeReg(I2C_DEV_LCD1, 0x40, 0x62);
-			I2C_readRegBuf(I2C_DEV_LCD1, 0x40, (u8*)&bot, 2);
-
-			if((top>>8) == 1 && (bot>>8) == 1) break;
-
-			TIMER_sleepTicks(TIMER_FREQ(1, 1000) * 33.333f);
-			i++;
-		} while(i < 10);
-	}
 }
 
 void GFX_powerOnBacklights(GfxBlight mask)

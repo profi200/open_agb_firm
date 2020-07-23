@@ -79,3 +79,54 @@
 #define PDC_SWAP_I_V        (1u<<17) // VBlank IRQ bit.
 #define PDC_SWAP_I_ERR      (1u<<18) // Error IRQ bit?
 #define PDC_SWAP_I_ALL      (PDC_SWAP_I_ERR | PDC_SWAP_I_V | PDC_SWAP_I_H)
+
+
+// LCD I2C regs.
+typedef enum
+{
+	LCD_I2C_REG_POWER      = 0x01u,
+	LCD_I2C_REG_UNK11      = 0x11u,
+	LCD_I2C_REG_READ_ADDR  = 0x40u,
+	LCD_I2C_REG_HS_SERIAL  = 0x50u, // Highspeed serial for upper LCD only.
+	LCD_I2C_REG_UNK54      = 0x54u, // Checksum on/off?
+	LCD_I2C_REG_UNK55      = 0x55u, // Checksum status?
+	LCD_I2C_REG_STATUS     = 0x60u, // Initially 0x01.
+	LCD_I2C_REG_BL_STATUS  = 0x62u, // Backlight status.
+	LCD_I2C_REG_RST_STATUS = 0xFEu, // Reset status. Initially 0x00.
+	LCD_I2C_REG_REVISION   = 0xFFu, // Revision/vendor infos.
+} LcdI2cReg;
+
+// LCD_I2C_REG_POWER
+#define LCD_REG_POWER_BLACK      (0x11u) // Force blackscreen.
+#define LCD_REG_POWER_ON         (0x10u) // Normal operation.
+#define LCD_REG_POWER_OFF        (0x00u) // LCD powered off.
+
+// LCD_I2C_REG_UNK11
+#define LCD_REG_UNK11_UNK10      (0x10u) // Written on init.
+
+// LCD_I2C_REG_HS_SERIAL
+#define LCD_REG_HS_SERIAL_ON     (0x01u) // Enable highspeed serial.
+
+// LCD_I2C_REG_UNK54
+
+// LCD_I2C_REG_UNK55
+
+// LCD_I2C_REG_STATUS
+#define LCD_REG_STATUS_OK        (0x00u)
+#define LCD_REG_STATUS_ERR       (0x01u)
+
+// LCD_I2C_REG_BL_STATUS
+#define LCD_REG_BL_STATUS_OFF    (0x00u)
+#define LCD_REG_BL_STATUS_ON     (0x01u)
+
+// LCD_I2C_REG_RST_STATUS
+#define LCD_REG_RST_STATUS_NONE  (0xAAu)
+#define LCD_REG_RST_STATUS_RST   (0x00u)
+
+
+
+u8 LCDI2C_readReg(u8 lcd, LcdI2cReg reg);
+void LCDI2C_writeReg(u8 lcd, LcdI2cReg reg, u8 data);
+void LCDI2C_init(void);
+void LCDI2C_waitBacklightsOn(void);
+u16 LCDI2C_getRevisions(void);
