@@ -312,7 +312,24 @@ void debugTests(void)
 		}
 		REG_GX_P3D(GPUREG_TEXENV1_SOURCE) = texEnvSource;
 		REG_GX_P3D(GPUREG_TEXENV1_COMBINER) = texEnvCombiner;*/
+
+		// Trigger Game Boy Player enhancements.
+		// Needs to be done on the Game Boy Player logo screen.
+		// 2 frames nothing pressed and 1 frame all D-Pad buttons pressed.
+		/*REG_LGY_PAD_SEL = 0x1FFF; // Override all buttons.
+		static u8 gbp = 2;
+		if(gbp > 0)
+		{
+			REG_LGY_PAD_VAL = 0x1FFF; // Force all buttons not pressed.
+			gbp--;
+		}
+		else
+		{
+			REG_LGY_PAD_VAL = 0x1F0F; // All D-Pad buttons pressed.
+			gbp = 2;
+		}*/
 	}
+	//else REG_LGY_PAD_SEL = 0; // Stop overriding buttons.
 	if(kDown & KEY_Y) LGYFB_dbgDumpFrame();
 }
 #endif

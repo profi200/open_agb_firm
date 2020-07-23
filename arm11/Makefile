@@ -37,18 +37,18 @@ endif
 ARCH	:=	-march=armv6k+vfpv2 -mtune=mpcore -mfloat-abi=hard -mtp=soft -marm -mthumb-interwork
 
 CFLAGS	:=	$(ARCH) -std=gnu17 -O2 -g -flto -mword-relocations -ffunction-sections \
-			-Wall -Wextra -Wno-unused-function
+			-fno-math-errno -Wall -Wextra -Wno-unused-function
 CFLAGS	+=	$(INCLUDE) $(DEFINES)
 
 CXXFLAGS	:=	$(ARCH) -std=c++17 -O2 -g -flto -fno-rtti -fno-exceptions \
-				-mword-relocations -ffunction-sections -Wall -Wextra \
+				-mword-relocations -ffunction-sections -fno-math-errno -Wall -Wextra \
 				-Wno-unused-function
 CXXFLAGS	+=	$(INCLUDE) $(DEFINES)
 
 ASFLAGS	:=	$(ARCH) -g -flto $(INCLUDE) $(DEFINES)
 LDFLAGS	=	$(ARCH) -g -flto -specs=../arm11.specs -Wl,-Map,$(notdir $*.map) -nostartfiles
 
-LIBS	:=
+LIBS	:=	-lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

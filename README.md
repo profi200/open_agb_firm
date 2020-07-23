@@ -52,6 +52,7 @@ You may use this under the terms of the GNU General Public License GPL v3 or und
 * **ChaN**
 * **fastboot3DS project**
 * **Wolfvak, Sono and all the other people on GodMode9 IRC/Discord**
+* **Extrems**
 * ...everyone who contributed to **3dbrew.org**
 
 Copyright (C) 2020 derrek, profi200, d0k3

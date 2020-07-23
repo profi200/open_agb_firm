@@ -13,17 +13,18 @@ LPFE
 	# Wait for single or burst requests.
 	WFP 14, periph
 
-	# LgyFb sometimes (at the end of each scanline?) sends
-	# single requests. Since we can transfer all 8 scanlines
-	# with bursts only we will ignore them.
-	# LP 31 # RGB5551 and RGB565
-	LP 47 # RGB8
-	# LP 63 # RGBA8
+	# Transfer 8 scanlines with 240 pixels each.
+	# LP 29 # RGB5551 and RGB565
+	LP 44 # RGB8
+	# LP 59 # RGBA8
 		LDB
 		STB
 	LPENDB
 	LDPB 14
 	STB
+
+	# Skip gaps swizzle edition™.
+	ADDH DAR, 0x180
 LPEND
 WMB
 SEV 0
