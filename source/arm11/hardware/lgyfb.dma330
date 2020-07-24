@@ -1,7 +1,7 @@
-# 8 bytes burst with 16 transfers. Total 128 bytes per burst.
+# 8 bytes burst with 15 transfers. Total 120 bytes per burst.
 # Source fixed address and destination incrementing.
 # Source and destination unprivileged, non-secure data access.
-MOV CCR, SB16 SS64 SAF SP2 DB16 DS64 DAI DP2
+MOV CCR, SB15 SS64 SAF SP2 DB15 DS64 DAI DP2
 MOV SAR, 0x10311000
 MOV DAR, 0x18200000
 
@@ -13,10 +13,16 @@ LPFE
 	# Wait for single or burst requests.
 	WFP 14, periph
 
-	# Transfer 8 scanlines with 240 pixels each.
-	# LP 29 # RGB5551 and RGB565
-	LP 44 # RGB8
-	# LP 59 # RGBA8
+	# Transfer 8 scanlines.
+	# For width 240:
+	#LP 29 # RGB5551 & RGB565, 128 bytes burst
+	#LP 44 # RGB8, 128 bytes burst
+	#LP 59 # RGBA8, 128 bytes burst
+
+	# For width 360:
+	#LP 44 # RGB5551 & RGB565, 128 bytes burst
+	LP 71 # RGB8, 120 bytes burst
+	#LP 89 # RGBA8, 128 bytes burst
 		LDB
 		STB
 	LPENDB
@@ -24,7 +30,15 @@ LPFE
 	STB
 
 	# Skip gaps swizzle edition™.
-	ADDH DAR, 0x180
+	# For width 240:
+	#ADDH DAR, 0x100 # RGB5551 & RGB565
+	#ADDH DAR, 0x180 # RGB8
+	#ADDH DAR, 0x200 # RGBA8
+
+	#For width 360:
+	#ADDH DAR, 0x980 # RGB5551 & RGB565
+	ADDH DAR, 0xE40 # RGB8
+	#ADDH DAR, 0x1300 # RGBA8
 LPEND
 WMB
 SEV 0
