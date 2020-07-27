@@ -117,13 +117,29 @@ void LGYFB_init(void)
 {
 	if(DMA330_run(0, program)) return;
 
+	//REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(240u, 160u);
 	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(360u, 240u);
 	REG_LGYFB_TOP_STAT  = LGYFB_IRQ_MASK;
 	REG_LGYFB_TOP_IRQ   = 0;
 	REG_LGYFB_TOP_ALPHA = 0xFF;
 
-	static const s16 matrix[6][8] =
+	/*
+	 * Limitations:
+	 * First pattern bit must be 1 and last 0 or it loses sync with the DS/GBA input.
+	 *
+	 * Matrix ranges:
+	 * in[-3] -1024-1023 (0xFC00-0x03FF)
+	 * in[-2] -4096-4095 (0xF000-0x0FFF)
+	 * in[-1] -32768-32767 (0x8000-0x7FFF)
+	 * in[0]  -32768-32767 (0x8000-0x7FFF)
+	 * in[1]  -4096-4095 (0xF000-0x0FFF)
+	 * in[2]  -1024-1023 (0xFC00-0x03FF)
+	 *
+	 * Note: At scanline start the in FIFO is all filled with the first pixel.
+	 */
+	static const s16 scaleMatrix[6][8] =
 	{
+		// Original from AGB_FIRM.
 		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
 		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
 		{     0, 0x2000, 0x4000,      0, 0x2000, 0x4000,      0,      0}, // in[-1]
@@ -131,8 +147,26 @@ void LGYFB_init(void)
 		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
 		{     0,      0,      0,      0,      0,      0,      0,      0}  // in[2]
 		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
+
+		// Razor sharp (pixel duplication).
+		/*{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
+		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
+		{     0,      0, 0x4000,      0,      0, 0x4000,      0,      0}, // in[-1]
+		{0x4000, 0x4000,      0, 0x4000, 0x4000,      0,      0,      0}, // in[0]
+		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
+		{     0,      0,      0,      0,      0,      0,      0,      0}*/  // in[2]
+		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
+
+		// Sharp interpolated.
+		/*{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
+		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
+		{     0,      0, 0x2000,      0,      0, 0x2000,      0,      0}, // in[-1]
+		{0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,      0,      0}, // in[0]
+		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
+		{     0,      0,      0,      0,      0,      0,      0,      0}*/  // in[2]
+		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
 	};
-	setScaleMatrixTop(6, 0b00011011, matrix);
+	setScaleMatrixTop(6, 0b00011011, scaleMatrix);
 
 	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.
 	// The green bias exists on the whole range of green colors.
@@ -503,8 +537,11 @@ void LGYFB_deinit(void)
 #include "fsutil.h"
 void LGYFB_dbgDumpFrame(void)
 {
-	GX_displayTransfer((u32*)0x18200000, 160u<<16 | 256u, (u32*)0x18400000, 160u<<16 | 256u, 1u<<12 | 1u<<8);
+	/*GX_displayTransfer((u32*)0x18200000, 160u<<16 | 256u, (u32*)0x18400000, 160u<<16 | 256u, 1u<<12 | 1u<<8);
 	GFX_waitForEvent(GFX_EVENT_PPF, false);
-	fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 256 * 160 * 3);
+	fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 256 * 160 * 3);*/
+	GX_displayTransfer((u32*)0x18200000, 240u<<16 | 512u, (u32*)0x18400000, 240u<<16 | 512u, 1u<<12 | 1u<<8);
+	GFX_waitForEvent(GFX_EVENT_PPF, false);
+	fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 512 * 240 * 3);
 }
 #endif
