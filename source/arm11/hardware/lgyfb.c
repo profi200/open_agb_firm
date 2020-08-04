@@ -107,8 +107,8 @@ static void setScaleMatrixTop(u32 len, u32 patt, const s16 matrix[6][8])
 		for(u32 j = 0; j < len; j++)
 		{
 			const s16 tmp = matrix[i][j];
-			REG_LGYFB_TOP_V_MATRIX[i][j] = tmp;
-			REG_LGYFB_TOP_H_MATRIX[i][j] = tmp;
+			REG_LGYFB_TOP_V_MATRIX[i][j] = tmp * 0xFF / 0xF8 + 8;
+			REG_LGYFB_TOP_H_MATRIX[i][j] = tmp + 8;
 		}
 	}
 }
@@ -140,12 +140,12 @@ void LGYFB_init(void)
 	static const s16 scaleMatrix[6][8] =
 	{
 		// Original from AGB_FIRM.
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
+		/*{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
 		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
 		{     0, 0x2000, 0x4000,      0, 0x2000, 0x4000,      0,      0}, // in[-1]
 		{0x4000, 0x2000,      0, 0x4000, 0x2000,      0,      0,      0}, // in[0]
 		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
-		{     0,      0,      0,      0,      0,      0,      0,      0}  // in[2]
+		{     0,      0,      0,      0,      0,      0,      0,      0}*/  // in[2]
 		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
 
 		// Razor sharp (pixel duplication).
@@ -158,12 +158,12 @@ void LGYFB_init(void)
 		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
 
 		// Sharp interpolated.
-		/*{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
+		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
 		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
 		{     0,      0, 0x2000,      0,      0, 0x2000,      0,      0}, // in[-1]
 		{0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,      0,      0}, // in[0]
 		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
-		{     0,      0,      0,      0,      0,      0,      0,      0}*/  // in[2]
+		{     0,      0,      0,      0,      0,      0,      0,      0}  // in[2]
 		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
 	};
 	setScaleMatrixTop(6, 0b00011011, scaleMatrix);

@@ -42,7 +42,7 @@ wait_vcount_160_lp:
 .global _arm7_stub_swi
 _arm7_stub_swi = . - _arm7_stub_start + 0x80BFE00 @ Final ARM9 mem location.
 	swi  0x01       @ RegisterRamReset
-	mov  r0, #0xBC  @ Function 0xB4 but skipping r2 & r4 loading.
+	mov  r0, #0xBC  @ SoftReset (0xB4) but skipping r2 & r4 loading.
 	mov  r2, #0
 	bx   r0
 
