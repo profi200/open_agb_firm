@@ -11,7 +11,7 @@
 #include "arm11/hardware/mcu.h"
 #include "arm11/hardware/lgyfb.h"
 #include "arm11/fmt.h"
-//#include "arm11/gba_save_type_table.h"
+//#include "arm11/gba_save_type_db.h"
 
 
 #define LGY_REGS_BASE     (IO_MEM_ARM9_ARM11 + 0x41100)
@@ -188,29 +188,23 @@ saveTypeFound:
 	return saveType;
 }
 
-/*static u16 getSaveTypeFromTable(u32 romSize)
+/*static u16 getSaveTypeFromTable(void)
 {
-	const u32 gameCode = *(u32*)(ROM_LOC + 0xAC);
+	const u32 gameCode = *(u32*)(ROM_LOC + 0xAC) & ~0xFF000000u;
 
 	u16 saveType = SAVE_TYPE_NONE;
 	for(u32 i = 0; i < sizeof(saveTypeLut) / sizeof(*saveTypeLut); i++)
 	{
 		// Save type in last byte.
-		const u32 entry = *((u32*)saveTypeLut[i].gameCode);
-		if((entry & 0xFFFFFFu) == (gameCode & 0xFFFFFFu))
+		const u32 entry = *((u32*)&saveTypeLut[i]);
+		if((entry & ~0xFF000000u) == gameCode)
 		{
 			saveType = entry>>24;
 			break;
 		}
 	}
 
-	if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
-	{
-		// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
-		if(romSize > 0x1000000) saveType++;
-	}
-
-	debug_printf("Using save type %" PRIX16 ".\n", saveType);
+	debug_printf("Using save type 0x%" PRIX16 ".\n", saveType);
 
 	return saveType;
 }*/
@@ -236,7 +230,7 @@ Result LGY_prepareGbaMode(bool biosIntro, char *const romPath)
 
 	// Try to detect the save type.
 	const u16 saveType = tryDetectSaveType(romSize);
-	//const u16 saveType = getSaveTypeFromTable(romSize);
+	//const u16 saveType = getSaveTypeFromTable();
 
 	// Prepare ARM9 for GBA mode + settings and save loading.
 	const u32 romPathLen = strlen(romPath);
