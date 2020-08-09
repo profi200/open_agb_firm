@@ -30,6 +30,26 @@ static u32 g_events = 0;
 
 static void mcuIrqHandler(UNUSED u32 intSource);
 
+u8 MCU_readReg(McuReg reg)
+{
+	return I2C_readReg(I2C_DEV_CTR_MCU, reg);
+}
+
+bool MCU_writeReg(McuReg reg, u8 data)
+{
+	return I2C_writeReg(I2C_DEV_CTR_MCU, reg, data);
+}
+
+bool MCU_readRegBuf(McuReg reg, u8 *out, u32 size)
+{
+	return I2C_readRegBuf(I2C_DEV_CTR_MCU, reg, out, size);
+}
+
+bool MCU_writeRegBuf(McuReg reg, const u8 *const in, u32 size)
+{
+	return I2C_writeRegBuf(I2C_DEV_CTR_MCU, reg, in, size);
+}
+
 void MCU_init(void)
 {
 	static bool inited = false;
@@ -38,13 +58,14 @@ void MCU_init(void)
 
 	I2C_init();
 
-	atomic_store_explicit(&g_mcuIrq, true, memory_order_relaxed);
-	(void)MCU_getEvents(0xFFFFFFFFu);
-
-	MCU_setEventMask(0xC0BF3F80);
 	// Configure GPIO for MCU event IRQs
 	GPIO_config(GPIO_3_MCU, GPIO_INPUT | GPIO_EDGE_FALLING | GPIO_IRQ_ENABLE);
 	IRQ_registerIsr(IRQ_CTR_MCU, 14, 0, mcuIrqHandler);
+
+	atomic_store_explicit(&g_mcuIrq, true, memory_order_relaxed);
+	(void)MCU_getEvents(0);
+
+	MCU_setEventMask(0xC0BF3F80);
 }
 
 static void mcuIrqHandler(UNUSED u32 intSource)
@@ -86,24 +107,4 @@ u32 MCU_waitEvents(u32 mask)
 	}
 
 	return events;
-}
-
-u8 MCU_readReg(McuReg reg)
-{
-	return I2C_readReg(I2C_DEV_CTR_MCU, reg);
-}
-
-bool MCU_writeReg(McuReg reg, u8 data)
-{
-	return I2C_writeReg(I2C_DEV_CTR_MCU, reg, data);
-}
-
-bool MCU_readRegBuf(McuReg reg, u8 *out, u32 size)
-{
-	return I2C_readRegBuf(I2C_DEV_CTR_MCU, reg, out, size);
-}
-
-bool MCU_writeRegBuf(McuReg reg, const u8 *const in, u32 size)
-{
-	return I2C_writeRegBuf(I2C_DEV_CTR_MCU, reg, in, size);
 }

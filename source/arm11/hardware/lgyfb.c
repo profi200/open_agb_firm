@@ -95,20 +95,25 @@ static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 	atomic_store_explicit(&g_frameReady, true, memory_order_relaxed);
 }
 
-static void setScaleMatrixTop(u32 len, u32 patt, const s16 matrix[6][8])
+static void setScaleMatrixTop(u32 len, u32 patt, const s16 *const matrix)
 {
 	REG_LGYFB_TOP_V_LEN = len - 1;
 	REG_LGYFB_TOP_V_PATT = patt;
 	REG_LGYFB_TOP_H_LEN = len - 1;
 	REG_LGYFB_TOP_H_PATT = patt;
 
-	for(u32 i = 0; i < 6; i++)
+	for(u32 y = 0; y < 6; y++)
 	{
-		for(u32 j = 0; j < len; j++)
+		for(u32 x = 0; x < len; x++)
 		{
-			const s16 tmp = matrix[i][j];
-			REG_LGYFB_TOP_V_MATRIX[i][j] = tmp * 0xFF / 0xF8 + 8;
-			REG_LGYFB_TOP_H_MATRIX[i][j] = tmp + 8;
+			const s16 tmp = matrix[len * y + x];
+
+			// Correct the color range using the scale matrix hardware.
+			// For example when converting RGB555 to RGB8 LgyFb lazily shifts the 5 bits up
+			// so 0b00011111 becomes 0b11111000. This creates wrong spacing between colors.
+			// TODO: What is the "+ 8" good for?
+			REG_LGYFB_TOP_V_MATRIX[y][x] = tmp * 0xFF / 0xF8 + 8;
+			REG_LGYFB_TOP_H_MATRIX[y][x] = tmp + 8;
 		}
 	}
 }
@@ -137,34 +142,32 @@ void LGYFB_init(void)
 	 *
 	 * Note: At scanline start the in FIFO is all filled with the first pixel.
 	 */
-	static const s16 scaleMatrix[6][8] =
+	static const s16 scaleMatrix[6 * 6] =
 	{
 		// Original from AGB_FIRM.
-		/*{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
-		{     0, 0x2000, 0x4000,      0, 0x2000, 0x4000,      0,      0}, // in[-1]
-		{0x4000, 0x2000,      0, 0x4000, 0x2000,      0,      0,      0}, // in[0]
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
-		{     0,      0,      0,      0,      0,      0,      0,      0}*/  // in[2]
+		/*     0,      0,      0,      0,      0,      0, // in[-3]
+		     0,      0,      0,      0,      0,      0, // in[-2]
+		     0, 0x2000, 0x4000,      0, 0x2000, 0x4000, // in[-1]
+		0x4000, 0x2000,      0, 0x4000, 0x2000,      0, // in[0]
+		     0,      0,      0,      0,      0,      0, // in[1]
+		     0,      0,      0,      0,      0,      0*/  // in[2]
 		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
 
 		// Razor sharp (pixel duplication).
-		/*{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
-		{     0,      0, 0x4000,      0,      0, 0x4000,      0,      0}, // in[-1]
-		{0x4000, 0x4000,      0, 0x4000, 0x4000,      0,      0,      0}, // in[0]
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
-		{     0,      0,      0,      0,      0,      0,      0,      0}*/  // in[2]
-		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
+		/*     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0, 0x4000,      0,      0, 0x4000,
+		0x4000, 0x4000,      0, 0x4000, 0x4000,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0*/
 
 		// Sharp interpolated.
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-3]
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[-2]
-		{     0,      0, 0x2000,      0,      0, 0x2000,      0,      0}, // in[-1]
-		{0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,      0,      0}, // in[0]
-		{     0,      0,      0,      0,      0,      0,      0,      0}, // in[1]
-		{     0,      0,      0,      0,      0,      0,      0,      0}  // in[2]
-		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0, 0x2000,      0,      0, 0x2000,
+		0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0
 	};
 	setScaleMatrixTop(6, 0b00011011, scaleMatrix);
 

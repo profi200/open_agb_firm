@@ -55,14 +55,6 @@ typedef enum
 
 
 
-void MCU_init(void);
-
-bool MCU_setEventMask(u32 mask);
-
-u32 MCU_getEvents(u32 mask);
-
-u32 MCU_waitEvents(u32 mask);
-
 u8 MCU_readReg(McuReg reg);
 
 bool MCU_writeReg(McuReg reg, u8 data);
@@ -70,6 +62,14 @@ bool MCU_writeReg(McuReg reg, u8 data);
 bool MCU_readRegBuf(McuReg reg, u8 *out, u32 size);
 
 bool MCU_writeRegBuf(McuReg reg, const u8 *const in, u32 size);
+
+void MCU_init(void);
+
+bool MCU_setEventMask(u32 mask);
+
+u32 MCU_getEvents(u32 mask);
+
+u32 MCU_waitEvents(u32 mask);
 
 
 static inline u8 MCU_getBatteryLevel(void)
