@@ -24,7 +24,7 @@
 
 
 static bool g_mcuIrq = false;
-static u32 g_events = 0;
+static u32 g_mcuEvents = 0;
 
 
 
@@ -80,7 +80,7 @@ bool MCU_setEventMask(u32 mask)
 
 u32 MCU_getEvents(u32 mask)
 {
-	u32 events = g_events;
+	u32 events = g_mcuEvents;
 
 	if(atomic_load_explicit(&g_mcuIrq, memory_order_relaxed))
 	{
@@ -92,7 +92,7 @@ u32 MCU_getEvents(u32 mask)
 		events |= data;
 	}
 
-	g_mcuIrq = events & ~mask;
+	g_mcuEvents = events & ~mask;
 
 	return events & mask;
 }

@@ -130,7 +130,7 @@ void LGYFB_init(void)
 
 	/*
 	 * Limitations:
-	 * First pattern bit must be 1 and last 0 or it loses sync with the DS/GBA input.
+	 * First pattern bit must be 1 and last 0 (for V-scale) or it loses sync with the DS/GBA input.
 	 *
 	 * Matrix ranges:
 	 * in[-3] -1024-1023 (0xFC00-0x03FF)
