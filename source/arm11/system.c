@@ -21,6 +21,7 @@
 #include "arm11/start.h"
 #include "arm11/hardware/interrupt.h"
 #include "arm11/hardware/timer.h"
+#include "kernel.h"
 #include "hardware/corelink_dma-330.h"
 #include "arm11/hardware/i2c.h"
 #include "arm11/hardware/mcu.h"
@@ -37,6 +38,7 @@ void WEAK __systemInit(void)
 
 	if(!__getCpuId()) // Core 0
 	{
+		kernelInit(2);
 		DMA330_init();
 		I2C_init();
 		hidInit();

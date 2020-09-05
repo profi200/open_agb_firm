@@ -36,13 +36,14 @@
 #include "arm.h"
 #include "util.h"
 #include "arm11/allocator/vram.h"
+#include "event.h"
 
 
 static struct
 {
 	u8 lcdPower;           // 1 = on. Bit 4 top light, bit 2 bottom light, bit 0 LCDs.
 	u8 lcdLights[2];       // LCD backlight brightness. Top, bottom.
-	bool events[6];
+	KEvent events[6];
 	u32 swap;              // Currently active framebuffer.
 	void *framebufs[2][4]; // For each screen A1, A2, B1, B2
 	u8 doubleBuf[2];       // Top, bottom, 1 = enable.
@@ -60,6 +61,7 @@ static void gfxIrqHandler(u32 intSource);
 
 void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 {
+	g_gfxState.lcdPower = 0x15; // All on.
 	setupFramebufs(fmtTop, fmtBot);
 	g_gfxState.doubleBuf[0] = 1;
 	g_gfxState.doubleBuf[1] = 1;
@@ -82,7 +84,7 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_PDC0_SWAP = 0; // Select framebuf 0.
 	REG_LCD_PDC1_SWAP = 0;
 	REG_LCD_PDC0_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ERR | PDC_CNT_I_MASK_H | PDC_CNT_E; // Start
-	REG_LCD_PDC1_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ERR | PDC_CNT_I_MASK_H | PDC_CNT_E;
+	REG_LCD_PDC1_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ALL | PDC_CNT_E;
 
 	// LCD reg setup.
 	REG_LCD_ABL0_FILL = 1u<<24; // Force blackscreen
@@ -92,13 +94,14 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_RST = 0;
 	REG_LCD_UNK00C = 0x10001;
 
-	// Register IRQ handlers.
-	IRQ_registerIsr(IRQ_PSC0, 14, 0, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_PSC1, 14, 0, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_PDC0, 14, 0, gfxIrqHandler);
-	//IRQ_registerIsr(IRQ_PDC1, 14, 0, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_PPF, 14, 0, gfxIrqHandler);
-	IRQ_registerIsr(IRQ_P3D, 14, 0, gfxIrqHandler);
+	// Create IRQ events.
+	// PSC0, PSC1, PDC0, PDC1, PPF, P3D
+	for(u8 i = 0; i < 6; i++)
+	{
+		KEvent tmp = createEvent(false);
+		bindInterruptToEvent(tmp, IRQ_PSC0 + i, 14);
+		g_gfxState.events[i] = tmp;
+	}
 
 	// Clear entire VRAM.
 	GX_memoryFill((u32*)VRAM_BANK0, 1u<<9, VRAM_SIZE / 2, 0,
@@ -129,7 +132,6 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_ABL1_LIGHT_PWM = 0x1023E;
 	MCU_controlLCDPower(0x28u); // Power on backlights.
 	if(MCU_waitEvents(0x3Fu<<24) != 0x28u<<24) panic();
-	g_gfxState.lcdPower = 0x15; // All on.
 
 	// Make sure the fills finished.
 	GFX_waitForPSC0();
@@ -176,12 +178,13 @@ void GFX_deinit(void)
 
 	deallocFramebufs();
 
-	IRQ_unregisterIsr(IRQ_PSC0);
-	IRQ_unregisterIsr(IRQ_PSC1);
-	IRQ_unregisterIsr(IRQ_PDC0);
-	//IRQ_unregisterIsr(IRQ_PDC1);
-	IRQ_unregisterIsr(IRQ_PPF);
-	IRQ_unregisterIsr(IRQ_P3D);
+	// PSC0, PSC1, PDC0, PDC1, PPF, P3D
+	for(u8 i = 0; i < 6; i++)
+	{
+		unbindInterruptEvent(IRQ_PSC0 + i);
+		deleteEvent(g_gfxState.events[i]);
+		g_gfxState.events[i] = NULL;
+	}
 }
 
 void GFX_setFramebufFmt(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
@@ -386,18 +389,11 @@ void GFX_swapFramebufs(void)
 
 void GFX_waitForEvent(GfxEvent event, bool discard)
 {
-	bool *const events = g_gfxState.events;
+	const KEvent kevent = g_gfxState.events[event];
 
-	if(discard) atomic_store_explicit(&events[event], false, memory_order_relaxed);
-	while(!atomic_load_explicit(&events[event], memory_order_relaxed)) __wfe();
-	atomic_store_explicit(&events[event], false, memory_order_relaxed);
-}
-
-static void gfxIrqHandler(u32 intSource)
-{
-	bool *const events = g_gfxState.events;
-
-	atomic_store_explicit(&events[intSource - IRQ_PSC0], true, memory_order_relaxed);
+	if(discard) clearEvent(kevent);
+	waitForEvent(kevent);
+	clearEvent(kevent);
 }
 
 void GX_memoryFill(u32 *buf0a, u32 buf0v, u32 buf0Sz, u32 val0, u32 *buf1a, u32 buf1v, u32 buf1Sz, u32 val1)

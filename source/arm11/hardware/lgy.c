@@ -345,8 +345,6 @@ void LGY_handleEvents(void)
 	debugTests();
 #endif
 
-	LGYFB_processFrame();
-
 	// Bit 0 triggers wakeup. Bit 1 sleep state/ack sleep end. Bit 2 unk. Bit 15 IRQ enable (triggers IRQ 89).
 	//if(REG_LGY_SLEEP & 2u) REG_HID_PADCNT = REG_LGY_PADCNT;
 }

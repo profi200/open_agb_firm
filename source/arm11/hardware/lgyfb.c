@@ -7,6 +7,8 @@
 #include "arm11/hardware/lcd.h"
 #include "hardware/gfx.h"
 #include "lgyfb_dma330.h"
+#include "kernel.h"
+#include "event.h"
 
 
 #define LGYFB_TOP_REGS_BASE      (IO_MEM_ARM9_ARM11 + 0x11000)
@@ -75,7 +77,8 @@
 #define LGYFB_BOT_FIFO           *((const vu32*)(0x10310000))
 
 
-static bool g_frameReady = false;
+static KTask g_lgyFbTask = NULL;
+static KEvent g_frameReadyEvent = NULL;
 
 
 
@@ -92,121 +95,21 @@ static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 	else                             vtotal = 414; // Faster than GBA.
 	REG_LCD_PDC0_VTOTAL = vtotal;
 
-	atomic_store_explicit(&g_frameReady, true, memory_order_relaxed);
+	signalEvent(g_frameReadyEvent, false);
 }
 
-static void setScaleMatrixTop(u32 len, u32 patt, const s16 *const matrix)
+//#include "arm11/fmt.h"
+static void lgyFbTask(void *args)
 {
-	REG_LGYFB_TOP_V_LEN = len - 1;
-	REG_LGYFB_TOP_V_PATT = patt;
-	REG_LGYFB_TOP_H_LEN = len - 1;
-	REG_LGYFB_TOP_H_PATT = patt;
+	const KEvent event = (KEvent)args;
 
-	for(u32 y = 0; y < 6; y++)
+	do
 	{
-		for(u32 x = 0; x < len; x++)
-		{
-			const s16 tmp = matrix[len * y + x];
+		waitForEvent(event);
 
-			// Correct the color range using the scale matrix hardware.
-			// For example when converting RGB555 to RGB8 LgyFb lazily shifts the 5 bits up
-			// so 0b00011111 becomes 0b11111000. This creates wrong spacing between colors.
-			// TODO: What is the "+ 8" good for?
-			REG_LGYFB_TOP_V_MATRIX[y][x] = tmp * 0xFF / 0xF8 + 8;
-			REG_LGYFB_TOP_H_MATRIX[y][x] = tmp + 8;
-		}
-	}
-}
-
-void LGYFB_init(void)
-{
-	if(DMA330_run(0, program)) return;
-
-	//REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(240u, 160u);
-	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(360u, 240u);
-	REG_LGYFB_TOP_STAT  = LGYFB_IRQ_MASK;
-	REG_LGYFB_TOP_IRQ   = 0;
-	REG_LGYFB_TOP_ALPHA = 0xFF;
-
-	/*
-	 * Limitations:
-	 * First pattern bit must be 1 and last 0 (for V-scale) or it loses sync with the DS/GBA input.
-	 *
-	 * Matrix ranges:
-	 * in[-3] -1024-1023 (0xFC00-0x03FF)
-	 * in[-2] -4096-4095 (0xF000-0x0FFF)
-	 * in[-1] -32768-32767 (0x8000-0x7FFF)
-	 * in[0]  -32768-32767 (0x8000-0x7FFF)
-	 * in[1]  -4096-4095 (0xF000-0x0FFF)
-	 * in[2]  -1024-1023 (0xFC00-0x03FF)
-	 *
-	 * Note: At scanline start the in FIFO is all filled with the first pixel.
-	 */
-	static const s16 scaleMatrix[6 * 6] =
-	{
-		// Original from AGB_FIRM.
-		/*     0,      0,      0,      0,      0,      0, // in[-3]
-		     0,      0,      0,      0,      0,      0, // in[-2]
-		     0, 0x2000, 0x4000,      0, 0x2000, 0x4000, // in[-1]
-		0x4000, 0x2000,      0, 0x4000, 0x2000,      0, // in[0]
-		     0,      0,      0,      0,      0,      0, // in[1]
-		     0,      0,      0,      0,      0,      0*/  // in[2]
-		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
-
-		// Razor sharp (pixel duplication).
-		/*     0,      0,      0,      0,      0,      0,
-		     0,      0,      0,      0,      0,      0,
-		     0,      0, 0x4000,      0,      0, 0x4000,
-		0x4000, 0x4000,      0, 0x4000, 0x4000,      0,
-		     0,      0,      0,      0,      0,      0,
-		     0,      0,      0,      0,      0,      0*/
-
-		// Sharp interpolated.
-		     0,      0,      0,      0,      0,      0,
-		     0,      0,      0,      0,      0,      0,
-		     0,      0, 0x2000,      0,      0, 0x2000,
-		0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,
-		     0,      0,      0,      0,      0,      0,
-		     0,      0,      0,      0,      0,      0
-	};
-	setScaleMatrixTop(6, 0b00011011, scaleMatrix);
-
-	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.
-	// The green bias exists on the whole range of green colors.
-	// Some results:
-	// RGBA8:   Same as RGB8 but with useless alpha component.
-	// RGB8:    Observed best format. Invisible dithering and best color accuracy.
-	// RGB565:  A little visible dithering. Good color accuracy.
-	// RGB5551: Lots of visible dithering. Good color accuracy (a little worse than 565).
-	REG_LGYFB_TOP_CNT = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_8880 |
-	                    LGYFB_HSCALE_E | LGYFB_VSCALE_E | LGYFB_ENABLE;
-
-	IRQ_registerIsr(IRQ_CDMA_EVENT0, 13, 0, lgyFbDmaIrqHandler);
-
-
-	const double inGamma = 4.0;
-	const double outGamma = 2.2;
-	//const double contrast = .74851331406341291833644689906823; // GBA
-	//const double brightness = .25148668593658708166355310093177; // GBA
-	const double contrast = 1.0; // No-op
-	const double brightness = 0.0; // No-op
-	//REG_LCD_PDC0_GTBL_IDX = 0;
-	for(u32 i = 0; i < 256; i++)
-	{
-		// Credits for this algo go to Extrems.
-		// Originally from Game Boy Interface Standard Edition for the Game Cube.
-		//const u32 x = (i & ~7u) | i>>5;
-		u32 res = pow(pow(contrast, inGamma) * pow((double)i / 255.0f + brightness / contrast, inGamma),
-		              1.0 / outGamma) * 255.0f;
-		if(res > 255) res = 255;
-
-		// Same adjustment for red/green/blue.
-		REG_LCD_PDC0_GTBL_FIFO = res<<16 | res<<8 | res;
-	}
-}
-
-static void rotateFrame(void)
-{
+		// Rotate the frame using the GPU.
+		// 240x160: TODO.
+		// 360x240: about 0.623620315 ms.
 // 360x240, no filter.
 alignas(16) static const u8 firstList[1136] =
 {
@@ -491,39 +394,140 @@ alignas(16) static const u8 secondList[448] =
 	0x10, 0x00, 0x0F, 0x00
 };*/
 
-	static bool normalRender = false;
-	u32 listSize;
-	const u32 *list;
-	if(normalRender == false)
-	{
-		normalRender = true;
+		static bool normalRender = false;
+		u32 listSize;
+		const u32 *list;
+		if(normalRender == false)
+		{
+			normalRender = true;
 
-		listSize = 1136;
-		list = (u32*)firstList;
-	}
-	else
-	{
-		listSize = 448;
-		list = (u32*)secondList;
-	}
-	GX_processCommandList(listSize, list);
-	GFX_waitForP3D();
-	GX_displayTransfer((u32*)(0x18180000 + (16 * 240 * 3)), 368u<<16 | 240u,
-	                   GFX_getFramebuffer(SCREEN_TOP) + (16 * 240 * 3), 368u<<16 | 240u, 1u<<12 | 1u<<8);
-	GFX_waitForPPF();
+			listSize = 1136;
+			list = (u32*)firstList;
+		}
+		else
+		{
+			listSize = 448;
+			list = (u32*)secondList;
+		}
+		GX_processCommandList(listSize, list);
+		GFX_waitForP3D();
+		GX_displayTransfer((u32*)(0x18180000 + (16 * 240 * 3)), 368u<<16 | 240u,
+		                   GFX_getFramebuffer(SCREEN_TOP) + (16 * 240 * 3), 368u<<16 | 240u, 1u<<12 | 1u<<8);
+		GFX_waitForPPF();
+		GFX_swapFramebufs();
+	} while(1);
 }
 
-void LGYFB_processFrame(void)
+static void setScaleMatrixTop(u32 len, u32 patt, const s16 *const matrix)
 {
-	if(atomic_load_explicit(&g_frameReady, memory_order_relaxed))
-	{
-		atomic_store_explicit(&g_frameReady, false, memory_order_relaxed);
+	REG_LGYFB_TOP_V_LEN = len - 1;
+	REG_LGYFB_TOP_V_PATT = patt;
+	REG_LGYFB_TOP_H_LEN = len - 1;
+	REG_LGYFB_TOP_H_PATT = patt;
 
-		// Rotate the frame using the GPU.
-		// 240x160: TODO.
-		// 360x240: about 0.623620315 ms.
-		rotateFrame();
-		GFX_swapFramebufs();
+	for(u32 y = 0; y < 6; y++)
+	{
+		for(u32 x = 0; x < len; x++)
+		{
+			const s16 tmp = matrix[len * y + x];
+
+			// Correct the color range using the scale matrix hardware.
+			// For example when converting RGB555 to RGB8 LgyFb lazily shifts the 5 bits up
+			// so 0b00011111 becomes 0b11111000. This creates wrong spacing between colors.
+			// TODO: What is the "+ 8" good for?
+			REG_LGYFB_TOP_V_MATRIX[y][x] = tmp * 0xFF / 0xF8 + 8;
+			REG_LGYFB_TOP_H_MATRIX[y][x] = tmp + 8;
+		}
+	}
+}
+
+void LGYFB_init(void)
+{
+	if(DMA330_run(0, program)) return;
+
+	//REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(240u, 160u);
+	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(360u, 240u);
+	REG_LGYFB_TOP_STAT  = LGYFB_IRQ_MASK;
+	REG_LGYFB_TOP_IRQ   = 0;
+	REG_LGYFB_TOP_ALPHA = 0xFF;
+
+	/*
+	 * Limitations:
+	 * First pattern bit must be 1 and last 0 (for V-scale) or it loses sync with the DS/GBA input.
+	 *
+	 * Matrix ranges:
+	 * in[-3] -1024-1023 (0xFC00-0x03FF)
+	 * in[-2] -4096-4095 (0xF000-0x0FFF)
+	 * in[-1] -32768-32767 (0x8000-0x7FFF)
+	 * in[0]  -32768-32767 (0x8000-0x7FFF)
+	 * in[1]  -4096-4095 (0xF000-0x0FFF)
+	 * in[2]  -1024-1023 (0xFC00-0x03FF)
+	 *
+	 * Note: At scanline start the in FIFO is all filled with the first pixel.
+	 */
+	static const s16 scaleMatrix[6 * 6] =
+	{
+		// Original from AGB_FIRM.
+		/*     0,      0,      0,      0,      0,      0, // in[-3]
+		     0,      0,      0,      0,      0,      0, // in[-2]
+		     0, 0x2000, 0x4000,      0, 0x2000, 0x4000, // in[-1]
+		0x4000, 0x2000,      0, 0x4000, 0x2000,      0, // in[0]
+		     0,      0,      0,      0,      0,      0, // in[1]
+		     0,      0,      0,      0,      0,      0*/  // in[2]
+		// out[0] out[1] out[2]  out[3]  out[4]  out[5]  out[6]  out[7]
+
+		// Razor sharp (pixel duplication).
+		/*     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0, 0x4000,      0,      0, 0x4000,
+		0x4000, 0x4000,      0, 0x4000, 0x4000,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0*/
+
+		// Sharp interpolated.
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0, 0x2000,      0,      0, 0x2000,
+		0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0
+	};
+	setScaleMatrixTop(6, 0b00011011, scaleMatrix);
+
+	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.
+	// The green bias exists on the whole range of green colors.
+	// Some results:
+	// RGBA8:   Same as RGB8 but with useless alpha component.
+	// RGB8:    Observed best format. Invisible dithering and best color accuracy.
+	// RGB565:  A little visible dithering. Good color accuracy.
+	// RGB5551: Lots of visible dithering. Good color accuracy (a little worse than 565).
+	REG_LGYFB_TOP_CNT = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_8880 |
+	                    LGYFB_HSCALE_E | LGYFB_VSCALE_E | LGYFB_ENABLE;
+
+	KEvent tmp = createEvent(true);
+	g_frameReadyEvent = tmp;
+	IRQ_registerIsr(IRQ_CDMA_EVENT0, 13, 0, lgyFbDmaIrqHandler);
+	g_lgyFbTask = createTask(0x800, 3, lgyFbTask, tmp);
+
+
+	const double inGamma = 4.0;
+	const double outGamma = 2.2;
+	//const double contrast = .74851331406341291833644689906823; // GBA
+	//const double brightness = .25148668593658708166355310093177; // GBA
+	const double contrast = 1.0; // No-op
+	const double brightness = 0.0; // No-op
+	//REG_LCD_PDC0_GTBL_IDX = 0;
+	for(u32 i = 0; i < 256; i++)
+	{
+		// Credits for this algo go to Extrems.
+		// Originally from Game Boy Interface Standard Edition for the Game Cube.
+		//const u32 x = (i & ~7u) | i>>5;
+		u32 res = pow(pow(contrast, inGamma) * pow((double)i / 255.0f + brightness / contrast, inGamma),
+		              1.0 / outGamma) * 255.0f;
+		if(res > 255) res = 255;
+
+		// Same adjustment for red/green/blue.
+		REG_LCD_PDC0_GTBL_FIFO = res<<16 | res<<8 | res;
 	}
 }
 

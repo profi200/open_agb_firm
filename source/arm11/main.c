@@ -29,6 +29,7 @@
 #include "fs.h"
 #include "arm11/filebrowser.h"
 #include "arm.h"
+#include "kernel.h"
 
 
 
@@ -64,7 +65,7 @@ int main(void)
 
 			LGY_handleEvents();
 
-			__wfi();
+			yieldTask();
 		} while(1);
 	}
 

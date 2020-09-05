@@ -18,11 +18,11 @@ include $(DEVKITARM)/base_rules
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	../source ../source/hardware ../source/arm11 \
+SOURCES		:=	../kernel/source ../source ../source/hardware ../source/arm11 \
 				../source/arm11/allocator ../source/arm11/hardware \
 				../source/arm11/util/rbtree
 DATA		:=
-INCLUDES	:=	../include
+INCLUDES	:=	../kernel/include ../include
 DEFINES		:=	-DARM11 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
 				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
 ASSETS		:=

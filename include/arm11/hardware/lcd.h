@@ -67,6 +67,7 @@
 #define PDC_CNT_I_MASK_H    (1u<<8)  // Disables H(Blank?) IRQs.
 #define PDC_CNT_I_MASK_V    (1u<<9)  // Disables VBlank IRQs.
 #define PDC_CNT_I_MASK_ERR  (1u<<10) // Disables error IRQs. What kind of errors?
+#define PDC_CNT_I_MASK_ALL  (PDC_CNT_I_MASK_ERR | PDC_CNT_I_MASK_V | PDC_CNT_I_MASK_H)
 #define PDC_CNT_OUT_E       (1u<<16) // Output enable?
 
 // REG_LCD_PDC_SWAP
