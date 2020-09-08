@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include "types.h"
-#include "mutex.h"
+#include "kmutex.h"
 #include "internal/list.h"
 #include "internal/kernel_private.h"
 #include "internal/util.h"

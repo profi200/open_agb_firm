@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "types.h"
-#include "timer.h"
+#include "ktimer.h"
 #include "internal/list.h"
 #include "arm11/hardware/interrupt.h"
 #include "arm11/hardware/timer.h"

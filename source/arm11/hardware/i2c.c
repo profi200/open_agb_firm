@@ -19,8 +19,8 @@
 #include "types.h"
 #include "mem_map.h"
 #include "arm11/hardware/i2c.h"
-#include "event.h"
-#include "mutex.h"
+#include "kevent.h"
+#include "kmutex.h"
 #include "arm11/hardware/interrupt.h"
 
 

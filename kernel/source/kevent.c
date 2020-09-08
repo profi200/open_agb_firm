@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "types.h"
-#include "event.h"
+#include "kevent.h"
 #include "internal/list.h"
 #include "arm11/hardware/interrupt.h"
 #include "internal/kernel_private.h"

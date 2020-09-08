@@ -1,5 +1,7 @@
 #pragma once
 
+#include "kevent.h"
+
 
 // REG_LGYFB_CNT
 #define LGYFB_ENABLE             (1u)
@@ -31,7 +33,7 @@
 
 
 
-void LGYFB_init(void);
+void LGYFB_init(const KEvent frameReadyEvent);
 void LGYFB_deinit(void);
 
 #ifndef NDEBUG

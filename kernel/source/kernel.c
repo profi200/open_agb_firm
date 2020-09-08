@@ -10,10 +10,6 @@
 #include "internal/list.h"
 #include "internal/contextswitch.h"
 #include "kernel.h"
-#include "event.h"
-#include "mutex.h"
-#include "semaphore.h"
-#include "timer.h"
 #include "arm.h"
 
 
