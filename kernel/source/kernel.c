@@ -167,7 +167,20 @@ bool waitQueueWakeN(ListNode *waitQueue, u32 wakeCount, KRes res, bool reschedul
 
 	do
 	{
-		TaskCb *task = LIST_ENTRY(listPopHead(waitQueue), TaskCb, node);
+		/*
+		 * Edge case:
+		 * 2 tasks, 1 single shot event. Task 2 waits first and then task 1.
+		 * When signaled (by an IRQ) only task 1 will ever run instead of
+		 * alternating between both because task 1 always lands on the
+		 * head (as intended) but on wakeup we take N tasks from the head
+		 * to preserve order.
+		 *
+		 * Workaround:
+		 * Take tasks from the tail instead. This will however punish
+		 * the longest waiting tasks unnecessarily.
+		 */
+		//TaskCb *task = LIST_ENTRY(listPopHead(waitQueue), TaskCb, node);
+		TaskCb *task = LIST_ENTRY(listPop(waitQueue), TaskCb, node);
 		readyBitmap |= 1u<<task->prio;
 		task->res = res;
 		listPushTail(&runQueues[task->prio], &task->node);
