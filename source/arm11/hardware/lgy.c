@@ -5,13 +5,10 @@
 #include "ipc_handler.h"
 #include "arm11/hardware/hid.h"
 #include "arm11/hardware/interrupt.h"
-#include "fs.h"
 #include "hardware/cache.h"
 #include "arm11/hardware/pdn.h"
 #include "arm11/hardware/mcu.h"
-#include "arm11/hardware/lgyfb.h"
 #include "arm11/fmt.h"
-//#include "arm11/gba_save_type_db.h"
 
 
 #define LGY_REGS_BASE     (IO_MEM_ARM9_ARM11 + 0x41100)
@@ -43,172 +40,6 @@ static void lgySleepIrqHandler(u32 intSource)
 	}
 }
 
-static Result loadGbaRom(const char *const path, u32 *const rsOut)
-{
-	Result res;
-	FHandle f;
-	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
-	{
-		u32 romSize;
-		if((romSize = fSize(f)) <= MAX_ROM_SIZE)
-		{
-			u8 *ptr = (u8*)ROM_LOC;
-			u32 read;
-			while((res = fRead(f, ptr, 0x100000u, &read)) == RES_OK && read == 0x100000u)
-				ptr += 0x100000u;
-
-			if(res == RES_OK)
-			{
-				*rsOut = romSize;
-				// Pad ROM area with "open bus" value.
-				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
-			}
-		}
-		else res = RES_ROM_TOO_BIG;
-
-		fClose(f);
-	}
-
-	return res;
-}
-
-static u16 checkSaveOverride(u32 gameCode)
-{
-	if((gameCode & 0xFFu) == 'F') // Classic NES Series.
-	{
-		return SAVE_TYPE_EEPROM_8k;
-	}
-
-	static const struct
-	{
-		alignas(4) char gameCode[4];
-		u16 saveType;
-	} overrideLut[] =
-	{
-		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew. TODO: Set WAITCNT to 0x4014?
-		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color (Homebrew).
-		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2.
-		{"A3A\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 3.
-	};
-
-	for(u32 i = 0; i < sizeof(overrideLut) / sizeof(*overrideLut); i++)
-	{
-		// Compare Game Code without region.
-		if((gameCode & 0xFFFFFFu) == *((u32*)overrideLut[i].gameCode))
-		{
-			return overrideLut[i].saveType;
-		}
-	}
-
-	return 0xFF;
-}
-
-// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
-static u16 tryDetectSaveType(u32 romSize)
-{
-	const u32 *romPtr = (u32*)ROM_LOC;
-	u16 saveType;
-	if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
-	{
-		debug_printf("Game Code in override list. Using save type %" PRIu16 ".\n", saveType);
-		return saveType;
-	}
-
-	romPtr += 0xE4 / 4; // Skip headers.
-	saveType = SAVE_TYPE_NONE;
-	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
-	{
-		u32 tmp = *romPtr;
-
-		// "EEPR" "FLAS" "SRAM"
-		if(tmp == 0x52504545u || tmp == 0x53414C46u || tmp == 0x4D415253u)
-		{
-			static const struct
-			{
-				const char *str;
-				u16 saveType;
-			} saveTypeLut[25] =
-			{
-				// EEPROM
-				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},  // Actually EEPROM 4k.
-				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},  // Confirmed.
-				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k}, // Confirmed.
-				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},  // Confirmed. Except Super Mario Advance 2/3.
-				{"EEPROM_V124", SAVE_TYPE_EEPROM_64k}, // Confirmed.
-				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},  // Confirmed.
-				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},  // Confirmed.
-
-				// FLASH
-				// Assume they all have RTC.
-				{"FLASH_V120",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V121",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V123",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V124",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V125",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V126",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH512_V130", SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH512_V131", SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH512_V133", SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH1M_V102",  SAVE_TYPE_FLASH_1m_MRX_RTC},
-				{"FLASH1M_V103",  SAVE_TYPE_FLASH_1m_MRX_RTC},
-
-				// FRAM & SRAM
-				{"SRAM_F_V100", SAVE_TYPE_SRAM_256k},
-				{"SRAM_F_V102", SAVE_TYPE_SRAM_256k},
-				{"SRAM_F_V103", SAVE_TYPE_SRAM_256k},
-
-				{"SRAM_V110",   SAVE_TYPE_SRAM_256k},
-				{"SRAM_V111",   SAVE_TYPE_SRAM_256k},
-				{"SRAM_V112",   SAVE_TYPE_SRAM_256k},
-				{"SRAM_V113",   SAVE_TYPE_SRAM_256k}
-			};
-
-			for(u32 i = 0; i < 25; i++)
-			{
-				const char *const str = saveTypeLut[i].str;
-				u16 tmpSaveType = saveTypeLut[i].saveType;
-
-				if(memcmp(romPtr, str, strlen(str)) == 0)
-				{
-					if(tmpSaveType == SAVE_TYPE_EEPROM_8k || tmpSaveType == SAVE_TYPE_EEPROM_64k)
-					{
-						// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
-						if(romSize > 0x1000000) tmpSaveType++;
-					}
-					saveType = tmpSaveType;
-					debug_printf("Detected SDK save type '%s'.\n", str);
-					goto saveTypeFound;
-				}
-			}
-		}
-	}
-
-saveTypeFound:
-
-	return saveType;
-}
-
-/*static u16 getSaveTypeFromTable(void)
-{
-	const u32 gameCode = *(u32*)(ROM_LOC + 0xAC) & ~0xFF000000u;
-
-	u16 saveType = SAVE_TYPE_NONE;
-	for(u32 i = 0; i < sizeof(saveTypeLut) / sizeof(*saveTypeLut); i++)
-	{
-		// Save type in last byte.
-		const u32 entry = *((u32*)&saveTypeLut[i]);
-		if((entry & ~0xFF000000u) == gameCode)
-		{
-			saveType = entry>>24;
-			break;
-		}
-	}
-
-	debug_printf("Using save type 0x%" PRIX16 ".\n", saveType);
-
-	return saveType;
-}*/
-
 static void setupFcramForGbaMode(void)
 {
 	// FCRAM reset and clock disable.
@@ -221,27 +52,14 @@ static void setupFcramForGbaMode(void)
 	while(REG_PDN_FCRAM_CNT & PDN_FCRAM_CNT_CLK_E_ACK); // Wait until clock is disabled.
 }
 
-Result LGY_prepareGbaMode(bool biosIntro, char *const romPath)
+Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePath)
 {
-	// Load the ROM image.
-	u32 romSize;
-	Result res = loadGbaRom(romPath, &romSize);
-	if(res != RES_OK) return res;
-
-	// Try to detect the save type.
-	const u16 saveType = tryDetectSaveType(romSize);
-	//const u16 saveType = getSaveTypeFromTable();
-
-	// Prepare ARM9 for GBA mode + settings and save loading.
-	const u32 romPathLen = strlen(romPath);
-	strcpy(romPath + romPathLen - 4, ".sav");
-
 	u32 cmdBuf[4];
-	cmdBuf[0] = (u32)romPath;
-	cmdBuf[1] = romPathLen + 1;
+	cmdBuf[0] = (u32)savePath;
+	cmdBuf[1] = strlen(savePath) + 1;
 	cmdBuf[2] = biosIntro;
 	cmdBuf[3] = saveType;
-	res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 4);
+	Result res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 4);
 	if(res != RES_OK) return res;
 
 	// Setup GBA Real-Time Clock.
@@ -251,9 +69,6 @@ Result LGY_prepareGbaMode(bool biosIntro, char *const romPath)
 	rtc.date = __builtin_bswap32(rtc.date)>>8;
 	// TODO: Do we need to set day of week?
 	LGY_setGbaRtc(rtc);
-
-	// Setup Legacy Framebuffer.
-	LGYFB_init();
 
 	// Setup FCRAM for GBA mode.
 	setupFcramForGbaMode();
@@ -324,11 +139,11 @@ void debugTests(void)
 		}*/
 	}
 	//else REG_LGY_PAD_SEL = 0; // Stop overriding buttons.
-	if(kDown & KEY_Y) LGYFB_dbgDumpFrame();
+	//if(kDown & KEY_Y) LGYFB_dbgDumpFrame();
 }
 #endif
 
-void LGY_handleEvents(void)
+void LGY_handleOverrides(void)
 {
 	// Override D-Pad if Circle-Pad is used.
 	const u32 kHeld = hidKeysHeld();
@@ -344,9 +159,6 @@ void LGY_handleEvents(void)
 #ifndef NDEBUG
 	debugTests();
 #endif
-
-	// Bit 0 triggers wakeup. Bit 1 sleep state/ack sleep end. Bit 2 unk. Bit 15 IRQ enable (triggers IRQ 89).
-	//if(REG_LGY_SLEEP & 2u) REG_HID_PADCNT = REG_LGY_PADCNT;
 }
 
 Result LGY_backupGbaSave(void)
@@ -356,11 +168,7 @@ Result LGY_backupGbaSave(void)
 
 void LGY_deinit(void)
 {
-	//REG_LGY_PAD_VAL = 0x1FFF; // Force all buttons not pressed.
-	//REG_LGY_PAD_SEL = 0x1FFF;
-
 	LGY_backupGbaSave();
-	LGYFB_deinit();
 
 	IRQ_unregisterIsr(IRQ_LGY_SLEEP);
 	IRQ_unregisterIsr(IRQ_HID_PADCNT);

@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "types.h"
-#include "semaphore.h"
+#include "ksemaphore.h"
 #include "internal/list.h"
 #include "internal/kernel_private.h"
 #include "internal/util.h"

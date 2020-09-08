@@ -36,7 +36,7 @@
 #include "arm.h"
 #include "util.h"
 #include "arm11/allocator/vram.h"
-#include "event.h"
+#include "kevent.h"
 
 
 static struct
