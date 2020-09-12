@@ -8,17 +8,16 @@
 #include "hardware/cache.h"
 #include "arm11/hardware/pdn.h"
 #include "arm11/hardware/mcu.h"
-#include "arm11/fmt.h"
 
 
 #define LGY_REGS_BASE     (IO_MEM_ARM9_ARM11 + 0x41100)
 #define REG_LGY_MODE      *((      vu16*)(LGY_REGS_BASE + 0x00))
 #define REG_LGY_SLEEP     *((      vu16*)(LGY_REGS_BASE + 0x04))
 #define REG_LGY_UNK       *((const vu16*)(LGY_REGS_BASE + 0x08)) // IRQ related?
-#define REG_LGY_PADCNT    *((const vu16*)(LGY_REGS_BASE + 0x0A)) // ARM7 "KEYCNT"
-#define REG_LGY_PAD_SEL   *((      vu16*)(LGY_REGS_BASE + 0x10)) // Select which keys to override.
-#define REG_LGY_PAD_VAL   *((      vu16*)(LGY_REGS_BASE + 0x12)) // Override value.
-#define REG_LGY_GPIO_SEL  *((      vu16*)(LGY_REGS_BASE + 0x14)) // Select which GPIOs to override.
+#define REG_LGY_PADCNT    *((const vu16*)(LGY_REGS_BASE + 0x0A)) // Read-only mirror of ARM7 "KEYCNT".
+#define REG_LGY_PAD_SEL   *((      vu16*)(LGY_REGS_BASE + 0x10)) // Select which keys to override. 1 = selected.
+#define REG_LGY_PAD_VAL   *((      vu16*)(LGY_REGS_BASE + 0x12)) // Override value. Each bit 0 = pressed.
+#define REG_LGY_GPIO_SEL  *((      vu16*)(LGY_REGS_BASE + 0x14)) // Select which GPIOs to override. 1 = selected.
 #define REG_LGY_GPIO_VAL  *((      vu16*)(LGY_REGS_BASE + 0x16)) // Override value.
 #define REG_LGY_UNK2      *((       vu8*)(LGY_REGS_BASE + 0x18)) // DSi gamecard detection select?
 #define REG_LGY_UNK3      *((       vu8*)(LGY_REGS_BASE + 0x19)) // DSi gamecard detection value?
@@ -26,11 +25,14 @@
 
 
 
-static void lgySleepIrqHandler(u32 intSource)
+static void lgySleepIsr(u32 intSource)
 {
 	if(intSource == IRQ_LGY_SLEEP)
 	{
-		REG_HID_PADCNT = REG_LGY_PADCNT;
+		// Workaround for The Legend of Zelda - A Link to the Past.
+		// This game doesn't set the IRQ enable bit so we force it
+		// on the 3DS side. Unknown if other games have this bug.
+		REG_HID_PADCNT = REG_LGY_PADCNT | 1u<<14;
 	}
 	else // IRQ_HID_PADCNT
 	{
@@ -40,15 +42,19 @@ static void lgySleepIrqHandler(u32 intSource)
 	}
 }
 
-static void setupFcramForGbaMode(void)
+static void powerDownFcramForLegacy(u8 mode)
 {
-	// FCRAM reset and clock disable.
 	flushDCache();
 	// TODO: Unmap FCRAM.
 	while(!REG_LGY_MODE); // Wait until legacy mode is ready.
-	*((vu32*)0x10201000) &= ~1u;                        // Some kind of bug fix for the GBA cart emu?
-	REG_PDN_FCRAM_CNT = 0;                              // Set reset low (active).
-	REG_PDN_FCRAM_CNT = PDN_FCRAM_CNT_RST;              // Take it out of reset.
+
+	// For GBA mode we need to additionally apply a bug fix and reset FCRAM.
+	if(mode == LGY_MODE_AGB)
+	{
+		*((vu32*)0x10201000) &= ~1u;                    // Bug fix for the GBA cart emu?
+		REG_PDN_FCRAM_CNT = PDN_FCRAM_CNT_CLK_E;        // Set reset low (active) but keep clock on.
+	}
+	REG_PDN_FCRAM_CNT = PDN_FCRAM_CNT_RST;              // Take it out of reset but disable clock.
 	while(REG_PDN_FCRAM_CNT & PDN_FCRAM_CNT_CLK_E_ACK); // Wait until clock is disabled.
 }
 
@@ -66,17 +72,16 @@ Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePa
 	GbaRtc rtc;
 	MCU_getRTCTime((u8*)&rtc);
 	rtc.time = __builtin_bswap32(rtc.time)>>8;
-	rtc.date = __builtin_bswap32(rtc.date)>>8;
-	// TODO: Do we need to set day of week?
+	rtc.date = __builtin_bswap32(rtc.date)>>8; // TODO: Do we need to set day of week?
 	LGY_setGbaRtc(rtc);
 
 	// Setup FCRAM for GBA mode.
-	setupFcramForGbaMode();
+	powerDownFcramForLegacy(LGY_MODE_AGB);
 
 	// Setup IRQ handlers and sleep mode handling.
 	REG_LGY_SLEEP = 1u<<15;
-	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, lgySleepIrqHandler);
-	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, lgySleepIrqHandler);
+	IRQ_registerIsr(IRQ_LGY_SLEEP, 14, 0, lgySleepIsr);
+	IRQ_registerIsr(IRQ_HID_PADCNT, 14, 0, lgySleepIsr);
 
 	return RES_OK;
 }
@@ -97,52 +102,6 @@ void LGY_switchMode(void)
 	REG_LGY_MODE = LGY_MODE_START;
 }
 
-#ifndef NDEBUG
-#include "arm11/hardware/gx.h"
-#include "arm11/hardware/gpu_regs.h"
-void debugTests(void)
-{
-	const u32 kDown = hidKeysDown();
-
-	// Print GBA RTC date/time.
-	if(kDown & KEY_X)
-	{
-		GbaRtc rtc; LGY_getGbaRtc(&rtc);
-		ee_printf("RTC: %02X.%02X.%04X %02X:%02X:%02X\n", rtc.d, rtc.mon, rtc.y + 0x2000u, rtc.h, rtc.min, rtc.s);
-
-		/*static u8 filter = 1;
-		filter ^= 1;
-		u32 texEnvSource = 0x000F000F;
-		u32 texEnvCombiner = 0x00000000;
-		if(filter == 1)
-		{
-			texEnvSource = 0x00FF00FFu;
-			texEnvCombiner = 0x00010001u;
-		}
-		REG_GX_P3D(GPUREG_TEXENV1_SOURCE) = texEnvSource;
-		REG_GX_P3D(GPUREG_TEXENV1_COMBINER) = texEnvCombiner;*/
-
-		// Trigger Game Boy Player enhancements.
-		// Needs to be done on the Game Boy Player logo screen.
-		// 2 frames nothing pressed and 1 frame all D-Pad buttons pressed.
-		/*REG_LGY_PAD_SEL = 0x1FFF; // Override all buttons.
-		static u8 gbp = 2;
-		if(gbp > 0)
-		{
-			REG_LGY_PAD_VAL = 0x1FFF; // Force all buttons not pressed.
-			gbp--;
-		}
-		else
-		{
-			REG_LGY_PAD_VAL = 0x1F0F; // All D-Pad buttons pressed.
-			gbp = 2;
-		}*/
-	}
-	//else REG_LGY_PAD_SEL = 0; // Stop overriding buttons.
-	//if(kDown & KEY_Y) LGYFB_dbgDumpFrame();
-}
-#endif
-
 void LGY_handleOverrides(void)
 {
 	// Override D-Pad if Circle-Pad is used.
@@ -155,10 +114,6 @@ void LGY_handleOverrides(void)
 	}
 	else padSel = 0;
 	REG_LGY_PAD_SEL = padSel;
-
-#ifndef NDEBUG
-	debugTests();
-#endif
 }
 
 Result LGY_backupGbaSave(void)
