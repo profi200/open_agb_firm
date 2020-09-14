@@ -9,22 +9,22 @@
 #include "internal/config.h"
 
 
-typedef struct
+struct KEvent
 {
 	bool signaled;
 	const bool oneShot;
 	ListNode waitQueue;
-} Event;
+};
 
 
 static SlabHeap g_eventSlab = {0};
-static KEvent g_irqEventTable[128 - 32] = {0}; // 128 - 32 private interrupts.
+static KEvent *g_irqEventTable[128 - 32] = {0}; // 128 - 32 private interrupts.
 
 
 
 void _eventSlabInit(void)
 {
-	slabInit(&g_eventSlab, sizeof(Event), MAX_EVENTS);
+	slabInit(&g_eventSlab, sizeof(KEvent), MAX_EVENTS);
 }
 
 static void eventIrqHandler(u32 intSource)
@@ -32,29 +32,27 @@ static void eventIrqHandler(u32 intSource)
 	signalEvent(g_irqEventTable[intSource - 32], false);
 }
 
-KEvent createEvent(bool oneShot)
+KEvent* createEvent(bool oneShot)
 {
-	Event *const event = (Event*)slabAlloc(&g_eventSlab);
+	KEvent *const kevent = (KEvent*)slabAlloc(&g_eventSlab);
 
-	event->signaled = false;
-	*(bool*)&event->oneShot = oneShot;
-	listInit(&event->waitQueue);
+	kevent->signaled = false;
+	*(bool*)&kevent->oneShot = oneShot;
+	listInit(&kevent->waitQueue);
 
-	return event;
+	return kevent;
 }
 
-void deleteEvent(const KEvent kevent)
+void deleteEvent(KEvent *const kevent)
 {
-	Event *const event = (Event*)kevent;
-
 	kernelLock();
-	waitQueueWakeN(&event->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
+	waitQueueWakeN(&kevent->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
 
-	slabFree(&g_eventSlab, event);
+	slabFree(&g_eventSlab, kevent);
 }
 
-// TODO: Critical sections needed for bin/unbind?
-void bindInterruptToEvent(const KEvent kevent, uint8_t id, uint8_t prio)
+// TODO: Critical sections needed for bind/unbind?
+void bindInterruptToEvent(KEvent *const kevent, uint8_t id, uint8_t prio)
 {
 	if(id < 32 || id > 127) return;
 
@@ -71,49 +69,44 @@ void unbindInterruptEvent(uint8_t id)
 }
 
 // TODO: Timeout.
-KRes waitForEvent(const KEvent kevent)
+KRes waitForEvent(KEvent *const kevent)
 {
-	Event *const event = (Event*)kevent;
 	KRes res;
 
 	kernelLock();
-	if(event->signaled)
+	if(kevent->signaled)
 	{
-		if(event->oneShot) event->signaled = false;
+		if(kevent->oneShot) kevent->signaled = false;
 		kernelUnlock();
 		res = KRES_OK;
 	}
-	else res = waitQueueBlock(&event->waitQueue);
+	else res = waitQueueBlock(&kevent->waitQueue);
 
 	return res;
 }
 
-void signalEvent(const KEvent kevent, bool reschedule)
+void signalEvent(KEvent *const kevent, bool reschedule)
 {
-	Event *const event = (Event*)kevent;
-
 	kernelLock();
-	if(!event->signaled)
+	if(!kevent->signaled)
 	{
-		if(event->oneShot)
+		if(kevent->oneShot)
 		{
-			if(!waitQueueWakeN(&event->waitQueue, 1, KRES_OK, reschedule))
-				event->signaled = true;
+			if(!waitQueueWakeN(&kevent->waitQueue, 1, KRES_OK, reschedule))
+				kevent->signaled = true;
 		}
 		else
 		{
-			event->signaled = true;
-			waitQueueWakeN(&event->waitQueue, (u32)-1, KRES_OK, reschedule);
+			kevent->signaled = true;
+			waitQueueWakeN(&kevent->waitQueue, (u32)-1, KRES_OK, reschedule);
 		}
 	}
 	else kernelUnlock();
 }
 
-void clearEvent(const KEvent kevent)
+void clearEvent(KEvent *const kevent)
 {
-	Event *const event = (Event*)kevent;
-
 	kernelLock(); // TODO: Can we do this without locks?
-	event->signaled = false;
+	kevent->signaled = false;
 	kernelUnlock();
 }

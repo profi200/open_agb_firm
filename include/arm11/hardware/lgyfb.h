@@ -33,7 +33,7 @@
 
 
 
-void LGYFB_init(const KEvent frameReadyEvent);
+void LGYFB_init(KEvent *frameReadyEvent);
 void LGYFB_deinit(void);
 
 #ifndef NDEBUG

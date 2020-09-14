@@ -43,7 +43,7 @@ static struct
 {
 	u8 lcdPower;           // 1 = on. Bit 4 top light, bit 2 bottom light, bit 0 LCDs.
 	u8 lcdLights[2];       // LCD backlight brightness. Top, bottom.
-	KEvent events[6];
+	KEvent *events[6];
 	u32 swap;              // Currently active framebuffer.
 	void *framebufs[2][4]; // For each screen A1, A2, B1, B2
 	u8 doubleBuf[2];       // Top, bottom, 1 = enable.
@@ -98,7 +98,7 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	// PSC0, PSC1, PDC0, PDC1, PPF, P3D
 	for(u8 i = 0; i < 6; i++)
 	{
-		KEvent tmp = createEvent(false);
+		KEvent *tmp = createEvent(false);
 		bindInterruptToEvent(tmp, IRQ_PSC0 + i, 14);
 		g_gfxState.events[i] = tmp;
 	}
@@ -389,7 +389,7 @@ void GFX_swapFramebufs(void)
 
 void GFX_waitForEvent(GfxEvent event, bool discard)
 {
-	const KEvent kevent = g_gfxState.events[event];
+	KEvent *kevent = g_gfxState.events[event];
 
 	if(discard) clearEvent(kevent);
 	waitForEvent(kevent);

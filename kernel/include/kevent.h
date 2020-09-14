@@ -22,65 +22,65 @@
 #include "kernel.h"
 
 
-typedef void* KEvent;
-
-
-
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+typedef struct KEvent KEvent;
+
+
 
 /**
  * @brief      Creates a new KEvent.
  *
  * @param[in]  oneShot  Event fires only once and auto clears if true.
  *
- * @return     The KEvent handle or NULL when out of memory.
+ * @return     The KEvent pointer or NULL when out of memory.
  */
-KEvent createEvent(bool oneShot);
+KEvent* createEvent(bool oneShot);
 
 /**
- * @brief      Deletes a KEvent handle.
+ * @brief      Deletes a KEvent.
  *
- * @param[in]  kevent  The KEvent handle.
+ * @param[in]  kevent  The KEvent pointer.
  */
-void deleteEvent(const KEvent kevent);
+void deleteEvent(KEvent *const kevent);
 
 /**
  * @brief      Binds the given KEvent to an interrupt.
  *
- * @param[in]  kevent  The KEvent handle.
+ * @param[in]  kevent  The KEvent pointer.
  * @param[in]  id      The interrupt id.
  * @param[in]  prio    The interrupt priority.
  */
-void bindInterruptToEvent(const KEvent kevent, uint8_t id, uint8_t prio);
+void bindInterruptToEvent(KEvent *const kevent, uint8_t id, uint8_t prio);
 
 void unbindInterruptEvent(uint8_t id);
 
 /**
  * @brief      Waits for the given KEvent to be signaled.
  *
- * @param[in]  kevent  The KEvent handle.
+ * @param[in]  kevent  The KEvent pointer.
  *
  * @return     Returns the result. See Kres above.
  */
-KRes waitForEvent(const KEvent kevent);
+KRes waitForEvent(KEvent *const kevent);
 
 /**
  * @brief      Signals a KEvent.
  *
- * @param[in]  kevent      The KEvent handle.
+ * @param[in]  kevent      The KEvent pointer.
  * @param[in]  reschedule  Set to true to immediately reschedule.
  */
-void signalEvent(const KEvent kevent, bool reschedule);
+void signalEvent(KEvent *const kevent, bool reschedule);
 
 /**
  * @brief      Clears a KEvent.
  *
- * @param[in]  kevent  The KEvent handle.
+ * @param[in]  kevent  The KEvent pointer.
  */
-void clearEvent(const KEvent kevent);
+void clearEvent(KEvent *const kevent);
 
 #ifdef __cplusplus
 } // extern "C"

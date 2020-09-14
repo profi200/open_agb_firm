@@ -11,14 +11,14 @@
  //#include "arm11/fmt.h"
 
 
-/*typedef struct
+/*struct KTimer
 {
 	ListNode node;
 	u32 delta;
 	u32 ticks;
 	const bool pulse;
 	ListNode waitQueue;
-} Timer;
+};
 
 
 static SlabHeap g_timerSlab = {0};
@@ -26,91 +26,85 @@ static ListNode g_deltaQueue = {0};
 
 
 
-static void timerIrqHandler(UNUSED u32 intSource);
-static void addToDeltaQueue(Timer *const timer, u32 ticks);
+static void timerIsr(UNUSED u32 intSource);
+static void addToDeltaQueue(KTimer *const timer, u32 ticks);
 
 void _timerInit(void)
 {
-	slabInit(&g_timerSlab, sizeof(Timer), MAX_TIMERS);
+	slabInit(&g_timerSlab, sizeof(KTimer), MAX_TIMERS);
 	listInit(&g_deltaQueue);
-	IRQ_registerHandler(IRQ_TIMER, 12, 0, true, timerIrqHandler);
+	IRQ_registerIsr(IRQ_TIMER, 12, 0, timerIsr);
 }
 
-KTimer createTimer(bool pulse)
+KTimer* createTimer(bool pulse)
 {
-	Timer *const timer = (Timer*)slabAlloc(&g_timerSlab);
+	KTimer *const ktimer = (KTimer*)slabAlloc(&g_timerSlab);
 
-	*(bool*)&timer->pulse = pulse;
-	listInit(&timer->waitQueue);
+	*(bool*)&ktimer->pulse = pulse;
+	listInit(&ktimer->waitQueue);
 
-	return timer;
+	return ktimer;
 }
 
-void deleteTimer(const KTimer ktimer)
+void deleteTimer(KTimer *const ktimer)
 {
-	Timer *const timer = (Timer*)ktimer;
-
 	kernelLock();
-	waitQueueWakeN(&timer->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
+	waitQueueWakeN(&ktimer->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
 
-	slabFree(&g_timerSlab, timer);
+	slabFree(&g_timerSlab, ktimer);
 }
 
-static void timerIrqHandler(UNUSED u32 intSource)
+static void timerIsr(UNUSED u32 intSource)
 {
 	kernelLock();
 //if(listEmpty(&g_deltaQueue)) *((vu32*)4) = 4; // This should never happen
-	Timer *timer = LIST_ENTRY(listPop(&g_deltaQueue), Timer, node);
-	if(timer->pulse) addToDeltaQueue(timer, timer->ticks);
+	KTimer *ktimer = LIST_ENTRY(listPop(&g_deltaQueue), KTimer, node);
+	if(ktimer->pulse) addToDeltaQueue(ktimer, ktimer->ticks);
 	if(!listEmpty(&g_deltaQueue))
 	{
 		// Don't use fp math in ISRs.
-		TIMER_start(1, LIST_FIRST_ENTRY(&g_deltaQueue, Timer, node)->delta, false, true);
+		TIMER_start(1, LIST_FIRST_ENTRY(&g_deltaQueue, KTimer, node)->delta, false, true);
 	}
-	waitQueueWakeN(&timer->waitQueue, (u32)-1, KRES_OK, false);
+	waitQueueWakeN(&ktimer->waitQueue, (u32)-1, KRES_OK, false);
 }
 
-static void addToDeltaQueue(Timer *const timer, u32 ticks)
+static void addToDeltaQueue(KTimer *const ktimer, u32 ticks)
 {
-	Timer *pos;
+	KTimer *pos;
 	u32 deltaSum = 0;
 	LIST_FOR_EACH_ENTRY(pos, &g_deltaQueue, node)
 	{
 		deltaSum += pos->delta;
 		if(deltaSum > ticks)
 		{
-			timer->delta = ticks - (deltaSum - pos->delta);
-			listAddBefore(&pos->node, &timer->node);
+			ktimer->delta = ticks - (deltaSum - pos->delta);
+			listAddBefore(&pos->node, &ktimer->node);
 			return;
 		}
 	}
 
-	timer->delta = ticks;
-	listPush(&g_deltaQueue, &timer->node);
+	ktimer->delta = ticks;
+	listPush(&g_deltaQueue, &ktimer->node);
 }
 
-void startTimer(const KTimer ktimer, uint32_t usec)
+void startTimer(KTimer *const ktimer, uint32_t usec)
 {
-	Timer *const timer = (Timer*)ktimer;
-
 	const u32 ticks = TIMER_FREQ(1, 1000000) * usec;
-	timer->ticks = ticks;
+	ktimer->ticks = ticks;
 
 	kernelLock();
 	const bool firstTimer = listEmpty(&g_deltaQueue);
-	addToDeltaQueue(timer, ticks);
+	addToDeltaQueue(ktimer, ticks);
 	kernelUnlock();
 	if(firstTimer) TIMER_start(1, ticks, false, true);
 }
 
-void stopTimer(const KTimer ktimer)
+void stopTimer(KTimer *const ktimer)
 {
 }
 
-KRes waitForTimer(const KTimer ktimer)
+KRes waitForTimer(KTimer *const ktimer)
 {
-	Timer *const timer = (Timer*)ktimer;
-
 	kernelLock();
-	return waitQueueBlock(&timer->waitQueue);
+	return waitQueueBlock(&ktimer->waitQueue);
 }*/

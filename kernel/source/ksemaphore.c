@@ -9,11 +9,11 @@
 #include "internal/config.h"
 
 
-typedef struct
+struct KSema
 {
 	s32 count;
 	ListNode waitQueue;
-} Semaphore;
+};
 
 
 static SlabHeap g_semaSlab = {0};
@@ -22,63 +22,57 @@ static SlabHeap g_semaSlab = {0};
 
 void _semaphoreSlabInit(void)
 {
-	slabInit(&g_semaSlab, sizeof(Semaphore), MAX_SEMAPHORES);
+	slabInit(&g_semaSlab, sizeof(KSema), MAX_SEMAPHORES);
 }
 
 // TODO: Test semaphore with multiple cores.
-KSema createSemaphore(int32_t count)
+KSema* createSemaphore(int32_t count)
 {
-	Semaphore *const sema = (Semaphore*)slabAlloc(&g_semaSlab);
+	KSema *const ksema = (KSema*)slabAlloc(&g_semaSlab);
 
-	sema->count = count;
-	listInit(&sema->waitQueue);
+	ksema->count = count;
+	listInit(&ksema->waitQueue);
 
-	return sema;
+	return ksema;
 }
 
-void deleteSemaphore(const KSema ksema)
+void deleteSemaphore(KSema *const ksema)
 {
-	Semaphore *const sema = (Semaphore*)ksema;
-
 	kernelLock();
-	waitQueueWakeN(&sema->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
+	waitQueueWakeN(&ksema->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
 
-	slabFree(&g_semaSlab, sema);
+	slabFree(&g_semaSlab, ksema);
 }
 
-KRes pollSemaphore(const KSema ksema)
+KRes pollSemaphore(KSema *const ksema)
 {
-	Semaphore *const sema = (Semaphore*)ksema;
 	KRes res;
 
 	// TODO: Plain spinlocks instead?
 	kernelLock();
-	if(UNLIKELY(sema->count <= 0)) res = KRES_WOULD_BLOCK;
-	else {sema->count--; res = KRES_OK;}
+	if(UNLIKELY(ksema->count <= 0)) res = KRES_WOULD_BLOCK;
+	else {ksema->count--; res = KRES_OK;}
 	kernelUnlock();
 
 	return res;
 }
 
-KRes waitForSemaphore(const KSema ksema)
+KRes waitForSemaphore(KSema *const ksema)
 {
-	Semaphore *const sema = (Semaphore*)ksema;
 	KRes res;
 
 	kernelLock();
-	if(UNLIKELY(--sema->count < 0)) res = waitQueueBlock(&sema->waitQueue);
+	if(UNLIKELY(--ksema->count < 0)) res = waitQueueBlock(&ksema->waitQueue);
 	else {kernelUnlock(); res = KRES_OK;}
 
 	return res;
 }
 
-void signalSemaphore(const KSema ksema, uint32_t signalCount, bool reschedule)
+void signalSemaphore(KSema *const ksema, uint32_t signalCount, bool reschedule)
 {
-	Semaphore *const sema = (Semaphore*)ksema;
-
 	kernelLock();
-	//if(UNLIKELY(++sema->count <= 0))
-	if(UNLIKELY((sema->count += signalCount) <= 0))
-		waitQueueWakeN(&sema->waitQueue, signalCount, KRES_OK, reschedule);
+	//if(UNLIKELY(++ksema->count <= 0))
+	if(UNLIKELY((ksema->count += signalCount) <= 0))
+		waitQueueWakeN(&ksema->waitQueue, signalCount, KRES_OK, reschedule);
 	else kernelUnlock();
 }
