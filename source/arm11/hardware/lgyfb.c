@@ -75,7 +75,7 @@
 #define LGYFB_BOT_FIFO           *((const vu32*)(0x10310000))
 
 
-static KEvent g_frameReadyEvent = NULL;
+static KEvent *g_frameReadyEvent = NULL;
 
 
 
@@ -118,11 +118,11 @@ static void setScaleMatrixTop(u32 len, u32 patt, const s16 *const matrix)
 	}
 }
 
-void LGYFB_init(const KEvent frameReadyEvent)
+void LGYFB_init(KEvent *frameReadyEvent)
 {
 	if(DMA330_run(0, program)) return;
 
-	g_frameReadyEvent = (KEvent)frameReadyEvent;
+	g_frameReadyEvent = frameReadyEvent;
 
 	//REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(240u, 160u);
 	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(360u, 240u);

@@ -2,6 +2,7 @@
 #include <stdnoreturn.h>
 #include <string.h>
 #include "types.h"
+#include "kernel.h"
 #include "internal/config.h"
 #include "internal/kernel_private.h"
 #include "internal/kmemcpy_set.h"
@@ -9,7 +10,6 @@
 #include "internal/util.h"
 #include "internal/list.h"
 #include "internal/contextswitch.h"
-#include "kernel.h"
 #include "arm.h"
 
 
@@ -75,7 +75,7 @@ void kernelInit(uint8_t priority)
 	g_numTasks = 2;
 }
 
-KTask createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg)
+KTask* createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg)
 {
 	if(priority > MAX_PRIO_BITS - 1u) return NULL;
 

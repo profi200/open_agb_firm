@@ -21,47 +21,47 @@
 #include "kernel.h"
 
 
-typedef void* KMutex; // TODO: Implement this using semaphores?
-
-
-
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-/**
- * @brief      Creates a mutex.
- *
- * @return     The KMutex handle or NULL when out of memory.
- */
-KMutex createMutex(void);
+typedef struct KMutex KMutex; // TODO: Implement this using semaphores?
+
+
 
 /**
- * @brief      Deletes a KMutex handle.
+ * @brief      Creates a new KMutex.
  *
- * @param[in]  kmutex  The KMutex handle.
+ * @return     The KMutex pointer or NULL when out of memory.
  */
-void deleteMutex(const KMutex kmutex);
+KMutex* createMutex(void);
+
+/**
+ * @brief      Deletes a KMutex.
+ *
+ * @param[in]  kmutex  The KMutex pointer.
+ */
+void deleteMutex(KMutex *const kmutex);
 
 /**
  * @brief      Locks a KMutex.
  *
- * @param[in]  kmutex  The KMutex handle.
+ * @param[in]  kmutex  The KMutex pointer.
  *
  * @return     Returns the result. See Kres.
  */
-KRes lockMutex(const KMutex kmutex);
+KRes lockMutex(KMutex *const kmutex);
 
 /**
  * @brief      Unlocks a KMutex.
  *
- * @param[in]  kmutex  The KMutex handle.
+ * @param[in]  kmutex  The KMutex pointer.
  *
  * @return     Returns KRES_NO_PERMISSIONS if the current task
- * @return     is not the locker. Otherwise KRES_OK.
+ * @return     is not the owner. Otherwise KRES_OK.
  */
-KRes unlockMutex(const KMutex kmutex);
+KRes unlockMutex(KMutex *const kmutex);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -22,6 +22,11 @@
 #include "kernel.h"
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct
 {
 	u32 r4;
@@ -36,11 +41,6 @@ typedef struct
 } cpuRegs;
 
 
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 KRes switchContext(KRes res, void *oldSp, uintptr_t newSp);
 

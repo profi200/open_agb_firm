@@ -68,8 +68,8 @@ static const struct
 typedef struct
 {
 	I2cRegs *const regs;
-	KEvent event;
-	KMutex mutex;
+	KEvent *event;
+	KMutex *mutex;
 } I2cState;
 static I2cState g_i2cState[3] = {{(I2cRegs*)I2C1_REGS_BASE, NULL, NULL},
                                  {(I2cRegs*)I2C2_REGS_BASE, NULL, NULL},
@@ -89,14 +89,14 @@ static bool checkAck(I2cRegs *const regs)
 	return true;
 }
 
-static void sendByte(I2cRegs *const regs, u8 data, u8 params, const KEvent event)
+static void sendByte(I2cRegs *const regs, u8 data, u8 params, KEvent *const event)
 {
 	regs->I2C_DATA = data;
 	regs->I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIR_WRITE | params;
 	waitForEvent(event);
 }
 
-static u8 recvByte(I2cRegs *const regs, u8 params, const KEvent event)
+static u8 recvByte(I2cRegs *const regs, u8 params, KEvent *const event)
 {
 	regs->I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIR_READ | params;
 	waitForEvent(event);
@@ -110,7 +110,7 @@ void I2C_init(void)
 	inited = true;
 
 
-	KEvent tmp = createEvent(true);
+	KEvent *tmp = createEvent(true);
 	bindInterruptToEvent(tmp, IRQ_I2C1, 14);
 	g_i2cState[0].event = tmp;
 	tmp = createEvent(true);
@@ -144,7 +144,7 @@ static bool startTransfer(u8 devAddr, u8 regAddr, bool read, const I2cState *con
 	do
 	{
 		I2cRegs *const regs = state->regs;
-		const KEvent event = state->event;
+		KEvent *const event = state->event;
 
 		// Edge case on previous transfer error (NACK).
 		// This is a special case where we can't predict when or if
@@ -179,8 +179,8 @@ bool I2C_readRegBuf(I2cDevice devId, u8 regAddr, u8 *out, u32 size)
 	const u8 devAddr = i2cDevTable[devId].devAddr;
 	const I2cState *const state = &g_i2cState[i2cDevTable[devId].busId];
 	I2cRegs *const regs = state->regs;
-	const KEvent event = state->event;
-	const KMutex mutex = state->mutex;
+	KEvent *const event = state->event;
+	KMutex *const mutex = state->mutex;
 
 
 	bool res = true;
@@ -203,8 +203,8 @@ bool I2C_writeRegBuf(I2cDevice devId, u8 regAddr, const u8 *in, u32 size)
 	const u8 devAddr = i2cDevTable[devId].devAddr;
 	const I2cState *const state = &g_i2cState[i2cDevTable[devId].busId];
 	I2cRegs *const regs = state->regs;
-	const KEvent event = state->event;
-	const KMutex mutex = state->mutex;
+	KEvent *const event = state->event;
+	KMutex *const mutex = state->mutex;
 
 
 	lockMutex(mutex);

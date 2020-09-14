@@ -18,7 +18,7 @@ typedef enum
 	TASK_STATE_RUNNING_SHORT = 3  // Continue task as soon as the woken ones are finished.
 } TaskState;
 
-typedef struct
+struct TaskCb
 {
 	ListNode node;
 	u8 core; // TODO: Multicore
@@ -29,7 +29,8 @@ typedef struct
 	void *stack;
 	// Name?
 	// Exit code?
-} TaskCb; // Task context
+}; // Task context
+typedef struct TaskCb TaskCb;
 static_assert(offsetof(TaskCb, node) == 0, "Error: Member node of TaskCb is not at offset 0!");
 
 

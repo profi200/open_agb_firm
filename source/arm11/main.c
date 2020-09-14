@@ -274,7 +274,7 @@ void debugTests(void)
 
 static void gbaGfxHandler(void *args)
 {
-	const KEvent event = (KEvent)args;
+	KEvent *const event = (KEvent*)args;
 
 	while(1)
 	{
@@ -343,9 +343,9 @@ int main(void)
 		if(MCU_getSystemModel() != 3) GFX_powerOffBacklights(GFX_BLIGHT_BOT);
 #endif
 
-		const KEvent frameReadyEvent = createEvent(false);
+		KEvent *const frameReadyEvent = createEvent(false);
 		LGYFB_init(frameReadyEvent); // Setup Legacy Framebuffer.
-		/*const KTask gfxTask =*/ createTask(0x800, 3, gbaGfxHandler, frameReadyEvent);
+		/*KTask *const gfxTask =*/ createTask(0x800, 3, gbaGfxHandler, frameReadyEvent);
 
 		// Adjust gamma table and sync LgyFb start with LCD VBlank.
 		adjustGammaTableForGba();
@@ -363,7 +363,7 @@ int main(void)
 		} while(1);
 
 		LGYFB_deinit();
-		deleteEvent(frameReadyEvent); // gfxTask() will automatically terminate.
+		deleteEvent(frameReadyEvent); // gbaGfxHandler() will automatically terminate.
 	}
 
 end:

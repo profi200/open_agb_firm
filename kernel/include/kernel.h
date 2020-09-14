@@ -22,6 +22,11 @@
 #include <stdint.h>
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 enum
 {
 	KRES_OK              = 0, // No error.
@@ -33,18 +38,13 @@ enum
 };
 
 typedef uintptr_t KRes; // See createTask()
-typedef void* KTask;
+typedef struct TaskCb KTask;
 typedef void (*TaskFunc)(void*);
 
 
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 /**
- * @brief      Init the kernel. Only call this once.
+ * @brief      Initializes the kernel. Only call this once.
  *
  * @param[in]  priority  The priority of the main task.
  */
@@ -61,7 +61,7 @@ void kernelInit(uint8_t priority);
  *
  * @return     Returns a KTask handle.
  */
-KTask createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg);
+KTask* createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg);
 
 /**
  * @brief      Switches to the next task. Use with care.

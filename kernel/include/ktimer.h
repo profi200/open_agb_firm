@@ -21,24 +21,24 @@
 #include "kernel.h"
 
 
-typedef void* KTimer;
-
-
-
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-KTimer createTimer(bool pulse);
+typedef struct KTimer KTimer;
 
-void deleteTimer(const KTimer ktimer);
 
-void startTimer(const KTimer ktimer, uint32_t usec);
 
-void stopTimer(const KTimer ktimer);
+KTimer* createTimer(bool pulse);
 
-KRes waitForTimer(const KTimer ktimer);
+void deleteTimer(KTimer *const ktimer);
+
+void startTimer(KTimer *const ktimer, uint32_t usec);
+
+void stopTimer(KTimer *const ktimer);
+
+KRes waitForTimer(KTimer *const ktimer);
 
 #ifdef __cplusplus
 } // extern "C"

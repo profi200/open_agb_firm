@@ -8,11 +8,11 @@
 #include "internal/config.h"
 
 
-typedef struct
+struct KMutex
 {
 	const TaskCb *owner;
 	ListNode waitQueue;
-} Mutex;
+};
 
 
 static SlabHeap g_mutexSlab = {0};
@@ -21,47 +21,43 @@ static SlabHeap g_mutexSlab = {0};
 
 void _mutexSlabInit(void)
 {
-	slabInit(&g_mutexSlab, sizeof(Mutex), MAX_MUTEXES);
+	slabInit(&g_mutexSlab, sizeof(KMutex), MAX_MUTEXES);
 }
 
 // TODO: Test mutex with multiple cores.
-KMutex createMutex(void)
+KMutex* createMutex(void)
 {
-	Mutex *const mutex = (Mutex*)slabAlloc(&g_mutexSlab);
+	KMutex *const kmutex = (KMutex*)slabAlloc(&g_mutexSlab);
 
-	mutex->owner = NULL;
-	listInit(&mutex->waitQueue);
+	kmutex->owner = NULL;
+	listInit(&kmutex->waitQueue);
 
-	return mutex;
+	return kmutex;
 }
 
-void deleteMutex(const KMutex kmutex)
+void deleteMutex(KMutex *const kmutex)
 {
-	Mutex *const mutex = (Mutex*)kmutex;
-
 	kernelLock();
-	waitQueueWakeN(&mutex->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
+	waitQueueWakeN(&kmutex->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
 
-	slabFree(&g_mutexSlab, mutex);
+	slabFree(&g_mutexSlab, kmutex);
 }
 
-KRes lockMutex(const KMutex kmutex)
+KRes lockMutex(KMutex *const kmutex)
 {
 	KRes res;
 
 	do
 	{
-		Mutex *const mutex = (Mutex*)kmutex;
-
 		kernelLock();
-		if(UNLIKELY(mutex->owner != NULL))
+		if(UNLIKELY(kmutex->owner != NULL))
 		{
-			res = waitQueueBlock(&mutex->waitQueue);
+			res = waitQueueBlock(&kmutex->waitQueue);
 			if(UNLIKELY(res != KRES_OK)) break;
 		}
 		else
 		{
-			mutex->owner = getCurrentTask();
+			kmutex->owner = getCurrentTask();
 			kernelUnlock();
 			res = KRES_OK;
 			break;
@@ -72,18 +68,17 @@ KRes lockMutex(const KMutex kmutex)
 }
 
 // TODO: Test if it works and only unlocks if current task == owner.
-KRes unlockMutex(const KMutex kmutex)
+KRes unlockMutex(KMutex *const kmutex)
 {
-	Mutex *const mutex = (Mutex*)kmutex;
 	KRes res = KRES_OK;
 
 	kernelLock();
-	if(LIKELY(mutex->owner != NULL))
+	if(LIKELY(kmutex->owner != NULL))
 	{
-		if(LIKELY(mutex->owner == getCurrentTask()))
+		if(LIKELY(kmutex->owner == getCurrentTask()))
 		{
-			mutex->owner = NULL;
-			waitQueueWakeN(&mutex->waitQueue, 1, KRES_OK, true);
+			kmutex->owner = NULL;
+			waitQueueWakeN(&kmutex->waitQueue, 1, KRES_OK, true);
 		}
 		else res = KRES_NO_PERMISSIONS;
 	}
