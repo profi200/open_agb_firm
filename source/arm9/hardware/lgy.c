@@ -52,8 +52,7 @@ static void setupBiosOverlay(bool biosIntro)
 	//iomemcpy(REGs_LGY_A7_VECTOR, biosVectors, 32);
 
 	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_size);
-	// Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
-	if(biosIntro) *((u8*)_arm7_stub_swi) = 0x26;
+	if(biosIntro) *((u8*)_arm7_stub_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
 }
 
 static u32 setupSaveType(u16 saveType)

@@ -58,6 +58,28 @@ static Result loadGbaRom(const char *const path, u32 *const rsOut)
 				*rsOut = romSize;
 				// Pad ROM area with "open bus" value.
 				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
+
+				// Round up to the next power of 2.
+				// https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+				/*u32 realRomSize = romSize;
+				realRomSize--;
+				realRomSize |= realRomSize>>1;
+				realRomSize |= realRomSize>>2;
+				realRomSize |= realRomSize>>4;
+				realRomSize |= realRomSize>>8;
+				realRomSize |= realRomSize>>16;
+				realRomSize++;
+
+				// Pad unused ROM area with 0xFFs.
+				if(realRomSize < 1024u * 1024) realRomSize = 1024u * 1024; // Smallest retail cart.
+				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, realRomSize - romSize);
+
+				// Mirror ROM area across the entire 32 MiB range.
+				for(uintptr_t i = ROM_LOC + realRomSize; i < ROM_LOC + MAX_ROM_SIZE; i += realRomSize)
+				{
+					//memcpy((void*)i, (void*)(i - realRomSize), realRomSize);
+					memcpy((void*)i, (void*)ROM_LOC, realRomSize);
+				}*/
 			}
 		}
 		else res = RES_ROM_TOO_BIG;
