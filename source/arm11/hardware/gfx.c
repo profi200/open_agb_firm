@@ -66,6 +66,10 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	g_gfxState.doubleBuf[0] = 1;
 	g_gfxState.doubleBuf[1] = 1;
 
+	// FIXME: Temporary workaround for screen init compatibility (Luma/fb3DS 1.2).
+	TIMER_sleepMs(50);
+	(void)MCU_getEvents(0x3Fu<<24); // Discard any screen init events.
+
 	REG_CFG11_GPUPROT = 0;
 
 	// Reset
