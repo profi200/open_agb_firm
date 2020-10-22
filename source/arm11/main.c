@@ -20,6 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
+#include "arm_intrinsic.h"
+#include "util.h"
+#include "arm11/hardware/hash.h"
 #include "arm11/hardware/hid.h"
 #include "arm11/hardware/codec.h"
 #include "hardware/lgy.h"
@@ -39,50 +42,105 @@
 
 
 
-static Result loadGbaRom(const char *const path, u32 *const rsOut)
+static u32 padRomArea(u32 romFileSize)
+{
+	// Pad unused ROM area with 0xFFs (trimmed ROMs).
+	// Smallest retail ROM chip is 8 Mbit (1 MiB).
+	u32 romSize = nextPow2(romFileSize);
+	if(romSize < 0x100000u) romSize = 0x100000u;
+	memset((void*)(ROM_LOC + romFileSize), 0xFFFFFFFFu, romSize - romFileSize);
+
+	if((*(u32*)(ROM_LOC + 0xAC) & 0xFFu) != 'F')
+	{
+		// Fake "open bus" padding.
+		u32 padding = (ROM_LOC + romSize) / 2;
+		padding = __pkhbt(padding, padding + 1, 16); // Copy lower half + 1 to upper half.
+		for(uintptr_t i = ROM_LOC + romSize; i < ROM_LOC + MAX_ROM_SIZE; i += 4)
+		{
+			*(u32*)i = padding;
+			padding = __uadd16(padding, 0x00020002u); // 0xBA028B
+		}
+	}
+	else
+	{
+		// Classic NES Series ROM mirroring.
+		// Mirror ROM area across the entire 32 MiB range.
+		for(uintptr_t i = ROM_LOC + romSize; i < ROM_LOC + MAX_ROM_SIZE; i += romSize)
+		{
+			//memcpy((void*)i, (void*)(i - romSize), romSize); // 0x23A15DD
+			memcpy((void*)i, (void*)ROM_LOC, romSize); // 0x237109B
+		}
+	}
+
+	return romSize;
+}
+
+static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 {
 	Result res;
 	FHandle f;
 	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
 	{
-		u32 romSize;
-		if((romSize = fSize(f)) <= MAX_ROM_SIZE)
+		u32 fileSize;
+		if((fileSize = fSize(f)) <= MAX_ROM_SIZE)
 		{
 			u8 *ptr = (u8*)ROM_LOC;
 			u32 read;
 			while((res = fRead(f, ptr, 0x100000u, &read)) == RES_OK && read == 0x100000u)
 				ptr += 0x100000u;
 
-			if(res == RES_OK)
-			{
-				*rsOut = romSize;
-				// Pad ROM area with "open bus" value.
-				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, MAX_ROM_SIZE - romSize);
-
-				// Round up to the next power of 2.
-				// https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
-				/*u32 realRomSize = romSize;
-				realRomSize--;
-				realRomSize |= realRomSize>>1;
-				realRomSize |= realRomSize>>2;
-				realRomSize |= realRomSize>>4;
-				realRomSize |= realRomSize>>8;
-				realRomSize |= realRomSize>>16;
-				realRomSize++;
-
-				// Pad unused ROM area with 0xFFs.
-				if(realRomSize < 1024u * 1024) realRomSize = 1024u * 1024; // Smallest retail cart.
-				memset((void*)(ROM_LOC + romSize), 0xFFFFFFFFu, realRomSize - romSize);
-
-				// Mirror ROM area across the entire 32 MiB range.
-				for(uintptr_t i = ROM_LOC + realRomSize; i < ROM_LOC + MAX_ROM_SIZE; i += realRomSize)
-				{
-					//memcpy((void*)i, (void*)(i - realRomSize), realRomSize);
-					memcpy((void*)i, (void*)ROM_LOC, realRomSize);
-				}*/
-			}
+			*romSizeOut = padRomArea(fileSize);
 		}
 		else res = RES_ROM_TOO_BIG;
+
+		fClose(f);
+	}
+
+	return res;
+}
+
+typedef struct
+{
+	char name[200];
+	char gameCode[4];
+	u8 sha1[20];
+	u32 attr;
+} GameDbEntry;
+
+// Search for entry with first u64 of the SHA1 = x using binary search.
+static Result searchGameDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
+{
+	debug_printf("Database search: '%016" PRIX64 "'\n", __builtin_bswap64(x));
+
+	Result res;
+	FHandle f;
+	if((res = fOpen(&f, "sdmc:/gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	{
+		s32 l = 0;
+		s32 r = fSize(f) / sizeof(GameDbEntry) - 1; // TODO: Check for 0!
+		while(1)
+		{
+			const s32 mid = l + (r - l) / 2;
+			debug_printf("l: %ld r: %ld mid: %ld\n", l, r, mid);
+
+			if((res = fLseek(f, sizeof(GameDbEntry) * mid)) != RES_OK) break;
+			if((res = fRead(f, db, sizeof(GameDbEntry), NULL)) != RES_OK) break;
+			const u64 tmp = *(u64*)db->sha1; // Unaligned access.
+			if(tmp == x)
+			{
+				*entryPos = mid; // TODO: Remove.
+				break;
+			}
+
+			if(r <= l || r < 0)
+			{
+				res = RES_NOT_FOUND;
+				break;
+			}
+
+			if(tmp > x) r = mid - 1;
+			else        l = mid + 1;
+		}
 
 		fClose(f);
 	}
@@ -122,7 +180,6 @@ static u16 checkSaveOverride(u32 gameCode)
 	return 0xFF;
 }
 
-// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 static u16 tryDetectSaveType(u32 romSize)
 {
 	const u32 *romPtr = (u32*)ROM_LOC;
@@ -133,6 +190,7 @@ static u16 tryDetectSaveType(u32 romSize)
 		return saveType;
 	}
 
+	// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 	romPtr += 0xE4 / 4; // Skip headers.
 	saveType = SAVE_TYPE_NONE;
 	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
@@ -207,26 +265,111 @@ saveTypeFound:
 	return saveType;
 }
 
-/*static u16 getSaveTypeFromTable(void)
+u16 saveDbDebug(const char *const savePath, u32 romSize)
 {
-	const u32 gameCode = *(u32*)(ROM_LOC + 0xAC) & ~0xFF000000u;
+	FILINFO fi;
+	const bool saveExists = fStat(savePath, &fi) == RES_OK;
+	const u16 autoSaveType = tryDetectSaveType(romSize);
 
+	// TODO: Check for homebrew before searching the db.
+	u64 sha1[3];
+	hash((u32*)ROM_LOC, romSize, (u32*)sha1, HASH_INPUT_BIG | HASH_MODE_1, HASH_OUTPUT_BIG);
+
+	Result res;
+	GameDbEntry dbEntry;
+	s32 dbPos = -1;
 	u16 saveType = SAVE_TYPE_NONE;
-	for(u32 i = 0; i < sizeof(saveTypeLut) / sizeof(*saveTypeLut); i++)
+	if((res = searchGameDb(*sha1, &dbEntry, &dbPos)) == RES_OK) saveType = dbEntry.attr & 0xFu;
+	else
 	{
-		// Save type in last byte.
-		const u32 entry = *((u32*)&saveTypeLut[i]);
-		if((entry & ~0xFF000000u) == gameCode)
+		ee_puts("Could not access the game db! Press the power button twice.");
+		printErrorWaitInput(res, 0);
+		return SAVE_TYPE_NONE;
+	}
+
+	consoleClear();
+	ee_printf("Save file (Press (X) to delete): %s\n"
+	          "Save type (from db): %u\n"
+	          "Save type (auto detect): %u\n\n"
+	          " EEPROM 4k/8k (0, 1)\n"
+	          " EEPROM 64k (2, 3)\n"
+	          " Flash 512k RTC (4, 6, 8)\n"
+	          " Flash 512k (5, 7, 9)\n"
+	          " Flash 1m RTC (10, 12)\n"
+	          " Flash 1m (11, 13)\n"
+	          " SRAM 256k (14)\n"
+	          " None (15)\n\n\n", (saveExists ? "found" : "not found"), saveType, autoSaveType);
+	ee_puts("Please note:\n"
+	        "- Auto detection is broken for EEPROM save types.\n"
+	        "- Choose the lowest size save type first and work your way up until the game fully works.\n"
+	        "- If the game works with a Flash save type try without RTC first.\n"
+	        "- Delete the save before you try a new save type.\n"
+	        "- Make sure all your dumps are verified good dumps (no-intro.org)!");
+
+	static const u8 saveTypeCursorLut[16] = {0, 0, 1, 1, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7};
+	u8 oldCursor = 0;
+	u8 cursor = saveTypeCursorLut[saveType];
+	while(1)
+	{
+		ee_printf("\x1b[%u;H ", oldCursor + 4);
+		ee_printf("\x1b[%u;H>", cursor + 4);
+		oldCursor = cursor;
+
+		u32 kDown;
+		do
 		{
-			saveType = entry>>24;
-			break;
+			GFX_waitForVBlank0();
+
+			hidScanInput();
+			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
+			kDown = hidKeysDown();
+		} while(kDown == 0);
+
+		if((kDown & KEY_DUP) && cursor > 0)        cursor--;
+		else if((kDown & KEY_DDOWN) && cursor < 7) cursor++;
+		else if(kDown & KEY_X)
+		{
+			fUnlink(savePath);
+			ee_printf("\x1b[0;33Hdeleted  ");
+		}
+		else if(kDown & KEY_A) break;
+	}
+
+	static const u8 cursorSaveTypeLut[8] = {0, 2, 8, 9, 10, 11, 14, 15};
+	saveType = cursorSaveTypeLut[cursor];
+	if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
+	{
+		// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
+		if(romSize > 0x1000000) saveType++;
+	}
+	if(dbEntry.attr != saveType)
+	{
+		if(dbPos > -1 || dbPos < 3256)
+		{
+			dbEntry.attr = saveType;
+			FHandle f;
+			if(fOpen(&f, "sdmc:/gba_db.bin", FA_OPEN_EXISTING | FA_WRITE) == RES_OK)
+			{
+				fLseek(f, (sizeof(GameDbEntry) * dbPos) + offsetof(GameDbEntry, attr));
+				fWrite(f, &dbEntry.attr, sizeof(dbEntry.attr), NULL);
+				fClose(f);
+			}
+			else
+			{
+				ee_puts("Could not open db for write!");
+				saveType = SAVE_TYPE_NONE;
+			}
+		}
+		else
+		{
+			ee_puts("Db position out of range!");
+			saveType = SAVE_TYPE_NONE;
 		}
 	}
 
-	debug_printf("Using save type 0x%" PRIX16 ".\n", saveType);
-
+end:
 	return saveType;
-}*/
+}
 
 static void adjustGammaTableForGba(void)
 {
@@ -255,12 +398,37 @@ static void adjustGammaTableForGba(void)
 #include "fsutil.h"
 static void dbgDumpFrame(void)
 {
+	// 512x-512 (hight negative to flip vertically).
+	alignas(4) static const u8 bmpHeader[122] =
+	{
+		0x42, 0x4D, 0x7A, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7A, 0x00,
+		0x00, 0x00, 0x6C, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0xFE,
+		0xFF, 0xFF, 0x01, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x0C, 0x00, 0x13, 0x0B, 0x00, 0x00, 0x13, 0x0B, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x47, 0x52, 0x73, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00
+	};
+
 	/*GX_displayTransfer((u32*)0x18200000, 160u<<16 | 256u, (u32*)0x18400000, 160u<<16 | 256u, 1u<<12 | 1u<<8);
 	GFX_waitForEvent(GFX_EVENT_PPF, false);
-	fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 256 * 160 * 3);*/
+	//fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 256 * 160 * 3);*/
 	GX_displayTransfer((u32*)0x18200000, 240u<<16 | 512u, (u32*)0x18400000, 240u<<16 | 512u, 1u<<12 | 1u<<8);
 	GFX_waitForEvent(GFX_EVENT_PPF, false);
-	fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 512 * 240 * 3);
+
+	FHandle f;
+	if(fOpen(&f, "sdmc:/texture_dump.bmp", FA_CREATE_ALWAYS | FA_WRITE) == RES_OK)
+	{
+		fLseek(f, 0x0C007A);
+		fLseek(f, 0);
+		fWrite(f, bmpHeader, sizeof(bmpHeader), NULL);
+		fWrite(f, (void*)0x18400000, 512 * 512 * 3, NULL);
+		fClose(f);
+	}
 }
 
 void debugTests(void)
@@ -355,6 +523,9 @@ int main(void)
 	const u16 saveType = tryDetectSaveType(romSize);
 	const u32 romPathLen = strlen(romPath);
 	strcpy(romPath + romPathLen - 4, ".sav");
+	/*const u32 romPathLen = strlen(romPath);
+	strcpy(romPath + romPathLen - 4, ".sav");
+	const u16 saveType = saveDbDebug(romPath, romSize);*/
 
 	// Prepare ARM9 for GBA mode + settings and save loading.
 	if((res = LGY_prepareGbaMode(false, saveType, romPath)) == RES_OK)

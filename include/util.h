@@ -46,3 +46,23 @@ static inline u32 intLog2(u32 val)
 	// The result is undefined if __builtin_clz() is called with 0.
 	return (val ? 31u - __builtin_clz(val) : 0u);
 }
+
+// Round up to the next power of 2.
+static inline u32 nextPow2(u32 val)
+{
+	// Portable variant:
+	// https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+	/*val--;
+	val |= val>>1;
+	val |= val>>2;
+	val |= val>>4;
+	val |= val>>8;
+	val |= val>>16;
+	val++;
+
+	return val;*/
+
+	// Warning: Allowed range is 2 - 2147483648.
+	// Everything else is undefined behavior.
+	return 1u<<(32u - __builtin_clz(val - 1));
+}

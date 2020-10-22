@@ -44,7 +44,7 @@ static struct
 
 static Result fres2Res(FRESULT fr)
 {
-	if(fr != FR_OK) return fr + 3;
+	if(fr != FR_OK) return fr + 5;
 	else            return RES_OK;
 }
 
