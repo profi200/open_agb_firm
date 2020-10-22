@@ -394,9 +394,7 @@ static void adjustGammaTableForGba(void)
 	}
 }
 
-#ifndef NDEBUG
-#include "fsutil.h"
-static void dbgDumpFrame(void)
+static void dumpFrameTex(void)
 {
 	// 512x-512 (hight negative to flip vertically).
 	alignas(4) static const u8 bmpHeader[122] =
@@ -415,10 +413,10 @@ static void dbgDumpFrame(void)
 	};
 
 	/*GX_displayTransfer((u32*)0x18200000, 160u<<16 | 256u, (u32*)0x18400000, 160u<<16 | 256u, 1u<<12 | 1u<<8);
-	GFX_waitForEvent(GFX_EVENT_PPF, false);
-	//fsQuickWrite((void*)0x18400000, "sdmc:/lgyfb_dbg_frame.bgr", 256 * 160 * 3);*/
+	GFX_waitForPPF();
+	//fsQuickWrite("sdmc:/lgyfb_dbg_frame.bgr", (void*)0x18400000, 256 * 160 * 3);*/
 	GX_displayTransfer((u32*)0x18200000, 240u<<16 | 512u, (u32*)0x18400000, 240u<<16 | 512u, 1u<<12 | 1u<<8);
-	GFX_waitForEvent(GFX_EVENT_PPF, false);
+	GFX_waitForPPF();
 
 	FHandle f;
 	if(fOpen(&f, "sdmc:/texture_dump.bmp", FA_CREATE_ALWAYS | FA_WRITE) == RES_OK)
@@ -430,37 +428,6 @@ static void dbgDumpFrame(void)
 		fClose(f);
 	}
 }
-
-void debugTests(void)
-{
-	const u32 kDown = hidKeysDown();
-
-	// Print GBA RTC date/time.
-	if(kDown & KEY_X)
-	{
-		GbaRtc rtc; LGY_getGbaRtc(&rtc);
-		ee_printf("RTC: %02X.%02X.%04X %02X:%02X:%02X\n", rtc.d, rtc.mon, rtc.y + 0x2000u, rtc.h, rtc.min, rtc.s);
-
-		// Trigger Game Boy Player enhancements.
-		// Needs to be done on the Game Boy Player logo screen.
-		// 2 frames nothing pressed and 1 frame all D-Pad buttons pressed.
-		/*REG_LGY_PAD_SEL = 0x1FFF; // Override all buttons.
-		static u8 gbp = 2;
-		if(gbp > 0)
-		{
-			REG_LGY_PAD_VAL = 0x1FFF; // Force all buttons not pressed.
-			gbp--;
-		}
-		else
-		{
-			REG_LGY_PAD_VAL = 0x1F0F; // All D-Pad buttons pressed.
-			gbp = 2;
-		}*/
-	}
-	//else REG_LGY_PAD_SEL = 0; // Stop overriding buttons.
-	if(kDown & KEY_Y) dbgDumpFrame();
-}
-#endif
 
 static void gbaGfxHandler(void *args)
 {
@@ -495,10 +462,43 @@ static void gbaGfxHandler(void *args)
 		                   GFX_getFramebuffer(SCREEN_TOP) + (16 * 240 * 3), 368u<<16 | 240u, 1u<<12 | 1u<<8);
 		GFX_waitForPPF();
 		GFX_swapFramebufs();
+
+		if(hidKeysDown() & KEY_Y) dumpFrameTex();
 	}
 
 	taskExit();
 }
+
+#ifndef NDEBUG
+void debugTests(void)
+{
+	const u32 kDown = hidKeysDown();
+
+	// Print GBA RTC date/time.
+	if(kDown & KEY_X)
+	{
+		GbaRtc rtc; LGY_getGbaRtc(&rtc);
+		ee_printf("RTC: %02X.%02X.%04X %02X:%02X:%02X\n", rtc.d, rtc.mon, rtc.y + 0x2000u, rtc.h, rtc.min, rtc.s);
+
+		// Trigger Game Boy Player enhancements.
+		// Needs to be done on the Game Boy Player logo screen.
+		// 2 frames nothing pressed and 1 frame all D-Pad buttons pressed.
+		/*REG_LGY_PAD_SEL = 0x1FFF; // Override all buttons.
+		static u8 gbp = 2;
+		if(gbp > 0)
+		{
+			REG_LGY_PAD_VAL = 0x1FFF; // Force all buttons not pressed.
+			gbp--;
+		}
+		else
+		{
+			REG_LGY_PAD_VAL = 0x1F0F; // All D-Pad buttons pressed.
+			gbp = 2;
+		}*/
+	}
+	//else REG_LGY_PAD_SEL = 0; // Stop overriding buttons.
+}
+#endif
 
 int main(void)
 {
