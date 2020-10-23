@@ -50,45 +50,59 @@
 
 #if !__ASSEMBLER__
 
-#define MAKE_STANDALONE(name)               \
-static inline void __##name(void)           \
-{                                           \
-	__asm__ volatile(#name : : : "memory"); \
-}
-
-#define MAKE_GET_REG(name, inst)            \
-static inline u32 __##name(void)            \
-{                                           \
-	u32 reg;                                \
-	__asm__ volatile(inst : "=r" (reg) : ); \
-	return reg;                             \
-}
-
-#define MAKE_SET_REG_ZERO(name, inst)              \
-static inline void __##name(void)                  \
+#define MAKE_INTR_NO_INOUT(isVolatile, name, ...)  \
+ALWAYS_INLINE void __##name(void)                  \
 {                                                  \
-	__asm__ volatile(inst : : "r" (0) : "memory"); \
+	if(isVolatile == 1)                            \
+		__asm__ volatile(#name : : : __VA_ARGS__); \
+	else                                           \
+		__asm__(#name : : : __VA_ARGS__);          \
 }
 
-#define MAKE_SET_REG(name, inst)                     \
-static inline void __##name(u32 reg)                 \
-{                                                    \
-	__asm__ volatile(inst : : "r" (reg) : "memory"); \
+#define MAKE_INTR_GET_REG(isVolatile, name, inst) \
+ALWAYS_INLINE u32 __##name(void)                  \
+{                                                 \
+	u32 reg;                                      \
+	if(isVolatile == 1)                           \
+		__asm__ volatile(inst : "=r" (reg) : : ); \
+	else                                          \
+		__asm__(inst : "=r" (reg) : : );          \
+	return reg;                                   \
 }
 
+#define MAKE_INTR_SET_REG_ZERO(isVolatile, name, inst, ...) \
+ALWAYS_INLINE void __##name(void)                           \
+{                                                           \
+	if(isVolatile == 1)                                     \
+		__asm__ volatile(inst : : "r" (0) : __VA_ARGS__);   \
+	else                                                    \
+		__asm__(inst : : "r" (0) : __VA_ARGS__);            \
+}
+
+#define MAKE_INTR_SET_REG(isVolatile, name, inst, ...)      \
+ALWAYS_INLINE void __##name(u32 reg)                        \
+{                                                           \
+	if(isVolatile == 1)                                     \
+		__asm__ volatile(inst : : "r" (reg) : __VA_ARGS__); \
+	else                                                    \
+		__asm__(inst : : "r" (reg) : __VA_ARGS__);          \
+}
+
+
+#define __bkpt(val) __asm__ volatile("bkpt #" #val : : : )
 
 #if !__thumb__
 // Program status register
-MAKE_GET_REG(getCpsr, "mrs %0, cpsr")
-MAKE_SET_REG(setCpsr_c, "msr cpsr_c, %0")
-MAKE_SET_REG(setCpsr, "msr cpsr_cxsf, %0")
-MAKE_GET_REG(getSpsr, "mrs %0, spsr")
-MAKE_SET_REG(setSpsr_c, "msr spsr_c, %0")
-MAKE_SET_REG(setSpsr, "msr spsr_cxsf, %0")
+MAKE_INTR_GET_REG(1, getCpsr, "mrs %0, cpsr")
+MAKE_INTR_SET_REG(1, setCpsr_c, "msr cpsr_c, %0", "memory")
+MAKE_INTR_SET_REG(1, setCpsr, "msr cpsr_cxsf, %0", "memory")
+MAKE_INTR_GET_REG(1, getSpsr, "mrs %0, spsr")
+MAKE_INTR_SET_REG(1, setSpsr_c, "msr spsr_c, %0", "memory")
+MAKE_INTR_SET_REG(1, setSpsr, "msr spsr_cxsf, %0", "memory")
 
 // Control Register
-MAKE_GET_REG(getCr, "mrc p15, 0, %0, c1, c0, 0")
-MAKE_SET_REG(setCr, "mcr p15, 0, %0, c1, c0, 0")
+MAKE_INTR_GET_REG(1, getCr, "mrc p15, 0, %0, c1, c0, 0")
+MAKE_INTR_SET_REG(1, setCr, "mcr p15, 0, %0, c1, c0, 0", "memory")
 #endif // if !__thumb__
 
 
@@ -97,64 +111,145 @@ MAKE_SET_REG(setCr, "mcr p15, 0, %0, c1, c0, 0")
 #define __cpsie(flags) __asm__ volatile("cpsie " #flags : : : "memory")
 #define __setend(end) __asm__ volatile("setend " #end : : : "memory")
 
-MAKE_STANDALONE(wfi)
-MAKE_STANDALONE(wfe)
-MAKE_STANDALONE(sev)
+MAKE_INTR_NO_INOUT(1, nop)
+MAKE_INTR_NO_INOUT(1, wfi, "memory")
+MAKE_INTR_NO_INOUT(1, wfe, "memory")
+MAKE_INTR_NO_INOUT(1, sev)
 
 #if !__thumb__
-static inline u32 __getCpuId(void)
+ALWAYS_INLINE u8 __ldrexb(vu8 *addr)
+{
+	u8 res;
+	__asm__ volatile("ldrexb %0, %1" : "=r" (res) : "Q" (*addr) : );
+	return res;
+}
+
+ALWAYS_INLINE u16 __ldrexh(vu16 *addr)
+{
+	u16 res;
+	__asm__ volatile("ldrexh %0, %1" : "=r" (res) : "Q" (*addr) : );
+	return res;
+}
+
+ALWAYS_INLINE u32 __ldrex(vu32 *addr)
+{
+	u32 res;
+	__asm__ volatile("ldrex %0, %1" : "=r" (res) : "Q" (*addr) : );
+	return res;
+}
+
+/*ALWAYS_INLINE u64 __ldrexd(vu64 *addr)
+{
+	union
+	{
+		u32 r32[2];
+		u64 r64;
+	} r;
+
+	// TODO: "Error: even register required -- `ldrexd r3,r2,[r0]'"
+#ifndef __ARMEB__ // Little endian
+	__asm__ volatile("ldrexd %0, %1, %2" : "=r" (r.r32[0]), "=r" (r.r32[1]) : "Q" (*addr) : );
+#else             // Big endian
+	__asm__ volatile("ldrexd %0, %1, %2" : "=r" (r.r32[1]), "=r" (r.r32[0]) : "Q" (*addr) : );
+#endif
+	return r.r64;
+}*/
+
+ALWAYS_INLINE u32 __strexb(vu8 *addr, u8 val)
+{
+	u32 res;
+	__asm__ volatile("strexb %0, %2, %1" : "=&r" (res), "=Q" (*addr) : "r" (val) : );
+	return res;
+}
+
+ALWAYS_INLINE u32 __strexh(vu16 *addr, u16 val)
+{
+	u32 res;
+	__asm__ volatile("strexh %0, %2, %1" : "=&r" (res), "=Q" (*addr) : "r" (val) : );
+	return res;
+}
+
+ALWAYS_INLINE u32 __strex(vu32 *addr, u32 val)
+{
+	u32 res;
+	__asm__ volatile("strex %0, %2, %1" : "=&r" (res), "=Q" (*addr) : "r" (val) : );
+	return res;
+}
+
+/*ALWAYS_INLINE u32 __strexd(vu64 *addr, u64 val)
+{
+	union
+	{
+		u32 r32[2];
+		u64 r64;
+	} r;
+	r.r64 = val;
+
+	// TODO: "Error: even register required -- `strexd r0,r3,r2,[r1]'"
+	u32 res;
+#ifndef __ARMEB__ // Little endian
+	__asm__ volatile("strexd %0, %2, %3, %1" : "=&r" (res), "=Q" (*addr) : "r" (r.r32[0]), "r" (r.r32[1]) : );
+#else             // Big endian
+	__asm__ volatile("strexd %0, %2, %3, %1" : "=&r" (res), "=Q" (*addr) : "r" (r.r32[1]), "r" (r.r32[0]) : );
+#endif
+	return res;
+}*/
+
+MAKE_INTR_NO_INOUT(1, clrex, "memory")
+
+ALWAYS_INLINE u32 __getCpuId(void)
 {
 	u32 cpuId;
 	__asm__("mrc p15, 0, %0, c0, c0, 5" : "=r" (cpuId) : );
 	return cpuId & 3;
 }
 
+// Auxiliary Control Register
+MAKE_INTR_GET_REG(1, getAcr, "mrc p15, 0, %0, c1, c0, 1")
+MAKE_INTR_SET_REG(1, setAcr, "mcr p15, 0, %0, c1, c0, 1", "memory")
+
+// Translation Table Base Register 0
+MAKE_INTR_GET_REG(1, getTtbr0, "mrc p15, 0, %0, c2, c0, 0")
+MAKE_INTR_SET_REG(1, setTtbr0, "mcr p15, 0, %0, c2, c0, 0", "memory")
+
+// Translation Table Base Register 1
+MAKE_INTR_GET_REG(1, getTtbr1, "mrc p15, 0, %0, c2, c0, 1")
+MAKE_INTR_SET_REG(1, setTtbr1, "mcr p15, 0, %0, c2, c0, 1", "memory")
+
+// Translation Table Base Control Register
+MAKE_INTR_GET_REG(1, getTtbcr, "mrc p15, 0, %0, c2, c0, 2")
+MAKE_INTR_SET_REG(1, setTtbcr, "mcr p15, 0, %0, c2, c0, 2", "memory")
+
+// Domain Access Control Register
+MAKE_INTR_GET_REG(1, getDacr, "mrc p15, 0, %0, c3, c0, 0")
+MAKE_INTR_SET_REG(1, setDacr, "mcr p15, 0, %0, c3, c0, 0", "memory")
+
 // Flush Prefetch Buffer
 // Data Synchronization Barrier
 // Data Memory Barrier
-MAKE_SET_REG_ZERO(isb, "mcr p15, 0, %0, c7, c5, 4")
-MAKE_SET_REG_ZERO(dsb, "mcr p15, 0, %0, c7, c10, 4")
-MAKE_SET_REG_ZERO(dmb, "mcr p15, 0, %0, c7, c10, 5")
-
-// Auxiliary Control Register
-MAKE_GET_REG(getAcr, "mrc p15, 0, %0, c1, c0, 1")
-MAKE_SET_REG(setAcr, "mcr p15, 0, %0, c1, c0, 1")
-
-// Translation Table Base Register 0
-MAKE_GET_REG(getTtbr0, "mrc p15, 0, %0, c2, c0, 0")
-MAKE_SET_REG(setTtbr0, "mcr p15, 0, %0, c2, c0, 0")
-
-// Translation Table Base Register 1
-MAKE_GET_REG(getTtbr1, "mrc p15, 0, %0, c2, c0, 1")
-MAKE_SET_REG(setTtbr1, "mcr p15, 0, %0, c2, c0, 1")
-
-// Translation Table Base Control Register
-MAKE_GET_REG(getTtbcr, "mrc p15, 0, %0, c2, c0, 2")
-MAKE_SET_REG(setTtbcr, "mcr p15, 0, %0, c2, c0, 2")
-
-// Domain Access Control Register
-MAKE_GET_REG(getDacr, "mrc p15, 0, %0, c3, c0, 0")
-MAKE_SET_REG(setDacr, "mcr p15, 0, %0, c3, c0, 0")
+MAKE_INTR_SET_REG_ZERO(1, isb, "mcr p15, 0, %0, c7, c5, 4", "memory")
+MAKE_INTR_SET_REG_ZERO(1, dsb, "mcr p15, 0, %0, c7, c10, 4", "memory")
+MAKE_INTR_SET_REG_ZERO(1, dmb, "mcr p15, 0, %0, c7, c10, 5", "memory")
 
 // FCSE PID Register
-MAKE_GET_REG(getFcsepidr, "mrc p15, 0, %0, c13, c0, 0")
-MAKE_SET_REG(setFcsepidr, "mcr p15, 0, %0, c13, c0, 0")
+MAKE_INTR_GET_REG(1, getFcsepidr, "mrc p15, 0, %0, c13, c0, 0")
+MAKE_INTR_SET_REG(1, setFcsepidr, "mcr p15, 0, %0, c13, c0, 0", "memory")
 
 // Context ID Register
-MAKE_GET_REG(getCidr, "mrc p15, 0, %0, c13, c0, 1")
-MAKE_SET_REG(setCidr, "mcr p15, 0, %0, c13, c0, 1")
+MAKE_INTR_GET_REG(1, getCidr, "mrc p15, 0, %0, c13, c0, 1")
+MAKE_INTR_SET_REG(1, setCidr, "mcr p15, 0, %0, c13, c0, 1", "memory")
 #endif // if !__thumb__
 
 #elif ARM9
 
 #if !__thumb__
-MAKE_SET_REG_ZERO(wfi, "mcr p15, 0, %0, c7, c0, 4")
+MAKE_INTR_SET_REG_ZERO(1, wfi, "mcr p15, 0, %0, c7, c0, 4", "memory")
 #endif // if !__thumb__
 #endif // ifdef ARM11
 
-#undef MAKE_STANDALONE
-#undef MAKE_GET_REG
-#undef MAKE_SET_REG_ZERO
-#undef MAKE_SET_REG
+#undef MAKE_INTR_NO_INOUT
+#undef MAKE_INTR_GET_REG
+#undef MAKE_INTR_SET_REG_ZERO
+#undef MAKE_INTR_SET_REG
 
 #endif // if !__ASSEMBLER__
