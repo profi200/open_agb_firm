@@ -15,6 +15,7 @@ void printError(Result res)
 	{
 		"OK",
 		"SD card removed",
+		"Disk full",
 		"Invalid argument",
 		"Out of memory",
 		"Out of range",
