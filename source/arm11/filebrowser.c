@@ -16,11 +16,9 @@
 
 typedef struct
 {
-	u32 num;
-	const char *strPtrs[MAX_DIR_ENTRIES];
-	u8 entTypes[MAX_DIR_ENTRIES]; // 0 = file, 1 = dir
-	char strBufs[MAX_DIR_ENTRIES][256];
-} DirList;
+	u8 type;       // 0 = file, 1 = dir
+	char str[255];
+} DirListEnt;
 
 
 
@@ -40,12 +38,27 @@ static size_t safeStrcpy(char *const dst, const char *const src, size_t num)
 	return len;
 }
 
-static Result scanDir(const char *const path, DirList *const dList, const char *const filter)
+int dlistCompare(const void *a, const void *b)
+{
+	const DirListEnt *const entA = (DirListEnt*)a;
+	const DirListEnt *const entB = (DirListEnt*)b;
+
+	if(entA->type != entB->type) return (int)entB->type - entA->type;
+
+	const char *strA = entA->str;
+	const char *strB = entB->str;
+	int res = *strA - *strB;
+	while(*strA != '\0' && *strB != '\0' && res == 0) res = *++strA - *++strB;
+
+	return res;
+}
+
+static Result scanDir(const char *const path, DirListEnt *const dList, u32 *num, const char *const filter)
 {
 	FILINFO *const fi = (FILINFO*)malloc(sizeof(FILINFO) * DIR_READ_BLOCKS);
 	if(fi == NULL) return RES_OUT_OF_MEM;
 
-	dList->num = 0;
+	*num = 0;
 
 	Result res;
 	DHandle dh;
@@ -69,37 +82,35 @@ static Result scanDir(const char *const path, DirList *const dList, const char *
 						continue;
 				}
 
-				dList->strPtrs[dListPos] = dList->strBufs[dListPos];
-				dList->entTypes[dListPos] = isDir;
-				safeStrcpy(dList->strBufs[dListPos], fi[i].fname, 256);
+				dList[dListPos].type = isDir;
+				safeStrcpy(dList[dListPos].str, fi[i].fname, 255);
 				dListPos++;
 			}
 		} while(read == DIR_READ_BLOCKS);
-		dList->num = dListPos;
+		*num = dListPos;
 
 		fCloseDir(dh);
 	}
 
 	free(fi);
 
-	// Hacky casting of function pointers. But they are compatible.
-	qsort(dList->strPtrs, dList->num, sizeof(char*), (int (*)(const void *, const void *))strcmp);
+	qsort(dList, *num, sizeof(DirListEnt), dlistCompare);
 
 	return res;
 }
 
-static void showDirList(const DirList *const dList, u32 start)
+static void showDirList(const DirListEnt *const dList, u32 num, u32 start)
 {
 	// Clear screen.
 	ee_printf("\x1b[2J");
 
-	const u32 listLength = (dList->num - start > SCREEN_ROWS ? start + SCREEN_ROWS : dList->num);
+	const u32 listLength = (num - start > SCREEN_ROWS ? start + SCREEN_ROWS : num);
 	for(u32 i = start; i < listLength; i++)
 	{
 		const char *const printStr =
-			(dList->entTypes[i] == 0 ? "\x1b[%lu;H\x1b[37m %.51s" : "\x1b[%lu;H\x1b[33m %.51s");
+			(dList[i].type == 0 ? "\x1b[%lu;H\x1b[37m %.51s" : "\x1b[%lu;H\x1b[33m %.51s");
 
-		ee_printf(printStr, i - start, dList->strPtrs[i]);
+		ee_printf(printStr, i - start, dList[i].str);
 	}
 }
 
@@ -112,12 +123,13 @@ Result browseFiles(const char *const basePath, char selected[512])
 	if(curDir == NULL) return RES_OUT_OF_MEM;
 	safeStrcpy(curDir, basePath, 512);
 
-	DirList *const dList = (DirList*)malloc(sizeof(DirList));
+	DirListEnt *const dList = (DirListEnt*)malloc(sizeof(DirListEnt) * MAX_DIR_ENTRIES);
 	if(dList == NULL) return RES_OUT_OF_MEM;
 
 	Result res;
-	if((res = scanDir(curDir, dList, ".gba")) != RES_OK) goto end;
-	showDirList(dList, 0);
+	u32 num;
+	if((res = scanDir(curDir, dList, &num, ".gba")) != RES_OK) goto end;
+	showDirList(dList, num, 0);
 
 	s32 cursorPos = 0; // Within the entire list.
 	u32 windowPos = 0; // Window start position within the list.
@@ -137,13 +149,13 @@ Result browseFiles(const char *const basePath, char selected[512])
 			kDown = hidKeysDown();
 		} while(kDown == 0);
 
-		if(dList->num != 0)
+		if(num != 0)
 		{
 			oldCursorPos = cursorPos;
 			if(kDown & KEY_DRIGHT)
 			{
 				cursorPos += SCREEN_ROWS;
-				if((u32)cursorPos > dList->num) cursorPos = dList->num - 1;
+				if((u32)cursorPos > num) cursorPos = num - 1;
 			}
 			if(kDown & KEY_DLEFT)
 			{
@@ -154,31 +166,31 @@ Result browseFiles(const char *const basePath, char selected[512])
 			if(kDown & KEY_DDOWN)  cursorPos += 1;
 		}
 
-		if(cursorPos < 0)                     cursorPos = dList->num - 1; // Wrap to end of list.
-		if((u32)cursorPos > (dList->num - 1)) cursorPos = 0;              // Wrap to start of list.
+		if(cursorPos < 0)              cursorPos = num - 1; // Wrap to end of list.
+		if((u32)cursorPos > (num - 1)) cursorPos = 0;       // Wrap to start of list.
 
 		if((u32)cursorPos < windowPos)
 		{
 			windowPos = cursorPos;
-			showDirList(dList, windowPos);
+			showDirList(dList, num, windowPos);
 		}
 		if((u32)cursorPos >= windowPos + SCREEN_ROWS)
 		{
 			windowPos = cursorPos - (SCREEN_ROWS - 1);
-			showDirList(dList, windowPos);
+			showDirList(dList, num, windowPos);
 		}
 
 		if(kDown & (KEY_A | KEY_B))
 		{
 			u32 pathLen = strlen(curDir);
 
-			if(kDown & KEY_A && dList->num != 0)
+			if(kDown & KEY_A && num != 0)
 			{
 				// TODO: !!! Insecure !!!
 				if(curDir[pathLen - 1] != '/') curDir[pathLen++] = '/';
-				safeStrcpy(curDir + pathLen, dList->strPtrs[cursorPos], 256);
+				safeStrcpy(curDir + pathLen, dList[cursorPos].str, 255);
 
-				if(dList->entTypes[cursorPos] == 0)
+				if(dList[cursorPos].type == 0)
 				{
 					safeStrcpy(selected, curDir, 512);
 					break;
@@ -192,10 +204,10 @@ Result browseFiles(const char *const basePath, char selected[512])
 				*tmpPathPtr = '\0';
 			}
 
-			if((res = scanDir(curDir, dList, ".gba")) != RES_OK) break;
+			if((res = scanDir(curDir, dList, &num, ".gba")) != RES_OK) break;
 			cursorPos = 0;
 			windowPos = 0;
-			showDirList(dList, 0);
+			showDirList(dList, num, 0);
 		}
 	}
 
