@@ -52,7 +52,7 @@ static void setupBiosOverlay(bool biosIntro)
 	//iomemcpy(REGs_LGY_A7_VECTOR, biosVectors, 32);
 
 	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_size);
-	if(biosIntro) *((u8*)_arm7_stub_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
+	if(biosIntro) *((vu8*)_arm7_stub_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
 }
 
 static u32 setupSaveType(u16 saveType)
@@ -92,7 +92,7 @@ Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePa
 	Result res = RES_OK;
 	if(saveSize != 0)
 	{
-		res = fsQuickRead((void*)SAVE_LOC, savePath, MAX_SAVE_SIZE);
+		res = fsQuickRead(savePath, (void*)SAVE_LOC, MAX_SAVE_SIZE);
 		if(res == RES_FR_NO_FILE)
 		{
 			res = RES_OK; // Ignore a missing save file.
@@ -168,7 +168,7 @@ Result LGY_backupGbaSave(void)
 			// Update hash.
 			memcpy(g_saveHash, newHash, 32);
 
-			res = fsQuickWrite((void*)SAVE_LOC, g_savePath, saveSize);
+			res = fsQuickWrite(g_savePath, (void*)SAVE_LOC, saveSize);
 		}
 
 		// Disable savegame mem region.

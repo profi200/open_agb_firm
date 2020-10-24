@@ -16,13 +16,9 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string.h>
-#include <malloc.h>
 #include "types.h"
 #include "error_codes.h"
-#include "util.h"
 #include "fs.h"
-#include "arm9/debug.h"
 #include "fatfs/ff.h"
 
 
@@ -44,7 +40,7 @@ static struct
 
 static Result fres2Res(FRESULT fr)
 {
-	if(fr != FR_OK) return fr + 5;
+	if(fr != FR_OK) return fr + RES_FR_DISK_ERR - 1;
 	else            return RES_OK;
 }
 
