@@ -118,7 +118,7 @@ static Result searchGameDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
 
 	Result res;
 	FHandle f;
-	if((res = fOpen(&f, "sdmc:/gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	if((res = fOpen(&f, OAF_WORK_DIR "/gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
 	{
 		s32 l = 0;
 		s32 r = fSize(f) / sizeof(GameDbEntry) - 1; // TODO: Check for 0!
@@ -352,7 +352,7 @@ static u16 saveDbDebug(const char *const savePath, u32 romSize)
 		{
 			dbEntry.attr = saveType;
 			FHandle f;
-			if(fOpen(&f, "sdmc:/gba_db.bin", FA_OPEN_EXISTING | FA_WRITE) == RES_OK)
+			if(fOpen(&f, OAF_WORK_DIR "/gba_db.bin", FA_OPEN_EXISTING | FA_WRITE) == RES_OK)
 			{
 				fLseek(f, (sizeof(GameDbEntry) * dbPos) + offsetof(GameDbEntry, attr));
 				fWrite(f, &dbEntry.attr, sizeof(dbEntry.attr), NULL);
@@ -507,8 +507,8 @@ static void debugTests(void)
 static Result handleFsStuff(char romPath[512])
 {
 	// Mount SD card.
-	Result res;
-	if((res = fMount(FS_DRIVE_SDMC)) == RES_OK)
+	Result res = fMount(FS_DRIVE_SDMC);
+	if(res == RES_OK)
 	{
 		char *lastDir = (char*)calloc(512, 1);
 		if(lastDir != NULL)
@@ -527,7 +527,16 @@ static Result handleFsStuff(char romPath[512])
 
 				// Show file browser.
 				*romPath = '\0';
-				if((res = browseFiles(lastDir, romPath)) != RES_OK) break;
+				if((res = browseFiles(lastDir, romPath)) != RES_OK)
+				{
+					// Second chance in case the last dir has been deleted.
+					if(res == RES_FR_NO_PATH)
+					{
+						strcpy(lastDir, "sdmc:/");
+						if((res = browseFiles(lastDir, romPath)) != RES_OK) break;
+					}
+					else break;
+				}
 
 				size_t cmpLen = strrchr(romPath, '/') - romPath;
 				if((size_t)(strchr(romPath, '/') - romPath) == cmpLen) cmpLen++; // Keep the first '/'.
