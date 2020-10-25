@@ -33,12 +33,16 @@
 #include "arm11/power.h"
 #include "hardware/gfx.h"
 #include "fs.h"
+#include "fsutil.h"
 #include "arm11/filebrowser.h"
 #include "arm.h"
 #include "arm11/hardware/lcd.h"
 #include "arm11/gpu_cmd_lists.h"
 #include "kernel.h"
 #include "kevent.h"
+
+
+#define OAF_WORK_DIR  "sdmc:/3ds/open_agb_firm"
 
 
 
@@ -265,7 +269,7 @@ saveTypeFound:
 	return saveType;
 }
 
-u16 saveDbDebug(const char *const savePath, u32 romSize)
+static u16 saveDbDebug(const char *const savePath, u32 romSize)
 {
 	FILINFO fi;
 	const bool saveExists = fStat(savePath, &fi) == RES_OK;
@@ -470,7 +474,7 @@ static void gbaGfxHandler(void *args)
 }
 
 #ifndef NDEBUG
-void debugTests(void)
+static void debugTests(void)
 {
 	const u32 kDown = hidKeysDown();
 
@@ -500,6 +504,52 @@ void debugTests(void)
 }
 #endif
 
+static Result handleFsStuff(char romPath[512])
+{
+	// Mount SD card.
+	Result res;
+	if((res = fMount(FS_DRIVE_SDMC)) == RES_OK)
+	{
+		char *lastDir = (char*)calloc(512, 1);
+		if(lastDir != NULL)
+		{
+			do
+			{
+				// Create working dir.
+				if((res = fsMakePath(OAF_WORK_DIR)) != RES_OK && res != RES_FR_EXIST) break;
+
+				// Get last ROM launch path.
+				if((res = fsQuickRead(OAF_WORK_DIR "/lastdir.bin", lastDir, 511)) != RES_OK)
+				{
+					if(res == RES_FR_NO_FILE) strcpy(lastDir, "sdmc:/");
+					else                      break;
+				}
+
+				// Show file browser.
+				*romPath = '\0';
+				if((res = browseFiles(lastDir, romPath)) != RES_OK) break;
+
+				size_t cmpLen = strrchr(romPath, '/') - romPath;
+				if((size_t)(strchr(romPath, '/') - romPath) == cmpLen) cmpLen++; // Keep the first '/'.
+				if(cmpLen < 512)
+				{
+					if(cmpLen < strlen(lastDir) || strncmp(lastDir, romPath, cmpLen) != 0)
+					{
+						strncpy(lastDir, romPath, cmpLen);
+						lastDir[cmpLen] = '\0';
+						res = fsQuickWrite(OAF_WORK_DIR "/lastdir.bin", lastDir, cmpLen + 1);
+					}
+				}
+			} while(0);
+
+			free(lastDir);
+		}
+		else res = RES_OUT_OF_MEM;
+	}
+
+	return res;
+}
+
 int main(void)
 {
 	GFX_init(GFX_BGR8, GFX_RGB565);
@@ -507,12 +557,9 @@ int main(void)
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
 
-	// Show file browser.
-	Result res;
 	char *romPath = (char*)malloc(512);
-	*romPath = '\0';
-	if((res = fMount(FS_DRIVE_SDMC)) != RES_OK || (res = browseFiles("sdmc:/", romPath)) != RES_OK || *romPath == '\0')
-		goto end;
+	Result res = handleFsStuff(romPath);
+	if(res != RES_OK || *romPath == '\0') goto end;
 
 	ee_puts("Reading ROM and save...");
 	u32 romSize;

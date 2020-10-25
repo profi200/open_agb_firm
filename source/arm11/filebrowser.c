@@ -3,6 +3,7 @@
 #include "types.h"
 #include "error_codes.h"
 #include "fs.h"
+#include "util.h"
 #include "arm11/hardware/hid.h"
 #include "arm11/fmt.h"
 #include "hardware/gfx.h"
@@ -17,7 +18,7 @@
 typedef struct
 {
 	u8 type;       // 0 = file, 1 = dir
-	char str[255];
+	char str[256];
 } DirListEnt;
 
 typedef struct
@@ -28,22 +29,6 @@ typedef struct
 } DirList;
 
 
-
-// num including null terminator.
-static size_t safeStrcpy(char *const dst, const char *const src, size_t num)
-{
-	if(num == 0) return 0;
-
-	const size_t len = strlen(src) + 1;
-	if(len > num)
-	{
-		*dst = '\0';
-		return 1;
-	}
-
-	strcpy(dst, src);
-	return len;
-}
 
 int dlistCompare(const void *a, const void *b)
 {
@@ -90,7 +75,7 @@ static Result scanDir(const char *const path, DirList *const dList, const char *
 				}
 
 				dList->entries[dListPos].type = isDir;
-				safeStrcpy(dList->entries[dListPos].str, fi[i].fname, 255);
+				safeStrcpy(dList->entries[dListPos].str, fi[i].fname, 256);
 				dList->ptrs[dListPos] = &dList->entries[dListPos];
 				dListPos++;
 			}
@@ -196,7 +181,7 @@ Result browseFiles(const char *const basePath, char selected[512])
 			{
 				// TODO: !!! Insecure !!!
 				if(curDir[pathLen - 1] != '/') curDir[pathLen++] = '/';
-				safeStrcpy(curDir + pathLen, dList->ptrs[cursorPos]->str, 255);
+				safeStrcpy(curDir + pathLen, dList->ptrs[cursorPos]->str, 256);
 
 				if(dList->ptrs[cursorPos]->type == 0)
 				{

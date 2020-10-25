@@ -23,7 +23,7 @@
 
 
 
-NAKED void wait(u32 cycles)
+NAKED void wait_cycles(u32 cycles)
 {
 #ifdef ARM9
 	__asm__("1: subs %0, %0, #4\n\t"
@@ -33,6 +33,22 @@ NAKED void wait(u32 cycles)
 #endif
 	        "bhi 1b\n\t"
 	        "bx lr\n\t" : : "r" (cycles) : "cc");
+}
+
+size_t safeStrcpy(char *const dst, const char *const src, size_t num)
+{
+	if(num == 0) return 0;
+
+	const size_t len = strlen(src) + 1;
+	if(len > num)
+	{
+		*dst = '\0';
+		return 1;
+	}
+
+	strcpy(dst, src);
+
+	return len;
 }
 
 // case insensitive string compare function
