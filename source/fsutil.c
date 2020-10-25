@@ -19,6 +19,7 @@
 #include <string.h>
 #include "fsutil.h"
 #include "fs.h"
+#include "util.h"
 
 
 
@@ -51,6 +52,33 @@ Result fsQuickWrite(const char *const path, const void *const buf, u32 size)
 
 		fClose(f);
 	}
+
+	return res;
+}
+
+Result fsMakePath(const char *const path)
+{
+	char tmpPath[512];
+	safeStrcpy(tmpPath, path, 512);
+
+	char *str;
+	if((str = strchr(tmpPath, ':')) == NULL) str = tmpPath;
+	else                                     str++;
+
+	// Path without any dir.
+	if(*str == '\0') return RES_INVALID_ARG;
+
+	Result res = RES_OK;
+	while((str = strchr(str + 1, '/')) != NULL)
+	{
+		*str = '\0';
+		if((res = fMkdir(tmpPath)) != RES_OK && res != RES_FR_EXIST) break;
+		*str = '/';
+	}
+
+	// Only create the last dir in the path if the
+	// previous error code is not an unexpected one.
+	if(res == RES_OK || res == RES_FR_EXIST) res = fMkdir(tmpPath);
 
 	return res;
 }

@@ -25,3 +25,4 @@
 
 Result fsQuickRead(const char *const path, void *const buf, u32 size);
 Result fsQuickWrite(const char *const path, const void *const buf, u32 size);
+Result fsMakePath(const char *const path);

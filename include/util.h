@@ -26,7 +26,26 @@
 
 
 
-NAKED void wait(u32 cycles);
+/**
+ * @brief      Waits at least the specified amount of CPU cycles.
+ *
+ * @param[in]  cycles  The cycles to wait.
+ */
+NAKED void wait_cycles(u32 cycles);
+
+/**
+ * @brief      Safer strcpy with checks.
+ *             The dst string always gets terminated except when num is 0.
+ *             If the src string is too long nothing is copied and dst will be terminated.
+ *             This function is not safe against race conditions!
+ *
+ * @param      dst   The destination pointer.
+ * @param[in]  src   The source pointer.
+ * @param[in]  num   Maximum number of chars to copy including null terminator.
+ *
+ * @return     The length of the copied string in bytes including null terminator.
+ */
+size_t safeStrcpy(char *const dst, const char *const src, size_t num);
 
 // case insensitive string compare function
 int strnicmp(const char *str1, const char *str2, u32 len);

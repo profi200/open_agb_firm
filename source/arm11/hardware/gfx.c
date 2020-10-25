@@ -74,7 +74,7 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 
 	// Reset
 	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E;
-	wait(12);
+	wait_cycles(12);
 	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E | PDN_GPU_CNT_RST_ALL;
 	REG_GX_GPU_CLK = 0x100;
 	REG_GX_PSC_VRAM = 0;
@@ -452,7 +452,7 @@ void GX_textureCopy(const u32 *const in, u32 indim, u32 *out, u32 outdim, u32 si
 void GX_processCommandList(u32 size, const u32 *const cmdList)
 {
 	REG_GX_P3D(GPUREG_IRQ_ACK) = 0; // Acknowledge last P3D.
-	while(REG_GX_PSC_STAT & 1u<<31) wait(0x30);
+	while(REG_GX_PSC_STAT & 1u<<31) wait_cycles(0x30);
 
 	REG_GX_P3D(GPUREG_CMDBUF_SIZE0) = size>>3;
 	REG_GX_P3D(GPUREG_CMDBUF_ADDR0) = (u32)cmdList>>3;
