@@ -22,9 +22,8 @@
 
 
 
-noreturn void panic();
+noreturn void panic(void);
 noreturn void panicMsg(const char *msg);
-//void debugMemdump(const char *filepath, void *mem, size_t size);
 
 // Exception tests
 /*static inline regTest(void)

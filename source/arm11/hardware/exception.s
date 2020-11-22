@@ -36,7 +36,7 @@ EXCEPTION_ENTRY undefInstrHandler, 0<<29
 EXCEPTION_ENTRY prefetchAbortHandler, 1<<29
 EXCEPTION_ENTRY dataAbortHandler, 2<<29
 BEGIN_ASM_FUNC exceptionHandler
-	sub sp, #68
+	sub sp, #84
 	stmia sp, {r0-r14}^            @ Save all user/system mode regs except pc
 	mrs r2, spsr                   @ Get saved cpsr
 	mrs r3, cpsr
@@ -51,13 +51,21 @@ BEGIN_ASM_FUNC exceptionHandler
 exceptionHandler_skip_other_mode:
 	str lr, [sp, #60]              @ Save lr (pc) on exception stack
 	str r2, [sp, #64]              @ Save spsr (cpsr) on exception stack
+	mrc p15, 0, r3, c5, c0, 0
+	str r3, [sp, #68]              @ DFSR
+	mrc p15, 0, r3, c5, c0, 1
+	str r3, [sp, #72]              @ IFSR
+	mrc p15, 0, r3, c6, c0, 0
+	str r3, [sp, #76]              @ FAR
+	mrc p15, 0, r3, c6, c0, 1
+	str r3, [sp, #80]              @ WFAR
 	mov r4, r0
 	mov r5, sp
 	bl deinitCpu
 	mov r0, r4
 	mov sp, r5
 	mov r1, r5
-	b guruMeditation               @ r0 = exception type, r1 = reg dump ptr {r0-r14, pc (unmodified), cpsr}
+	b guruMeditation               @ r0 = exception type, r1 = reg dump ptr {r0-r14, pc (unmodified), CPSR, DFSR, IFSR, FAR, WFAR}
 END_ASM_FUNC
 
 

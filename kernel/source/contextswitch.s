@@ -54,7 +54,7 @@ switchContextAllRegs_end:
 	cpsie i
 	bx lr*/
 
-@ KRes switchContext(KRes res, void *oldSp, uintptr_t newSp);
+@ KRes switchContext(KRes res, uintptr_t *oldSp, uintptr_t newSp);
 BEGIN_ASM_FUNC switchContext
 	stmfd sp!, {r4-r11, lr}
 	str sp, [r1]

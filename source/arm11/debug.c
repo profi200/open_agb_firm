@@ -17,6 +17,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "types.h"
 #include "mem_map.h"
@@ -24,7 +25,6 @@
 #include "arm11/fmt.h"
 #include "hardware/pxi.h"
 #include "ipc_handler.h"
-#include "hardware/gfx.h"
 #include "arm11/hardware/interrupt.h"
 #include "arm.h"
 #include "arm11/hardware/mcu.h"
@@ -32,20 +32,17 @@
 
 
 
-noreturn void panic()
+noreturn void panic(void)
 {
 	enterCriticalSection();
 
 	consoleInit(SCREEN_BOT, NULL);
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n");
 
-	//PXI_sendPanicCmd(IPC_CMD9_PANIC);
+	PXI_sendPanicCmd(IPC_CMD9_PREPARE_POWER);
 
 	// Wait for A/B/X or Y
-	do
-	{
-		hidScanInput();
-	} while(!(hidKeysDown() & (KEY_A | KEY_B | KEY_X | KEY_Y)));
+	while(!(REG_HID_PAD & (KEY_A | KEY_B | KEY_X | KEY_Y)));
 
 	MCU_powerOffSys();
 	while(1) __wfi();
@@ -59,32 +56,21 @@ noreturn void panicMsg(const char *msg)
 	ee_printf("\x1b[41m\x1b[0J\x1b[15C****PANIC!!!****\n\n");
 	ee_printf("\nERROR MESSAGE:\n%s\n", msg);
 
-	//PXI_sendPanicCmd(IPC_CMD9_PANIC);
+	PXI_sendPanicCmd(IPC_CMD9_PREPARE_POWER);
 
 	// Wait for A/B/X or Y
-	do
-	{
-		hidScanInput();
-	} while(!(hidKeysDown() & (KEY_A | KEY_B | KEY_X | KEY_Y)));
+	while(!(REG_HID_PAD & (KEY_A | KEY_B | KEY_X | KEY_Y)));
 
 	MCU_powerOffSys();
 	while(1) __wfi();
 }
 
 // Expects the registers in the exception stack to be in the following order:
-// r0-r14, pc (unmodified), cpsr
+// r0-r14, pc (unmodified), CPSR, DFSR, IFSR, FAR, WFAR
 noreturn void guruMeditation(u8 type, const u32 *excStack)
 {
 	const char *const typeStr[3] = {"Undefined instruction", "Prefetch abort", "Data abort"};
 	u32 realPc, instSize = 4;
-	//bool codeChanged = false;
-
-
-	// verify text and rodata
-	/*u32 prevHash = debugHash;
-	debugHashCodeRoData();
-	if(prevHash != debugHash)
-		codeChanged = true;*/
 
 	consoleInit(SCREEN_BOT, NULL);
 
@@ -123,32 +109,72 @@ noreturn void guruMeditation(u8 type, const u32 *excStack)
 		}
 	}
 
-	//if(codeChanged) ee_printf("Attention: RO section data changed!!");
-
-	//PXI_sendPanicCmd(IPC_CMD9_EXCEPTION);
+	PXI_sendPanicCmd(IPC_CMD9_PREPARE_POWER);
 
 	// Wait for A/B/X or Y
-	do
-	{
-		hidScanInput();
-	} while(!(hidKeysDown() & (KEY_A | KEY_B | KEY_X | KEY_Y)));
+	while(!(REG_HID_PAD & (KEY_A | KEY_B | KEY_X | KEY_Y)));
 
 	MCU_powerOffSys();
 	while(1) __wfi();
 }
 
-/*void debugMemdump(const char *filepath, void *mem, size_t size)
+#ifndef NDEBUG
+// Needs to be marked as used to work with LTO.
+// The used attribute also overrides the newlib symbol.
+// This is for debugging purposes only. For security this value needs to be random!
+__attribute__((used)) uintptr_t __stack_chk_guard = 0xC724B66D;
+
+// Needs to be marked as noinline and used to work with LTO.
+// The used attribute also overrides the newlib symbol.
+// Combine -fstack-protector-all with -fno-inline to get the most effective detection.
+__attribute__((noinline, used)) noreturn void __stack_chk_fail(void)
 {
-	s32 file;
+	panicMsg("Stack smash!");
+}
 
-	if((file = fOpen(filepath, FS_CREATE_ALWAYS | FS_OPEN_WRITE)) < 0)
-	{
-		return;
-	}
-		
-	fWrite(file, mem, size);
-	
-	fSync(file);
 
-	fClose(file);
-}*/
+// Add "-Wl,-wrap=malloc,-wrap=calloc,-wrap=free" to LDFLAGS to enable the heap check.
+static const u32 __heap_chk_guard[4] = {0x9240A724, 0x6A6594A0, 0x976F0392, 0xB3A669AB};
+
+void* __real_malloc(size_t size);
+void __real_free(void *ptr);
+
+void* __wrap_malloc(size_t size)
+ {
+	void *const buf = __real_malloc(size + 32);
+	if(buf == NULL) return NULL;
+
+	memcpy(buf, &size, sizeof(size_t));
+	memcpy(buf + sizeof(size_t), (u8*)__heap_chk_guard + sizeof(size_t), 16 - sizeof(size_t));
+	memcpy(buf + 16 + size, __heap_chk_guard, 16);
+
+	return buf + 16;
+}
+
+void* __wrap_calloc(size_t num, size_t size)
+{
+	void *const buf = __wrap_malloc(num * size);
+	if(buf == NULL) return NULL;
+
+	memset(buf, 0, num * size);
+
+	return buf;
+}
+
+void __wrap_free(void *ptr)
+{
+	if(ptr == NULL) return;
+
+	if(memcmp(ptr - (16 - sizeof(size_t)), (u8*)__heap_chk_guard + sizeof(size_t), 16 - sizeof(size_t)) != 0)
+		panicMsg("Heap underflow!");
+	size_t size;
+	memcpy(&size, ptr - 16, sizeof(size_t));
+
+	// Important! Adjust the size check if needed.
+	// 1024u * 512 is roughly ok for AXIWRAM.
+	if(size > (1024u * 512) || memcmp(ptr + size, __heap_chk_guard, 16) != 0)
+		panicMsg("Heap overflow!");
+
+	__real_free(ptr - 16);
+}
+#endif

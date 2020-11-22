@@ -57,7 +57,6 @@ static u8 fmt2PixSize(GfxFbFmt fmt);
 static void setupFramebufs(GfxFbFmt fmtTop, GfxFbFmt fmtBot);
 static void deallocFramebufs(void);
 static void setupDislayController(u8 lcd);
-static void gfxIrqHandler(u32 intSource);
 
 void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 {
