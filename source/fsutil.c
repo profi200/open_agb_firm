@@ -43,12 +43,7 @@ Result fsQuickWrite(const char *const path, const void *const buf, u32 size)
 	FHandle f;
 	if((res = fOpen(&f, path, FA_OPEN_ALWAYS | FA_WRITE)) == RES_OK)
 	{
-		if((res = fLseek(f, size)) == RES_OK && fTell(f) == size)
-		{
-			fLseek(f, 0);
-			res = fWrite(f, buf, size, NULL);
-		}
-		else if(res == RES_OK) res = RES_DISK_FULL; // Seek pre-allocation fail.
+		res = fWrite(f, buf, size, NULL);
 
 		fClose(f);
 	}

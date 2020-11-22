@@ -108,6 +108,7 @@ u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, const u32 *const buf)
 
 		// Miscellaneous API.
 		case IPC_CMD_ID_MASK(IPC_CMD9_PREPARE_POWER):
+			fsDeinit();
 			break;
 		default:
 			panic();

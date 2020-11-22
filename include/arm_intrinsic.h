@@ -111,6 +111,7 @@ ALWAYS_INLINE u64 __##inst(u32 op1, u32 op2, u64 acc)                           
 
 
 
+// Pack Halfword Bottom Top.
 #define __pkhbt(op1, op2, sh)                                                               \
 ({                                                                                          \
 	u32 __res;                                                                              \
@@ -118,6 +119,7 @@ ALWAYS_INLINE u64 __##inst(u32 op1, u32 op2, u64 acc)                           
 	__res;                                                                                  \
 })
 
+// Pack Halfword Top Bottom.
 #define __pkhtb(op1, op2, sh)                                                                     \
 ({                                                                                                \
 	u32 __res, __sh = (sh);                                                                       \

@@ -31,28 +31,15 @@ static char g_savePath[512] = {0};
 
 
 
-#define STRINGIFY(s) #s
-#define STR(s) STRINGIFY(s)
-NAKED static void _overlay_stub(void)
-{
-	__asm__("mov r0, #0x4000000\n\t"
-	        "mov r1, #1\n\t"
-	        "strb r1, [r0, #0x300]\n\t"   // "POSTFLG"
-	        "ldr pc, _overlay_stub_jmp\n\t"
-	        "_overlay_stub_jmp: .4byte " STR(ARM7_STUB_LOC) "\n\t"
-	        "_overlay_stub_size = . - _overlay_stub\n\t" : : : );
-}
-extern const u32 _overlay_stub_size[];
-
 static void setupBiosOverlay(bool biosIntro)
 {
-	iomemcpy(REGs_LGY_A7_VECTOR, (u32*)_overlay_stub, (u32)_overlay_stub_size);
+	iomemcpy(REGs_LGY_A7_VECTOR, (u32*)_a7_overlay_stub, (u32)_a7_overlay_stub_size);
 	//static const u32 biosVectors[8] = {0xEA000018, 0xEA000004, 0xEA00004C, 0xEA000002,
 	//                                   0xEA000001, 0xEA000000, 0xEA000042, 0xE59FD1A0};
 	//iomemcpy(REGs_LGY_A7_VECTOR, biosVectors, 32);
 
-	NDMA_copy((u32*)ARM7_STUB_LOC9, _arm7_stub_start, (u32)_arm7_stub_size);
-	if(biosIntro) *((vu8*)_arm7_stub_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
+	NDMA_copy((u32*)ARM7_STUB_LOC9, (u32*)_a7_stub_start, (u32)_a7_stub_size);
+	if(biosIntro) *((vu8*)_a7_stub9_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
 }
 
 static u32 setupSaveType(u16 saveType)

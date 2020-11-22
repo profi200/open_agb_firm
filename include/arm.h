@@ -197,6 +197,59 @@ ALWAYS_INLINE u32 __strex(vu32 *addr, u32 val)
 
 MAKE_INTR_NO_INOUT(1, clrex, "memory")
 
+// Debug ID Register
+MAKE_INTR_GET_REG(0, getDidr, "mrc p14, 0, %0, c0, c0, 0")
+
+// Debug Status and Control Register
+MAKE_INTR_GET_REG(1, getDscr, "mrc p14, 0, %0, c0, c1, 0")
+MAKE_INTR_SET_REG(1, setDscr, "mcr p14, 0, %0, c0, c1, 0", "memory")
+
+// Data Transfer Register
+
+// Vector Catch Register
+MAKE_INTR_GET_REG(1, getVcr, "mrc p14, 0, %0, c0, c7, 0")
+MAKE_INTR_SET_REG(1, setVcr, "mcr p14, 0, %0, c0, c7, 0", "memory")
+
+// Breakpoint Value Register 0-5
+MAKE_INTR_GET_REG(1, getBvr0, "mrc p14, 0, %0, c0, c0, 4")
+MAKE_INTR_SET_REG(1, setBvr0, "mcr p14, 0, %0, c0, c0, 4", "memory")
+MAKE_INTR_GET_REG(1, getBvr1, "mrc p14, 0, %0, c0, c1, 4")
+MAKE_INTR_SET_REG(1, setBvr1, "mcr p14, 0, %0, c0, c1, 4", "memory")
+MAKE_INTR_GET_REG(1, getBvr2, "mrc p14, 0, %0, c0, c2, 4")
+MAKE_INTR_SET_REG(1, setBvr2, "mcr p14, 0, %0, c0, c2, 4", "memory")
+MAKE_INTR_GET_REG(1, getBvr3, "mrc p14, 0, %0, c0, c3, 4")
+MAKE_INTR_SET_REG(1, setBvr3, "mcr p14, 0, %0, c0, c3, 4", "memory")
+MAKE_INTR_GET_REG(1, getBvr4, "mrc p14, 0, %0, c0, c4, 4")
+MAKE_INTR_SET_REG(1, setBvr4, "mcr p14, 0, %0, c0, c4, 4", "memory")
+MAKE_INTR_GET_REG(1, getBvr5, "mrc p14, 0, %0, c0, c5, 4")
+MAKE_INTR_SET_REG(1, setBvr5, "mcr p14, 0, %0, c0, c5, 4", "memory")
+
+// Breakpoint Control Register 0-5
+MAKE_INTR_GET_REG(1, getBcr0, "mrc p14, 0, %0, c0, c0, 5")
+MAKE_INTR_SET_REG(1, setBcr0, "mcr p14, 0, %0, c0, c0, 5", "memory")
+MAKE_INTR_GET_REG(1, getBcr1, "mrc p14, 0, %0, c0, c1, 5")
+MAKE_INTR_SET_REG(1, setBcr1, "mcr p14, 0, %0, c0, c1, 5", "memory")
+MAKE_INTR_GET_REG(1, getBcr2, "mrc p14, 0, %0, c0, c2, 5")
+MAKE_INTR_SET_REG(1, setBcr2, "mcr p14, 0, %0, c0, c2, 5", "memory")
+MAKE_INTR_GET_REG(1, getBcr3, "mrc p14, 0, %0, c0, c3, 5")
+MAKE_INTR_SET_REG(1, setBcr3, "mcr p14, 0, %0, c0, c3, 5", "memory")
+MAKE_INTR_GET_REG(1, getBcr4, "mrc p14, 0, %0, c0, c4, 5")
+MAKE_INTR_SET_REG(1, setBcr4, "mcr p14, 0, %0, c0, c4, 5", "memory")
+MAKE_INTR_GET_REG(1, getBcr5, "mrc p14, 0, %0, c0, c5, 5")
+MAKE_INTR_SET_REG(1, setBcr5, "mcr p14, 0, %0, c0, c5, 5", "memory")
+
+// Watchpoint Value Register 0-1
+MAKE_INTR_GET_REG(1, getWvr0, "mrc p14, 0, %0, c0, c0, 6")
+MAKE_INTR_SET_REG(1, setWvr0, "mcr p14, 0, %0, c0, c0, 6", "memory")
+MAKE_INTR_GET_REG(1, getWvr1, "mrc p14, 0, %0, c0, c1, 6")
+MAKE_INTR_SET_REG(1, setWvr1, "mcr p14, 0, %0, c0, c1, 6", "memory")
+
+// Watchpoint Control Register 0-1
+MAKE_INTR_GET_REG(1, getWcr0, "mrc p14, 0, %0, c0, c0, 7")
+MAKE_INTR_SET_REG(1, setWcr0, "mcr p14, 0, %0, c0, c0, 7", "memory")
+MAKE_INTR_GET_REG(1, getWcr1, "mrc p14, 0, %0, c0, c1, 7")
+MAKE_INTR_SET_REG(1, setWcr1, "mcr p14, 0, %0, c0, c1, 7", "memory")
+
 ALWAYS_INLINE u32 __getCpuId(void)
 {
 	u32 cpuId;
@@ -223,6 +276,22 @@ MAKE_INTR_SET_REG(1, setTtbcr, "mcr p15, 0, %0, c2, c0, 2", "memory")
 // Domain Access Control Register
 MAKE_INTR_GET_REG(1, getDacr, "mrc p15, 0, %0, c3, c0, 0")
 MAKE_INTR_SET_REG(1, setDacr, "mcr p15, 0, %0, c3, c0, 0", "memory")
+
+// Data Fault Status Register
+MAKE_INTR_GET_REG(1, getDfsr, "mrc p15, 0, %0, c5, c0, 0")
+MAKE_INTR_SET_REG(1, setDfsr, "mcr p15, 0, %0, c5, c0, 0", "memory")
+
+// Instruction Fault Status Register
+MAKE_INTR_GET_REG(1, getIfsr, "mrc p15, 0, %0, c5, c0, 1")
+MAKE_INTR_SET_REG(1, setIfsr, "mcr p15, 0, %0, c5, c0, 1", "memory")
+
+// Fault Address Register
+MAKE_INTR_GET_REG(1, getFar, "mrc p15, 0, %0, c6, c0, 0")
+MAKE_INTR_SET_REG(1, setFar, "mcr p15, 0, %0, c6, c0, 0", "memory")
+
+// Watchpoint Fault Address Register
+MAKE_INTR_GET_REG(1, getWfar, "mrc p15, 0, %0, c6, c0, 1")
+MAKE_INTR_SET_REG(1, setWfar, "mcr p15, 0, %0, c6, c0, 1", "memory")
 
 // Flush Prefetch Buffer
 // Data Synchronization Barrier

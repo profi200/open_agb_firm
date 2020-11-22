@@ -42,7 +42,7 @@ typedef struct
 
 
 
-KRes switchContext(KRes res, void *oldSp, uintptr_t newSp);
+KRes switchContext(KRes res, uintptr_t *oldSp, uintptr_t newSp);
 
 #ifdef __cplusplus
 }

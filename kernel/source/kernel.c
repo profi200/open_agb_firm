@@ -195,6 +195,10 @@ bool waitQueueWakeN(ListNode *waitQueue, u32 wakeCount, KRes res, bool reschedul
 
 static KRes scheduler(TaskState curTaskState)
 {
+#ifndef NDEBUG
+	if((__getCpsr() & PSR_MODE_MASK) != PSR_SYS_MODE) panic();
+#endif
+
 	TaskCb *const curDeadTask = g_curDeadTask;
 	// TODO: Get rid of this and find a better way.
 	if(UNLIKELY(curDeadTask != NULL))

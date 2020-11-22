@@ -64,7 +64,7 @@ typedef enum
 	IPC_CMD9_BACKUP_GBA_SAVE   = MAKE_CMD9(0, 0, 0),
 
 	// Miscellaneous API.
-	IPC_CMD9_PREPARE_POWER     = MAKE_CMD9(0, 0, 0)
+	IPC_CMD9_PREPARE_POWER     = MAKE_CMD9(0, 0, 0)  // Also used for panic() and guruMeditation().
 } IpcCmd9;
 
 enum {_CMD11_C_BASE = __COUNTER__ + 1}; // Start at 0.
