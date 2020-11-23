@@ -20,7 +20,7 @@ END_ASM_FUNC
 @ Must be located at 0x3007E00.
 BEGIN_ASM_FUNC _a7_stub_start
 	adr r1, _a7_stub_thumb + 1  @ 0x3007E1D
-	msr CPSR_fsxc, #PSR_INT_OFF | PSR_SVC_MODE
+	msr CPSR_fsxc, #PSR_INT_OFF | PSR_SVC_MODE  @ Already set on reset.
 	add sp, r1, #0x6B  @ 0x3007E88
 	msr CPSR_fsxc, #PSR_INT_OFF | PSR_SYS_MODE
 	add sp, r1, #0x5B  @ 0x3007E78
