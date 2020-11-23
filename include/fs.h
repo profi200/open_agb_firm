@@ -20,11 +20,7 @@
 
 #include "types.h"
 #include "error_codes.h"
-#ifdef ARM11
-#include "../thirdparty/fatfs/ff.h"
-#else
 #include "fatfs/ff.h"
-#endif // ifdef ARM11
 
 
 #define FS_MAX_DRIVES   (FF_VOLUMES)

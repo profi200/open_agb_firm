@@ -34,6 +34,7 @@
 #include "hardware/gfx.h"
 #include "fs.h"
 #include "fsutil.h"
+#include "inih/ini.h"
 #include "arm11/filebrowser.h"
 #include "arm.h"
 #include "arm11/hardware/lcd.h"
@@ -42,7 +43,29 @@
 #include "kevent.h"
 
 
-#define OAF_WORK_DIR  "sdmc:/3ds/open_agb_firm"
+#define OAF_WORK_DIR    "sdmc:/3ds/open_agb_firm"
+#define INI_BUF_SIZE    (1024u)
+#define DEFAULT_CONFIG  "[general]\n"      \
+                        "backlight=32\n"   \
+                        "biosIntro=true\n"
+
+
+typedef struct
+{
+	// [general]
+	u8 backlight; // Both LCDs.
+	bool biosIntro;
+
+	// [video]
+	// TODO
+
+	// [audio]
+	// Maybe?
+
+	// [input]
+	// TODO
+} OafConfig;
+static OafConfig g_oafConfig = {32, true};
 
 
 
@@ -495,6 +518,54 @@ static void debugTests(void)
 }
 #endif
 
+static int confIniCallback(void* user, const char* section, const char* name, const char* value)
+{
+	OafConfig *const config = (OafConfig*)user;
+
+	if(strcmp(section, "general") == 0)
+	{
+		if(strcmp(name, "backlight") == 0)
+			config->backlight = (u8)strtoul(value, NULL, 10);
+		else if(strcmp(name, "biosIntro") == 0)
+			config->biosIntro = (strcmp(value, "true") == 0 ? true : false);
+	}
+	/*else if(strcmp(section, "video") == 0)
+	{
+	}
+	else if(strcmp(section, "audio") == 0)
+	{
+	}
+	else if(strcmp(section, "input") == 0)
+	{
+	}*/
+	else return 0; // Error.
+
+	return 1; // 1 is no error? Really?
+}
+
+static Result parseMainConfig(void)
+{
+	char *iniBuf = (char*)calloc(INI_BUF_SIZE, 1);
+	if(iniBuf == NULL) return RES_OUT_OF_MEM;
+
+	Result res = fsQuickRead(OAF_WORK_DIR "/config.ini", iniBuf, INI_BUF_SIZE - 1);
+	if(res == RES_OK) ini_parse_string(iniBuf, confIniCallback, &g_oafConfig);
+	else
+	{
+		const char *const defaultConfig = DEFAULT_CONFIG;
+		res = fsQuickWrite(OAF_WORK_DIR "/config.ini", defaultConfig, strlen(defaultConfig));
+	}
+
+	// Apply backlight brightness.
+	// TODO: Move this elsewhere.
+	const u8 backlight = g_oafConfig.backlight;
+	GFX_setBrightness(backlight, backlight);
+
+	free(iniBuf);
+
+	return res;
+}
+
 static Result handleFsStuff(char romPath[512])
 {
 	// Mount SD card.
@@ -508,6 +579,9 @@ static Result handleFsStuff(char romPath[512])
 			{
 				// Create working dir.
 				if((res = fsMakePath(OAF_WORK_DIR)) != RES_OK && res != RES_FR_EXIST) break;
+
+				// Parse config.
+				parseMainConfig();
 
 				// Get last ROM launch path.
 				if((res = fsQuickRead(OAF_WORK_DIR "/lastdir.bin", lastDir, 511)) != RES_OK)
@@ -553,7 +627,6 @@ static Result handleFsStuff(char romPath[512])
 int main(void)
 {
 	GFX_init(GFX_BGR8, GFX_RGB565);
-	GFX_setBrightness(DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS);
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
 
@@ -575,7 +648,7 @@ int main(void)
 	const u16 saveType = saveDbDebug(romPath, romSize);*/
 
 	// Prepare ARM9 for GBA mode + settings and save loading.
-	if((res = LGY_prepareGbaMode(false, saveType, romPath)) == RES_OK)
+	if((res = LGY_prepareGbaMode(g_oafConfig.biosIntro, saveType, romPath)) == RES_OK)
 	{
 #ifdef NDEBUG
 		GFX_setForceBlack(false, true);
