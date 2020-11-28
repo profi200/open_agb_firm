@@ -45,9 +45,14 @@
 
 #define OAF_WORK_DIR    "sdmc:/3ds/open_agb_firm"
 #define INI_BUF_SIZE    (1024u)
-#define DEFAULT_CONFIG  "[general]\n"      \
-                        "backlight=32\n"   \
-                        "biosIntro=true\n"
+#define DEFAULT_CONFIG  "[general]\n"        \
+                        "backlight=40\n"     \
+                        "biosIntro=true\n\n" \
+                        "[video]\n"          \
+                        "inGamma=4.0\n"      \
+                        "outGamma=2.8\n"     \
+                        "contrast=1.0\n"     \
+                        "brightness=0.0\n"
 
 
 typedef struct
@@ -57,7 +62,10 @@ typedef struct
 	bool biosIntro;
 
 	// [video]
-	// TODO
+	float inGamma;
+	float outGamma;
+	float contrast;
+	float brightness;
 
 	// [audio]
 	// Maybe?
@@ -65,7 +73,15 @@ typedef struct
 	// [input]
 	// TODO
 } OafConfig;
-static OafConfig g_oafConfig = {32, true};
+static OafConfig g_oafConfig =
+{
+	40,
+	true,
+	4.0f,
+	2.8f,
+	1.0f,
+	0.0f
+};
 
 
 
@@ -400,20 +416,16 @@ end:
 
 static void adjustGammaTableForGba(void)
 {
-	const double inGamma = 4.0;
-	const double outGamma = 2.2;
-	//const double contrast = .74851331406341291833644689906823; // GBA
-	//const double brightness = .25148668593658708166355310093177; // GBA
-	const double contrast = 1.0; // No-op
-	const double brightness = 0.0; // No-op
-	//REG_LCD_PDC0_GTBL_IDX = 0;
+	const float inGamma = g_oafConfig.inGamma;
+	const float outGamma = g_oafConfig.outGamma;
+	const float contrast = g_oafConfig.contrast;
+	const float brightness = g_oafConfig.brightness;
 	for(u32 i = 0; i < 256; i++)
 	{
 		// Credits for this algo go to Extrems.
-		// Originally from Game Boy Interface Standard Edition for the Game Cube.
-		//const u32 x = (i & ~7u) | i>>5;
-		u32 res = pow(pow(contrast, inGamma) * pow((double)i / 255.0f + brightness / contrast, inGamma),
-		              1.0 / outGamma) * 255.0f;
+		// Originally from Game Boy Interface Standard Edition for the GameCube.
+		u32 res = powf(powf(contrast, inGamma) * powf((float)i / 255.0f + brightness / contrast, inGamma),
+		              1.0f / outGamma) * 255.0f;
 		if(res > 255) res = 255;
 
 		// Same adjustment for red/green/blue.
@@ -529,10 +541,18 @@ static int confIniCallback(void* user, const char* section, const char* name, co
 		else if(strcmp(name, "biosIntro") == 0)
 			config->biosIntro = (strcmp(value, "true") == 0 ? true : false);
 	}
-	/*else if(strcmp(section, "video") == 0)
+	else if(strcmp(section, "video") == 0)
 	{
+		if(strcmp(name, "inGamma") == 0)
+			config->inGamma = str2float(value);
+		else if(strcmp(name, "outGamma") == 0)
+			config->outGamma = str2float(value);
+		else if(strcmp(name, "contrast") == 0)
+			config->contrast = str2float(value);
+		else if(strcmp(name, "brightness") == 0)
+			config->brightness = str2float(value);
 	}
-	else if(strcmp(section, "audio") == 0)
+	/*else if(strcmp(section, "audio") == 0)
 	{
 	}
 	else if(strcmp(section, "input") == 0)
