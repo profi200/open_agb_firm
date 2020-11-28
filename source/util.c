@@ -51,6 +51,35 @@ size_t safeStrcpy(char *const dst, const char *const src, size_t num)
 	return len;
 }
 
+// Limited to 6 after-decimal places.
+// Based on: https://codereview.stackexchange.com/a/158724
+float str2float(const char *str)
+{
+	for(; isspace((unsigned char)*str) != 0; str++); // Skip whitespaces.
+
+	const float sign = (*str == '-' ? -1.f : 1.f);
+	if(*str == '-' || *str == '+') str++;
+
+	float val = 0.f;
+	while(isdigit((unsigned char)*str) != 0)
+	{
+		val = val * 10.f + (*str - '0');
+		str++;
+	}
+
+	if(*str == '.') str++;
+
+	u32 place = 1;
+	while(isdigit((unsigned char)*str) != 0)
+	{
+		val = val * 10.f + (*str - '0');
+		place *= 10;
+		str++;
+	}
+
+	return val * sign / place;
+}
+
 // case insensitive string compare function
 int strnicmp(const char *str1, const char *str2, u32 len)
 {

@@ -47,6 +47,16 @@ NAKED void wait_cycles(u32 cycles);
  */
 size_t safeStrcpy(char *const dst, const char *const src, size_t num);
 
+/**
+ * @brief      Basic string to float conversion.
+ *             Limited to 6 after-decimal digits.
+ *
+ * @param[in]  str   The string.
+ *
+ * @return     The floatingpoint number represented by str.
+ */
+float str2float(const char *str);
+
 // case insensitive string compare function
 int strnicmp(const char *str1, const char *str2, u32 len);
 
