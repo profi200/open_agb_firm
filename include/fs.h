@@ -51,6 +51,7 @@ u32    fTell(FHandle h);
 u32    fSize(FHandle h);
 Result fClose(FHandle h);
 Result fStat(const char *const path, FILINFO *const fi);
+Result fChdir(const char *const path);
 Result fOpenDir(DHandle *const hOut, const char *const path);
 Result fReadDir(DHandle h, FILINFO *const fi, u32 num, u32 *const entriesRead);
 Result fCloseDir(DHandle h);

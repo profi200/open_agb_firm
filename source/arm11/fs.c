@@ -127,6 +127,15 @@ Result fStat(const char *const path, FILINFO *const fi)
 	return PXI_sendCmd(IPC_CMD9_FSTAT, cmdBuf, 4);
 }
 
+Result fChdir(const char *const path)
+{
+	u32 cmdBuf[2];
+	cmdBuf[0] = (u32)path;
+	cmdBuf[1] = strlen(path) + 1;
+
+	return PXI_sendCmd(IPC_CMD9_FCHDIR, cmdBuf, 2);
+}
+
 Result fOpenDir(DHandle *const hOut, const char *const path)
 {
 	u32 cmdBuf[4];
