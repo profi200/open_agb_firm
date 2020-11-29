@@ -50,6 +50,7 @@ typedef enum
 	IPC_CMD9_FSIZE             = MAKE_CMD9(0, 0, 1),
 	IPC_CMD9_FCLOSE            = MAKE_CMD9(0, 0, 1),
 	IPC_CMD9_FSTAT             = MAKE_CMD9(1, 1, 0),
+	IPC_CMD9_FCHDIR            = MAKE_CMD9(1, 0, 0),
 	IPC_CMD9_FOPEN_DIR         = MAKE_CMD9(1, 1, 0),
 	IPC_CMD9_FREAD_DIR         = MAKE_CMD9(0, 2, 2),
 	IPC_CMD9_FCLOSE_DIR        = MAKE_CMD9(0, 0, 1),

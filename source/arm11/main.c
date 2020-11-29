@@ -157,7 +157,7 @@ static Result searchGameDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
 
 	Result res;
 	FHandle f;
-	if((res = fOpen(&f, OAF_WORK_DIR "/gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	if((res = fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
 	{
 		s32 l = 0;
 		s32 r = fSize(f) / sizeof(GameDbEntry) - 1; // TODO: Check for 0!
@@ -391,7 +391,7 @@ static u16 saveDbDebug(const char *const savePath, u32 romSize)
 		{
 			dbEntry.attr = saveType;
 			FHandle f;
-			if(fOpen(&f, OAF_WORK_DIR "/gba_db.bin", FA_OPEN_EXISTING | FA_WRITE) == RES_OK)
+			if(fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_WRITE) == RES_OK)
 			{
 				fLseek(f, (sizeof(GameDbEntry) * dbPos) + offsetof(GameDbEntry, attr));
 				fWrite(f, &dbEntry.attr, sizeof(dbEntry.attr), NULL);
@@ -456,7 +456,7 @@ static Result dumpFrameTex(void)
 
 	memcpy((void*)0x18400000, bmpHeader, sizeof(bmpHeader));
 
-	return fsQuickWrite("sdmc:/texture_dump.bmp", (void*)0x18400000, 0x40 + 512 * 512 * 3);
+	return fsQuickWrite("texture_dump.bmp", (void*)0x18400000, 0x40 + 512 * 512 * 3);
 }
 
 static void gbaGfxHandler(void *args)
@@ -568,12 +568,12 @@ static Result parseMainConfig(void)
 	char *iniBuf = (char*)calloc(INI_BUF_SIZE, 1);
 	if(iniBuf == NULL) return RES_OUT_OF_MEM;
 
-	Result res = fsQuickRead(OAF_WORK_DIR "/config.ini", iniBuf, INI_BUF_SIZE - 1);
+	Result res = fsQuickRead("config.ini", iniBuf, INI_BUF_SIZE - 1);
 	if(res == RES_OK) ini_parse_string(iniBuf, confIniCallback, &g_oafConfig);
 	else
 	{
 		const char *const defaultConfig = DEFAULT_CONFIG;
-		res = fsQuickWrite(OAF_WORK_DIR "/config.ini", defaultConfig, strlen(defaultConfig));
+		res = fsQuickWrite("config.ini", defaultConfig, strlen(defaultConfig));
 	}
 
 	// Apply backlight brightness.
@@ -597,14 +597,15 @@ static Result handleFsStuff(char romPath[512])
 		{
 			do
 			{
-				// Create working dir.
+				// Create the work dir and switch to it.
 				if((res = fsMakePath(OAF_WORK_DIR)) != RES_OK && res != RES_FR_EXIST) break;
+				if((res = fChdir(OAF_WORK_DIR)) != RES_OK) break;
 
 				// Parse config.
 				parseMainConfig();
 
 				// Get last ROM launch path.
-				if((res = fsQuickRead(OAF_WORK_DIR "/lastdir.bin", lastDir, 511)) != RES_OK)
+				if((res = fsQuickRead("lastdir.bin", lastDir, 511)) != RES_OK)
 				{
 					if(res == RES_FR_NO_FILE) strcpy(lastDir, "sdmc:/");
 					else                      break;
@@ -631,7 +632,7 @@ static Result handleFsStuff(char romPath[512])
 					{
 						strncpy(lastDir, romPath, cmpLen);
 						lastDir[cmpLen] = '\0';
-						res = fsQuickWrite(OAF_WORK_DIR "/lastdir.bin", lastDir, cmpLen + 1);
+						res = fsQuickWrite("lastdir.bin", lastDir, cmpLen + 1);
 					}
 				}
 			} while(0);

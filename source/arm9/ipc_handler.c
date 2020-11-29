@@ -73,6 +73,9 @@ u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, const u32 *const buf)
 		case IPC_CMD_ID_MASK(IPC_CMD9_FSTAT):
 			result = fStat((const char *const)buf[0], (FILINFO *const)buf[2]);
 			break;
+		case IPC_CMD_ID_MASK(IPC_CMD9_FCHDIR):
+			result = fChdir((const char *const)buf[0]);
+			break;
 		case IPC_CMD_ID_MASK(IPC_CMD9_FOPEN_DIR):
 			result = fOpenDir((DHandle *const)buf[2], (const char *const)buf[0]);
 			break;

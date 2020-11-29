@@ -197,6 +197,11 @@ Result fStat(const char *const path, FILINFO *const fi)
 	return fres2Res(f_stat(path, fi));
 }
 
+Result fChdir(const char *const path)
+{
+	return fres2Res(f_chdir(path));
+}
+
 Result fOpenDir(DHandle *const hOut, const char *const path)
 {
 	if(hOut == NULL) return RES_INVALID_ARG;
