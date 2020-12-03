@@ -48,8 +48,8 @@ NAKED void wait_cycles(u32 cycles);
 size_t safeStrcpy(char *const dst, const char *const src, size_t num);
 
 /**
- * @brief      Basic string to float conversion.
- *             Limited to 6 after-decimal digits.
+ * @brief      Basic string to float conversion. Limited to 6 decimal places.
+ *             Doesn't support exponents.
  *
  * @param[in]  str   The string.
  *

@@ -46,12 +46,12 @@ size_t safeStrcpy(char *const dst, const char *const src, size_t num)
 		return 1;
 	}
 
-	strcpy(dst, src);
+	memcpy(dst, src, len);
 
 	return len;
 }
 
-// Limited to 6 after-decimal places.
+// Limited to 6 decimal places. Doesn't support exponents.
 // Based on: https://codereview.stackexchange.com/a/158724
 float str2float(const char *str)
 {
