@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include "fsutil.h"
 #include "fs.h"
@@ -53,17 +54,24 @@ Result fsQuickWrite(const char *const path, const void *const buf, u32 size)
 
 Result fsMakePath(const char *const path)
 {
-	char tmpPath[512];
+	Result res = fMkdir(path);
+	if(res != RES_FR_NO_PATH) return res;
+
+	char *tmpPath = (char*)malloc(512);
+	if(tmpPath == NULL) return RES_OUT_OF_MEM;
 	safeStrcpy(tmpPath, path, 512);
 
 	char *str;
 	if((str = strchr(tmpPath, ':')) == NULL) str = tmpPath;
 	else                                     str++;
 
-	// Path without any dir.
-	if(*str == '\0') return RES_INVALID_ARG;
+	// Empty path.
+	if(*str == '\0')
+	{
+		free(tmpPath);
+		return RES_INVALID_ARG;
+	}
 
-	Result res = RES_OK;
 	while((str = strchr(str + 1, '/')) != NULL)
 	{
 		*str = '\0';
@@ -74,6 +82,8 @@ Result fsMakePath(const char *const path)
 	// Only create the last dir in the path if the
 	// previous error code is not an unexpected one.
 	if(res == RES_OK || res == RES_FR_EXIST) res = fMkdir(tmpPath);
+
+	free(tmpPath);
 
 	return res;
 }

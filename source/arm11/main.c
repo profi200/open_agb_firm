@@ -49,8 +49,8 @@
                         "backlight=40\n"     \
                         "biosIntro=true\n\n" \
                         "[video]\n"          \
-                        "inGamma=4.0\n"      \
-                        "outGamma=2.8\n"     \
+                        "inGamma=2.2\n"      \
+                        "outGamma=1.54\n"    \
                         "contrast=1.0\n"     \
                         "brightness=0.0\n"
 
@@ -77,10 +77,10 @@ static OafConfig g_oafConfig =
 {
 	40,
 	true,
-	4.0f,
-	2.8f,
-	1.0f,
-	0.0f
+	2.2f,
+	1.54f,
+	1.f,
+	0.f
 };
 
 
@@ -578,6 +578,7 @@ static Result parseMainConfig(void)
 
 	// Apply backlight brightness.
 	// TODO: Move this elsewhere.
+	// FIXME: If any error happens before this point it will be invisible.
 	const u8 backlight = g_oafConfig.backlight;
 	GFX_setBrightness(backlight, backlight);
 
