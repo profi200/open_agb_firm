@@ -30,7 +30,7 @@
 
 
 
-noreturn void panic()
+NOINLINE NOINLINE noreturn void panic(void)
 {
 	enterCriticalSection();
 	//fsDeinit();
@@ -44,7 +44,7 @@ noreturn void panic()
 	}
 }
 
-noreturn void panicMsg(UNUSED const char *msg)
+NOINLINE noreturn void panicMsg(UNUSED const char *msg)
 {
 	enterCriticalSection();
 	//fsDeinit();
@@ -60,7 +60,7 @@ noreturn void panicMsg(UNUSED const char *msg)
 
 // Expects the registers in the exception stack to be in the following order:
 // r0-r14, pc (unmodified), cpsr
-noreturn void guruMeditation(UNUSED u8 type, UNUSED const u32 *excStack)
+NOINLINE noreturn void guruMeditation(UNUSED u8 type, UNUSED const u32 *excStack)
 {
 	// avoid fs corruptions
 	//fsDeinit();

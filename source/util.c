@@ -29,7 +29,7 @@ NAKED void wait_cycles(u32 cycles)
 	__asm__("1: subs %0, %0, #4\n\t"
 #elif ARM11
 	__asm__("1: subs %0, %0, #2\n\t"
-	        "nop\n\t"
+	        "yield\n\t"
 #endif
 	        "bhi 1b\n\t"
 	        "bx lr\n\t" : : "r" (cycles) : "cc");

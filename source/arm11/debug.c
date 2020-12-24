@@ -32,7 +32,7 @@
 
 
 
-noreturn void panic(void)
+NOINLINE noreturn void panic(void)
 {
 	enterCriticalSection();
 
@@ -48,7 +48,7 @@ noreturn void panic(void)
 	while(1) __wfi();
 }
 
-noreturn void panicMsg(const char *msg)
+NOINLINE noreturn void panicMsg(const char *msg)
 {
 	enterCriticalSection();
 
@@ -67,7 +67,7 @@ noreturn void panicMsg(const char *msg)
 
 // Expects the registers in the exception stack to be in the following order:
 // r0-r14, pc (unmodified), CPSR, DFSR, IFSR, FAR, WFAR
-noreturn void guruMeditation(u8 type, const u32 *excStack)
+NOINLINE noreturn void guruMeditation(u8 type, const u32 *excStack)
 {
 	const char *const typeStr[3] = {"Undefined instruction", "Prefetch abort", "Data abort"};
 	u32 realPc, instSize = 4;
