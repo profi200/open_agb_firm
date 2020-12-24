@@ -535,11 +535,11 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	return 1; // 1 is no error? Really?
 }
 
-static int gameConfIniHandler(void* user, const char* section, const char* name, const char* value)
+/*static int gameConfIniHandler(void* user, const char* section, const char* name, const char* value)
 {
-	//OafGameConfig *const config = (OafGameConfig*)user;
+	OafGameConfig *const config = (OafGameConfig*)user;
 
-	/*if(strcmp(section, "game") == 0)
+	if(strcmp(section, "game") == 0)
 	{
 		// Save type.
 		// Save slot.
@@ -561,18 +561,18 @@ static int gameConfIniHandler(void* user, const char* section, const char* name,
 	else if(strcmp(section, "input") == 0)
 	{
 	}
-	else return 0;*/ // Error.
+	else return 0; // Error.
 
 	return 1; // 1 is no error? Really?
-}
+}*/
 
-static Result parseConfig(const char *const path, u8 confType, void *config)
+static Result parseConfig(const char *const path, /* u8 confType, */ void *config)
 {
 	char *iniBuf = (char*)calloc(INI_BUF_SIZE, 1);
 	if(iniBuf == NULL) return RES_OUT_OF_MEM;
 
 	Result res = fsQuickRead(path, iniBuf, INI_BUF_SIZE - 1);
-	if(res == RES_OK) ini_parse_string(iniBuf, (confType == 0 ? confIniHandler : gameConfIniHandler), config);
+	if(res == RES_OK) ini_parse_string(iniBuf, /* (confType == 0 ? */ confIniHandler /* : gameConfIniHandler) */, config);
 	else
 	{
 		const char *const defaultConfig = DEFAULT_CONFIG;
@@ -597,7 +597,7 @@ static Result handleFsStuff(char romAndSavePath[512])
 			if((res = fChdir(OAF_WORK_DIR)) != RES_OK) break;
 
 			// Parse config.
-			parseConfig("config.ini", 0, &g_oafConfig);
+			parseConfig("config.ini", /* 0, */ &g_oafConfig);
 			{ // TODO: Move this elsewhere?
 				const u8 backlight = g_oafConfig.backlight;
 				GFX_setBrightness(backlight, backlight);
