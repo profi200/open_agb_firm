@@ -61,4 +61,5 @@ release: clean
 	firm_builder $(TARGET).firm $(ENTRY9) $(ENTRY11) $(SECTION0_ADR) $(SECTION0_TYPE) \
 		$(SECTION0_FILE) $(SECTION1_ADR) $(SECTION1_TYPE) $(SECTION1_FILE)
 	@7z a -mx -m0=ARM -m1=LZMA $(TARGET)$(VERS_STRING).7z $(TARGET).firm
-	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z LICENSE.txt README.md
+	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z LICENSE.txt thirdparty/fatfs/LICENSE.txt thirdparty/inih/LICENSE.txt README.md
+	@7z rn $(TARGET)$(VERS_STRING).7z thirdparty/fatfs/LICENSE.txt LICENSE_fatfs.txt thirdparty/inih/LICENSE.txt LICENSE_inih.txt
