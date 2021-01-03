@@ -58,6 +58,7 @@ typedef struct
 	// [general]
 	u8 backlight; // Both LCDs.
 	bool biosIntro;
+	// Setting to separate save and config files from the ROMs?
 
 	// [video]
 	float inGamma;
@@ -496,7 +497,7 @@ static void gbaGfxHandler(void *args)
 		GFX_waitForPPF();
 		GFX_swapFramebufs();
 
-		if(hidKeysDown() & KEY_Y) dumpFrameTex();
+		if(hidKeysDown() & (KEY_Y | KEY_SELECT)) dumpFrameTex();
 	}
 
 	taskExit();
