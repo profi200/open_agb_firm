@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- * This code is part of ctrulib (https://github.com/smealum/ctrulib)
+ * This code is part of libctru (https://github.com/devkitPro/libctru)
  */
 
 /**

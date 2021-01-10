@@ -1,4 +1,4 @@
-// From https://github.com/smealum/ctrulib/blob/master/libctru/include/3ds/gpu/registers.h
+// From https://github.com/devkitPro/libctru/blob/master/libctru/include/3ds/gpu/registers.h
 
 /**
  * @file registers.h

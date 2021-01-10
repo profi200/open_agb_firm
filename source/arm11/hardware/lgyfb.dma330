@@ -9,9 +9,10 @@ FLUSHP 14
 
 
 # Loop until the entire frame has been transferred.
-LPFE
-	# Wait for single or burst requests.
-	WFP 14, periph
+#LP 20 # For height 160.
+LP 30 # For height 240.
+	# Wait for a burst request.
+	WFP 14, burst
 
 	# Transfer 8 scanlines.
 	# For width 240:
@@ -23,19 +24,19 @@ LPFE
 	#LP 44 # RGB5551 & RGB565, 128 bytes burst
 	LP 71 # RGB8, 120 bytes burst
 	#LP 89 # RGBA8, 128 bytes burst
-		LDB
-		STB
-	LPENDB
-	LDPB 14
-	STB
+		LD
+		ST
+	LPEND
+	LDPB 14 # This must always be conditional on bursts. No idea why. Assembler bug?
+	ST
 
 	# Skip gaps swizzle edition™.
-	# For width 240:
+	# For width 240 with 256x256 texture:
 	#ADDH DAR, 0x100 # RGB5551 & RGB565
 	#ADDH DAR, 0x180 # RGB8
 	#ADDH DAR, 0x200 # RGBA8
 
-	#For width 360:
+	#For width 360 with 512x512 texture:
 	#ADDH DAR, 0x980 # RGB5551 & RGB565
 	ADDH DAR, 0xE40 # RGB8
 	#ADDH DAR, 0x1300 # RGBA8

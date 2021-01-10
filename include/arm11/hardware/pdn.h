@@ -1,8 +1,8 @@
 #pragma once
 
 /*
- *   This file is part of fastboot 3DS
- *   Copyright (C) 2020 derrek, profi200
+ *   This file is part of open_agb_firm
+ *   Copyright (C) 2021 derrek, profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by

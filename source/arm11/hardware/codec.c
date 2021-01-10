@@ -1,6 +1,6 @@
 /*
- *   This file is part of fastboot 3DS
- *   Copyright (C) 2019 Sergi Granell (xerpi), Paul LaMendola (paulguy), derrek, profi200
+ *   This file is part of open_agb_firm
+ *   Copyright (C) 2021 Sergi Granell (xerpi), Paul LaMendola (paulguy), derrek, profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
