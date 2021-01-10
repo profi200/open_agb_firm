@@ -133,6 +133,7 @@ void LGYFB_init(KEvent *frameReadyEvent)
 	/*
 	 * Limitations:
 	 * First pattern bit must be 1 and last 0 (for V-scale) or it loses sync with the DS/GBA input.
+	 * Vertical scaling is fucked with identity matrix.
 	 *
 	 * Matrix ranges:
 	 * in[-3] -1024-1023 (0xFC00-0x03FF)
@@ -170,7 +171,16 @@ void LGYFB_init(KEvent *frameReadyEvent)
 		0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,
 		     0,      0,      0,      0,      0,      0,
 		     0,      0,      0,      0,      0,      0
+
+		// Identity (no scaling). Don't use for vertical scaling!
+		/*     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		0x4000, 0x4000, 0x4000, 0x4000, 0x4000, 0x4000,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0*/
 	};
+	//setScaleMatrixTop(6, 0b00111111, scaleMatrix); // Identity.
 	setScaleMatrixTop(6, 0b00011011, scaleMatrix);
 
 	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.

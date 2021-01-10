@@ -1,6 +1,6 @@
 /*
- *   This file is part of fastboot 3DS
- *   Copyright (C) 2017 derrek, profi200
+ *   This file is part of open_agb_firm
+ *   Copyright (C) 2021 derrek, profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -429,8 +429,7 @@ static void adjustGammaTableForGba(void)
 		// Credits for this algo go to Extrems.
 		// Originally from Game Boy Interface Standard Edition for the GameCube.
 		u32 res = powf(powf(contrast, inGamma) * powf((float)i / 255.0f + brightness / contrast, inGamma),
-		              1.0f / outGamma) * 255.0f;
-		if(res > 255) res = 255;
+		               1.0f / outGamma) * 255.0f;
 
 		// Same adjustment for red/green/blue.
 		REG_LCD_PDC0_GTBL_FIFO = res<<16 | res<<8 | res;
@@ -497,7 +496,7 @@ static void gbaGfxHandler(void *args)
 		GFX_waitForPPF();
 		GFX_swapFramebufs();
 
-		if(hidKeysDown() & (KEY_Y | KEY_SELECT)) dumpFrameTex();
+		if(hidKeysDown() == (KEY_Y | KEY_SELECT)) dumpFrameTex();
 	}
 
 	taskExit();
