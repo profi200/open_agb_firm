@@ -95,12 +95,10 @@ static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 	signalEvent(g_frameReadyEvent, false);
 }
 
-static void setScaleMatrixTop(u32 len, u32 patt, const s16 *const matrix)
+static void setScaleMatrix(vu32 *const regs, u8 colorAdjust, u32 len, u32 patt, const s16 *const matrix)
 {
-	REG_LGYFB_TOP_V_LEN = len - 1;
-	REG_LGYFB_TOP_V_PATT = patt;
-	REG_LGYFB_TOP_H_LEN = len - 1;
-	REG_LGYFB_TOP_H_PATT = patt;
+	regs[0] = len - 1; // Reg *_LEN
+	regs[1] = patt;    // Reg *_PATT
 
 	for(u32 y = 0; y < 6; y++)
 	{
@@ -112,8 +110,7 @@ static void setScaleMatrixTop(u32 len, u32 patt, const s16 *const matrix)
 			// For example when converting RGB555 to RGB8 LgyFb lazily shifts the 5 bits up
 			// so 0b00011111 becomes 0b11111000. This creates wrong spacing between colors.
 			// TODO: What is the "+ 8" good for?
-			REG_LGYFB_TOP_V_MATRIX[y][x] = tmp * 0xFF / 0xF8 + 8;
-			REG_LGYFB_TOP_H_MATRIX[y][x] = tmp + 8;
+			regs[16 + (8 * y + x)] = (colorAdjust != 0 ? tmp * 0xFF / colorAdjust + 8 : tmp + 8); // Reg *_MATRIX/*_ARRAY0
 		}
 	}
 }
@@ -180,8 +177,11 @@ void LGYFB_init(KEvent *frameReadyEvent)
 		     0,      0,      0,      0,      0,      0,
 		     0,      0,      0,      0,      0,      0*/
 	};
-	//setScaleMatrixTop(6, 0b00111111, scaleMatrix); // Identity.
-	setScaleMatrixTop(6, 0b00011011, scaleMatrix);
+	// Identity.
+	//setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 0xF8, 6, 0b00111111, scaleMatrix);
+	// Other
+	setScaleMatrix(&REG_LGYFB_TOP_V_LEN, 0xF8, 6, 0b00011011, scaleMatrix);
+	setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 0x00, 6, 0b00011011, scaleMatrix);
 
 	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.
 	// The green bias exists on the whole range of green colors.
