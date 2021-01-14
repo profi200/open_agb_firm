@@ -24,7 +24,7 @@ SOURCES		:=	../kernel/source ../source ../source/hardware ../source/arm11 \
 DATA		:=
 INCLUDES	:=	../kernel/include ../include ../thirdparty
 DEFINES		:=	-DARM11 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
-				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
+				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR) -DOAF_SCALE_SELECT=2
 ASSETS		:=
 
 ifneq ($(strip $(NO_DEBUG)),)

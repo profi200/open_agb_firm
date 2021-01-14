@@ -5,7 +5,11 @@
 #include "arm11/hardware/interrupt.h"
 #include "hardware/corelink_dma-330.h"
 #include "arm11/hardware/lcd.h"
-#include "lgyfb_dma330.h"
+#if OAF_SCALE_SELECT < 2
+#include "lgyfb_240x160_dma330.h"
+#else
+#include "lgyfb_360x240_dma330.h"
+#endif
 #include "kevent.h"
 
 
@@ -121,14 +125,17 @@ void LGYFB_init(KEvent *frameReadyEvent)
 
 	g_frameReadyEvent = frameReadyEvent;
 
-	//REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(240u, 160u);
+#if OAF_SCALE_SELECT < 2
+	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(240u, 160u);
+#else
 	REG_LGYFB_TOP_SIZE  = LGYFB_SIZE(360u, 240u);
+#endif
 	REG_LGYFB_TOP_STAT  = LGYFB_IRQ_MASK;
 	REG_LGYFB_TOP_IRQ   = 0;
 	REG_LGYFB_TOP_ALPHA = 0xFF;
 
 	/*
-	 * Limitations:
+	 * Scale matrix limitations:
 	 * First pattern bit must be 1 and last 0 (for V-scale) or it loses sync with the DS/GBA input.
 	 * Vertical scaling is fucked with identity matrix.
 	 *
@@ -142,6 +149,21 @@ void LGYFB_init(KEvent *frameReadyEvent)
 	 *
 	 * Note: At scanline start the in FIFO is all filled with the first pixel.
 	 */
+#if OAF_SCALE_SELECT < 2
+	// Identity.
+	static const s16 scaleMatrix[6 * 6] =
+	{
+		// Identity (no scaling). Don't use for vertical scaling!
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0,
+		0x4000, 0x4000, 0x4000, 0x4000, 0x4000, 0x4000,
+		     0,      0,      0,      0,      0,      0,
+		     0,      0,      0,      0,      0,      0
+	};
+	setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 0xF8, 6, 0b00111111, scaleMatrix);
+#else
+	// Other
 	static const s16 scaleMatrix[6 * 6] =
 	{
 		// Original from AGB_FIRM.
@@ -168,20 +190,10 @@ void LGYFB_init(KEvent *frameReadyEvent)
 		0x4000, 0x4000, 0x2000, 0x4000, 0x4000, 0x2000,
 		     0,      0,      0,      0,      0,      0,
 		     0,      0,      0,      0,      0,      0
-
-		// Identity (no scaling). Don't use for vertical scaling!
-		/*     0,      0,      0,      0,      0,      0,
-		     0,      0,      0,      0,      0,      0,
-		     0,      0,      0,      0,      0,      0,
-		0x4000, 0x4000, 0x4000, 0x4000, 0x4000, 0x4000,
-		     0,      0,      0,      0,      0,      0,
-		     0,      0,      0,      0,      0,      0*/
 	};
-	// Identity.
-	//setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 0xF8, 6, 0b00111111, scaleMatrix);
-	// Other
 	setScaleMatrix(&REG_LGYFB_TOP_V_LEN, 0xF8, 6, 0b00011011, scaleMatrix);
 	setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 0x00, 6, 0b00011011, scaleMatrix);
+#endif
 
 	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.
 	// The green bias exists on the whole range of green colors.
@@ -190,8 +202,13 @@ void LGYFB_init(KEvent *frameReadyEvent)
 	// RGB8:    Observed best format. Invisible dithering and best color accuracy.
 	// RGB565:  A little visible dithering. Good color accuracy.
 	// RGB5551: Lots of visible dithering. Good color accuracy (a little worse than 565).
+#if OAF_SCALE_SELECT < 2
+	REG_LGYFB_TOP_CNT = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_8880 |
+	                    LGYFB_HSCALE_E | LGYFB_ENABLE;
+#else
 	REG_LGYFB_TOP_CNT = LGYFB_DMA_E | LGYFB_OUT_SWIZZLE | LGYFB_OUT_FMT_8880 |
 	                    LGYFB_HSCALE_E | LGYFB_VSCALE_E | LGYFB_ENABLE;
+#endif
 
 	IRQ_registerIsr(IRQ_CDMA_EVENT0, 13, 0, lgyFbDmaIrqHandler);
 }
