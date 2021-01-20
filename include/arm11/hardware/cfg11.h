@@ -22,6 +22,9 @@
 
 
 #define CFG11_REGS_BASE                (IO_MEM_ARM9_ARM11 + 0x40000)
+#define REGs_CFG11_SHAREDWRAM_32K_CODE  ((       vu8*)(CFG11_REGS_BASE + 0x000)) // 8 regs.
+#define REGs_CFG11_SHAREDWRAM_32K_DATA  ((       vu8*)(CFG11_REGS_BASE + 0x008)) // 8 regs.
+#define REG_CFG11_UNK100               *((      vu32*)(CFG11_REGS_BASE + 0x100))
 #define REG_CFG11_FIQ_MASK             *((       vu8*)(CFG11_REGS_BASE + 0x104))
 #define REG_CFG11_UNK105               *((       vu8*)(CFG11_REGS_BASE + 0x105)) // Debug related? Mask?
 #define REG_CFG11_UNK108               *((       vu8*)(CFG11_REGS_BASE + 0x108)) // LGY gamecard related?
@@ -75,6 +78,6 @@
 #define BOOTROM_OVERLAY_CNT_E   (1u)
 
 // REG_CFG11_SOCINFO
-#define SOCINFO_O3DS            (1u)    // Also set on New3DS.
-#define SOCINFO_N3DS_PROTO      (1u<<1) // Never saw the daylight?
-#define SOCINFO_N3DS            (1u<<2) // Set on New3DS.
+#define SOCINFO_CTR             (1u)    // Also set on New 3DS.
+#define SOCINFO_LGR1            (1u<<1) // Never saw the daylight? Set on retail N3DS (LGR2).
+#define SOCINFO_LGR2            (1u<<2) // Set on New 3DS.

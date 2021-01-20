@@ -26,6 +26,7 @@
 #define REG_PDN_CNT                  *((vu16*)(PDN_REGS_BASE + 0x000))
 #define REG_PDN_WAKE_ENABLE          *((vu32*)(PDN_REGS_BASE + 0x008))
 #define REG_PDN_WAKE_REASON          *((vu32*)(PDN_REGS_BASE + 0x00C)) // Write 1 to acknowledge and 0 to clear?
+// Some LGY regs are located inbetween. See lgy.h/c.
 #define REG_PDN_GPU_CNT              *((vu32*)(PDN_REGS_BASE + 0x200))
 #define REG_PDN_VRAM_CNT             *((vu8* )(PDN_REGS_BASE + 0x204)) // This reg doesn't seem to exist on retail hardware.
 #define REG_PDN_LCD_CNT              *((vu8* )(PDN_REGS_BASE + 0x208)) // This reg doesn't seem to exist on retail hardware.
@@ -33,10 +34,10 @@
 #define REG_PDN_I2S_CNT              *((vu8* )(PDN_REGS_BASE + 0x220))
 #define REG_PDN_CAM_CNT              *((vu8* )(PDN_REGS_BASE + 0x224))
 #define REG_PDN_DSP_CNT              *((vu8* )(PDN_REGS_BASE + 0x230))
-#define REG_PDN_G1_CNT               *((vu8* )(PDN_REGS_BASE + 0x240)) // Hantro G1 decoder.
-#define REG_PDN_MPCORE_SOCMODE       *((vu16*)(PDN_REGS_BASE + 0x300))
-#define REG_PDN_MPCORE_CNT           *((vu16*)(PDN_REGS_BASE + 0x304)) // Is this reg actually only vu8?
-#define REGs_PDN_MPCORE_BOOTCNT       ((vu8* )(PDN_REGS_BASE + 0x310))
+#define REG_PDN_G1_CNT               *((vu8* )(PDN_REGS_BASE + 0x240)) // Hantro G1 decoder aka MVD.
+#define REG_PDN_LGR_SOCMODE          *((vu16*)(PDN_REGS_BASE + 0x300))
+#define REG_PDN_LGR_CNT              *((vu16*)(PDN_REGS_BASE + 0x304)) // Is this reg actually only vu8?
+#define REGs_PDN_LGR_CPU_CNT          ((vu8* )(PDN_REGS_BASE + 0x310)) // 4 regs.
 
 
 // REG_PDN_CNT
@@ -63,15 +64,15 @@ enum
 // Note: The resets are active low.
 enum
 {
-	PDN_GPU_CNT_RST_REGS           = 1u,    // And more?
-	PDN_GPU_CNT_RST_PSC            = 1u<<1, // ?
-	PDN_GPU_CNT_RST_GEOSHADER      = 1u<<2, // ?
-	PDN_GPU_CNT_RST_RASTERIZER     = 1u<<3, // ?
-	PDN_GPU_CNT_RST_PPF            = 1u<<4,
-	PDN_GPU_CNT_RST_PDC            = 1u<<5, // ?
-	PDN_GPU_CNT_RST_PDC2           = 1u<<6, // Maybe pixel pipeline or so?
+	PDN_GPU_CNT_NORST_REGS         = 1u,    // And more?
+	PDN_GPU_CNT_NORST_PSC          = 1u<<1, // ?
+	PDN_GPU_CNT_NORST_GEOSHADER    = 1u<<2, // ?
+	PDN_GPU_CNT_NORST_RASTERIZER   = 1u<<3, // ?
+	PDN_GPU_CNT_NORST_PPF          = 1u<<4,
+	PDN_GPU_CNT_NORST_PDC          = 1u<<5, // ?
+	PDN_GPU_CNT_NORST_PDC2         = 1u<<6, // Maybe pixel pipeline or so?
 
-	PDN_GPU_CNT_RST_ALL            = (PDN_GPU_CNT_RST_PDC2<<1) - 1
+	PDN_GPU_CNT_NORST_ALL          = (PDN_GPU_CNT_NORST_PDC2<<1) - 1
 };
 
 #define PDN_GPU_CNT_CLK_E         (1u<<16)
@@ -84,7 +85,7 @@ enum
 
 // REG_PDN_FCRAM_CNT
 // Note: Reset is active low.
-#define PDN_FCRAM_CNT_RST         (1u)
+#define PDN_FCRAM_CNT_NORST       (1u)
 #define PDN_FCRAM_CNT_CLK_E       (1u<<1)
 #define PDN_FCRAM_CNT_CLK_E_ACK   (1u<<2) // Gets set or unset depending on CLK_E.
 
@@ -97,37 +98,37 @@ enum
 
 // REG_PDN_DSP_CNT
 // Note: Reset is active low.
-#define PDN_DSP_CNT_RST           (1u)
+#define PDN_DSP_CNT_NORST         (1u)
 #define PDN_DSP_CNT_CLK_E         (1u<<1)
 
 // REG_PDN_G1_CNT
 // TODO: Active low or high?
-#define PDN_G1_CNT_RST            (1u)
+#define PDN_G1_CNT_NORST          (1u)
 
-// REG_PDN_MPCORE_SOCMODE
+// REG_PDN_LGR_SOCMODE
 typedef enum
 {
-	SOCMODE_O3DS_268MHz            = 0u,
-	SOCMODE_N3DS_268MHz            = 1u, // Also enables FCRAM extension.
-	SOCMODE_N3DS_PROTO_268MHz      = 2u, // Also enables FCRAM extension?
-	SOCMODE_N3DS_PROTO_536MHz      = 3u, // Also enables FCRAM extension?
-	SOCMODE_N3DS_804MHz            = 5u, // Also enables FCRAM extension.
+	SOCMODE_CTR_268MHz            = 0u,
+	SOCMODE_LGR2_268MHz           = 1u, // Also enables FCRAM extension.
+	SOCMODE_LGR1_268MHz           = 2u, // Also enables FCRAM extension?
+	SOCMODE_LGR1_536MHz           = 3u, // Also enables FCRAM extension?
+	SOCMODE_LGR2_804MHz           = 5u, // Also enables FCRAM extension.
 
-	SOCMODE_MASK                   = 7u
+	SOCMODE_MASK                  = 7u
 } PdnSocmode;
 
-#define PDN_MPCORE_SOCMODE_ACK    (1u<<15)
+#define PDN_LGR_SOCMODE_ACK       (1u<<15)
 
-// REG_PDN_MPCORE_CNT
-#define PDN_MPCORE_CNT_MEM_EXT_E  (1u)    // Does it actually affect all mem extensions or just QTM?
-#define PDN_MPCORE_CNT_L2C_E      (1u<<8)
+// REG_PDN_LGR_CNT
+#define PDN_LGR_CNT_WRAM_EXT_E    (1u)    // QTM WRAM enable.
+#define PDN_LGR_CNT_L2C_E         (1u<<8) // L2C L2 cache enable.
 
-// REGs_PDN_MPCORE_BOOTCNT
+// REGs_PDN_LGR_CPU_CNT
 // Note: Reset is active low.
-#define MPCORE_BOOTCNT_RST        (1u)    // Core 2/3 only. Reset and instruction overlay enable.
-#define MPCORE_BOOTCNT_D_OVERL_E  (1u<<1) // Core 2/3 only. Data overlay enable. Also used to signal a core booted.
-#define MPCORE_BOOTCNT_RST_STAT   (1u<<4)
-#define MPCORE_BOOTCNT_UNK        (1u<<5)
+#define LGR_CPU_CNT_NORST         (1u)    // Core 2/3 only. Reset and instruction overlay enable.
+#define LGR_CPU_CNT_D_OVERL_E     (1u<<1) // Core 2/3 only. Data overlay enable. Also used to signal a core booted.
+#define LGR_CPU_CNT_RST_STAT      (1u<<4) // Reset status.
+#define LGR_CPU_CNT_UNK           (1u<<5) // Something ready?
 
 
 

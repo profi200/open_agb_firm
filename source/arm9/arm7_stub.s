@@ -60,6 +60,8 @@ _a7_stub_thumb:
 .global _a7_stub9_swi
 _a7_stub9_swi = . - _a7_stub_start + 0x80BFE00 @ Final ARM9 mem location.
 	swi  0x01       @ RegisterRamReset
+	@ After BIOS intro REG_TM0CNT_L is set to 0xFF8C instead of 0.
+	@ No other differences between direct boot and BIOS.
 
 	mov  r0, #0xBC  @ SoftReset (0xB4) but skipping r2 & r4 loading.
 	mov  r2, #0

@@ -72,7 +72,7 @@ static void powerDownFcramForLegacy(u8 mode)
 		*((vu32*)0x10201000) &= ~1u;                    // Bug fix for the GBA cart emu?
 		REG_PDN_FCRAM_CNT = PDN_FCRAM_CNT_CLK_E;        // Set reset low (active) but keep clock on.
 	}
-	REG_PDN_FCRAM_CNT = PDN_FCRAM_CNT_RST;              // Take it out of reset but disable clock.
+	REG_PDN_FCRAM_CNT = PDN_FCRAM_CNT_NORST;            // Take it out of reset but disable clock.
 	while(REG_PDN_FCRAM_CNT & PDN_FCRAM_CNT_CLK_E_ACK); // Wait until clock is disabled.
 }
 
