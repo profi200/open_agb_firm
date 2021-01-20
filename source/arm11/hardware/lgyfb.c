@@ -99,22 +99,25 @@ static void lgyFbDmaIrqHandler(UNUSED u32 intSource)
 	signalEvent(g_frameReadyEvent, false);
 }
 
-static void setScaleMatrix(vu32 *const regs, u8 colorAdjust, u32 len, u32 patt, const s16 *const matrix)
+static void setScaleMatrix(vu32 *const regs, u32 len, u32 patt, const s16 *const matrix, u8 inBits, u8 outBits)
 {
 	regs[0] = len - 1; // Reg *_LEN
 	regs[1] = patt;    // Reg *_PATT
 
+	const u8 inMax = (inBits == 0 ? 0 : (s8)-128>>(inBits - 1));
+	const u8 outMax = (1u<<outBits) - 1;
 	for(u32 y = 0; y < 6; y++)
 	{
 		for(u32 x = 0; x < len; x++)
 		{
-			const s16 tmp = matrix[len * y + x];
+			const s32 mEntry = matrix[len * y + x];
 
 			// Correct the color range using the scale matrix hardware.
 			// For example when converting RGB555 to RGB8 LgyFb lazily shifts the 5 bits up
 			// so 0b00011111 becomes 0b11111000. This creates wrong spacing between colors.
 			// TODO: What is the "+ 8" good for?
-			regs[16 + (8 * y + x)] = (colorAdjust != 0 ? tmp * 0xFF / colorAdjust + 8 : tmp + 8); // Reg *_MATRIX/*_ARRAY0
+			if(inMax != 0) regs[16 + (8 * y + x)] = mEntry * outMax / inMax + 8; // Reg *_MATRIX/*_ARRAY0
+			else           regs[16 + (8 * y + x)] = mEntry + 8;
 		}
 	}
 }
@@ -161,7 +164,7 @@ void LGYFB_init(KEvent *frameReadyEvent)
 		     0,      0,      0,      0,      0,      0,
 		     0,      0,      0,      0,      0,      0
 	};
-	setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 0xF8, 6, 0b00111111, scaleMatrix);
+	setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 6, 0b00111111, scaleMatrix, 5, 8);
 #else
 	// Other
 	static const s16 scaleMatrix[6 * 6] =
@@ -191,8 +194,8 @@ void LGYFB_init(KEvent *frameReadyEvent)
 		     0,      0,      0,      0,      0,      0,
 		     0,      0,      0,      0,      0,      0
 	};
-	setScaleMatrix(&REG_LGYFB_TOP_V_LEN, 0xF8, 6, 0b00011011, scaleMatrix);
-	setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 0x00, 6, 0b00011011, scaleMatrix);
+	setScaleMatrix(&REG_LGYFB_TOP_V_LEN, 6, 0b00011011, scaleMatrix, 5, 8);
+	setScaleMatrix(&REG_LGYFB_TOP_H_LEN, 6, 0b00011011, scaleMatrix, 0, 8);
 #endif
 
 	// With RGB8 output solid red and blue are converted to 0xF8 and green to 0xFA.
