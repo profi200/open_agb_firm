@@ -68,7 +68,7 @@ void PDN_core123Init(void)
 		REGs_GIC_DIST_ENABLE_SET[2] = 1u<<24;    // Enable interrupt ID 88.
 
 		// Certain bootloaders leave the ack bit set. Clear it.
-		REG_PDN_LGR_SOCMODE = PDN_LGR_SOCMODE_ACK;
+		REG_PDN_LGR_SOCMODE = REG_PDN_LGR_SOCMODE;
 
 #ifdef CORE123_INIT
 		// Use 804 MHz for LGR2 and 536 for LGR1.
