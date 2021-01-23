@@ -70,7 +70,7 @@ static void setupKeys(void)
 	const bool isDevUnit = REG_CFG9_UNITINFO != 0;
 	const u64 twlConsoleId = (isDevUnit ? (*((vu64*)0x10012000)) :
 	                                      ((*((vu64*)0x01FFB808) ^ 0x8C267B7B358A6AFULL) | 0x80000000ULL));
-	*((vu8*)0x10010014) = REG_CFG9_UNITINFO;
+	REG_CFG9_TWLUNITINFO = REG_CFG9_UNITINFO;
 	*((vu64*)0x10012100) = twlConsoleId;
 
 
@@ -169,7 +169,7 @@ static void setupKeys(void)
 void AES_init(void)
 {
 	REG_AESCNT = AES_MAC_SIZE(4) | AES_FLUSH_WRITE_FIFO | AES_FLUSH_READ_FIFO;
-	*((vu8*)0x10000008) = 0; // ??
+	REG_CFG9_XDMA_PERIPHALS = 0; // Use NDMA for AES.
 
 	REG_NDMA0_DST_ADDR = REG_AESWRFIFO;
 	REG_NDMA0_INT_CNT = NDMA_INT_SYS_FREQ;
