@@ -54,35 +54,30 @@ void SPICARD_init(void)
 	inited = true;
 
 	// TODO
-#define REG_CFG9_CARDCTL      *((vu16*)0x1000000C)
-#define REG_CFG9_CARDSTATUS   *((vu8* )0x10000010)
-#define REG_CFG9_CARDCYCLES0  *((vu16*)0x10000012)
-#define REG_CFG9_CARDCYCLES1  *((vu16*)0x10000014)
-
 #define REG_NTRCARDMCNT       *((vu16*)0x10164000)
 #define REG_NTRCARDROMCNT     *((vu32*)0x10164004)
 
-	REG_CFG9_CARDCYCLES0 = 0x1988;
-	REG_CFG9_CARDCYCLES1 = 0x264C;
+	REG_CFG9_CARD_INSERT_DELAY = 0x1988; // 100 ms
+	REG_CFG9_CARD_PWROFF_DELAY = 0x264C; // 150 ms
 	// boot9 waits here. Unnecessary?
 
-	REG_CFG9_CARDSTATUS = 3u<<2;     // Request power off
-	while(REG_CFG9_CARDSTATUS != 0); // Aotomatically changes to 0 (off)
+	REG_CFG9_CARD_POWER = CARD_POWER_OFF_REQ;     // Request power off.
+	while(REG_CFG9_CARD_POWER != CARD_POWER_OFF); // Aotomatically changes to off.
 	TIMER_sleep(1);
 
-	REG_CFG9_CARDSTATUS = 1u<<2;     // Prepare power on
+	REG_CFG9_CARD_POWER = CARD_POWER_ON_RESET; // Power on and reset.
 	TIMER_sleep(10);
 
-	REG_CFG9_CARDSTATUS = 2u<<2;     // Power on
+	REG_CFG9_CARD_POWER = CARD_POWER_ON; // Power on.
 	TIMER_sleep(27);
 
 	// Switch to NTRCARD controller.
-	REG_CFG9_CARDCTL = 0;
+	REG_CFG9_CARDCTL = CARDCTL_NTRCARD;
 	REG_NTRCARDMCNT = 0xC000u;
 	REG_NTRCARDROMCNT = 0x20000000;
 	TIMER_sleep(120);
 
-	REG_CFG9_CARDCTL |= 1u<<8;
+	REG_CFG9_CARDCTL = CARDCTL_NSPI_SEL | CARDCTL_NTRCARD;
 
 	IRQ_registerIsr(IRQ_CTR_CARD_1, NULL);
 	REG_NSPI_INT_MASK = NSPI_INT_TRANSF_END; // Disable interrupt 1

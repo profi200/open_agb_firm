@@ -93,10 +93,10 @@ BEGIN_ASM_FUNC _start
 	bl iomemset
 	@ Setup newlib heap
 	ldr r0, =IO_MEM_ARM9_ONLY   @ CFG9 regs
-	ldr r1, [r0, #0xFFC]        @ REG_CFG9_MPCORECFG
-	tst r1, #2                  @ Test for New 3DS bit
+	ldr r1, [r0, #0xFFC]        @ REG_CFG9_SOCINFO
+	tst r1, #2                  @ Test for LGR1 bit (New 3DS prototype).
 	movne r2, #1
-	strne r2, [r0, #0x200]      @ REG_CFG9_EXTMENTCNT9
+	strne r2, [r0, #0x200]      @ REG_CFG9_EXTMEMCNT9
 	ldr r0, =A9_HEAP_END
 	addne r0, #A9_RAM_N3DS_EXT_SIZE
 	ldr r1, =fake_heap_end

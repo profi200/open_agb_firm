@@ -26,6 +26,7 @@
 #include "types.h"
 #include "util.h"
 #include "arm9/hardware/sdmmc.h"
+#include "arm9/hardware/cfg9.h"
 #include "arm9/hardware/timer.h"
 
 #define DATA32_SUPPORT
@@ -451,7 +452,7 @@ int Nand_Init()
 
 int SD_Init()
 {
-	*((vu16*)0x10000020) = 0x340u;
+	REG_CFG9_SDMMCCTL = SDMMCCTL_SD_TMIO1_SEL | SDMMCCTL_TMIO3_MAP11 | SDMMCCTL_UNKBIT6;
 	u32 timeout = 10; // In ms.
 	do 
 	{
