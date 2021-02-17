@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include "types.h"
 #include "mem_map.h"
 #include "arm9/hardware/spicard.h"
@@ -25,26 +26,40 @@
 #include "arm9/hardware/ndma.h"
 
 
-#define SPICARD_REGS_BASE   (IO_MEM_ARM9_ONLY + 0xD800)
-#define REG_NSPI_CNT        *((vu32*)(SPICARD_REGS_BASE + 0x00))
-#define REG_NSPI_CS         *((vu8* )(SPICARD_REGS_BASE + 0x04)) // 32 bit but can be accessed as u8
-#define REG_NSPI_BLKLEN     *((vu32*)(SPICARD_REGS_BASE + 0x08))
-#define REG_NSPI_FIFO       *((vu32*)(SPICARD_REGS_BASE + 0x0C))
-#define REG_NSPI_FIFO_STAT  *((vu8* )(SPICARD_REGS_BASE + 0x10)) // 32 bit but can be accessed as u8
-#define REG_NSPI_AUTOPOLL   *((vu32*)(SPICARD_REGS_BASE + 0x14))
-#define REG_NSPI_INT_MASK   *((vu32*)(SPICARD_REGS_BASE + 0x18))
-#define REG_NSPI_INT_STAT   *((vu32*)(SPICARD_REGS_BASE + 0x1C))
+#define SPICARD_REGS_BASE  (IO_MEM_ARM9_ONLY + 0xD800)
+
+typedef struct
+{
+	vu32 cnt;
+	vu8  cs;        // 32 bit but can be accessed as u8.
+	u8 _0x5[3];
+	vu32 blklen;
+	vu32 fifo;
+	vu8  fifo_stat; // 32 bit but can be accessed as u8.
+	u8 _0x11[3];
+	vu32 autopoll;
+	vu32 int_mask;
+	vu32 int_stat;
+} Nspi;
+static_assert(offsetof(Nspi, int_stat) == 0x1C, "Error: Member int_stat of Nspi is not at offset 0x1C!");
+
+ALWAYS_INLINE Nspi* getNspiRegs(void)
+{
+	return (Nspi*)SPICARD_REGS_BASE;
+}
 
 
 
 static inline void nspiWaitBusy(void)
 {
-	while(REG_NSPI_CNT & NSPI_ENABLE);
+	Nspi *const nspi = getNspiRegs();
+	while(nspi->cnt & NSPI_ENABLE);
 }
 
 static inline void nspiWaitFifoBusy(void)
 {
-	while(REG_NSPI_FIFO_STAT & NSPI_FIFO_BUSY);
+	Nspi *const nspi = getNspiRegs();
+	while(nspi->fifo_stat & NSPI_FIFO_BUSY);
 }
 
 void SPICARD_init(void)
@@ -53,66 +68,71 @@ void SPICARD_init(void)
 	if(inited) return;
 	inited = true;
 
-	// TODO
+	// TODO: The whole gamecard init doesn't belong here.
 #define REG_NTRCARDMCNT       *((vu16*)0x10164000)
 #define REG_NTRCARDROMCNT     *((vu32*)0x10164004)
 
-	REG_CFG9_CARD_INSERT_DELAY = 0x1988; // 100 ms
-	REG_CFG9_CARD_PWROFF_DELAY = 0x264C; // 150 ms
+	Cfg9 *const cfg9 = getCfg9Regs();
+	cfg9->card_insert_delay = 0x1988; // 100 ms.
+	cfg9->card_pwroff_delay = 0x264C; // 150 ms.
 	// boot9 waits here. Unnecessary?
 
-	REG_CFG9_CARD_POWER = CARD_POWER_OFF_REQ;     // Request power off.
-	while(REG_CFG9_CARD_POWER != CARD_POWER_OFF); // Aotomatically changes to off.
-	TIMER_sleep(1);
+	cfg9->card_power = CARD_POWER_OFF_REQ;     // Request power off.
+	while(cfg9->card_power != CARD_POWER_OFF); // Aotomatically changes to off.
+	TIMER_sleepMs(1);
 
-	REG_CFG9_CARD_POWER = CARD_POWER_ON_RESET; // Power on and reset.
-	TIMER_sleep(10);
+	cfg9->card_power = CARD_POWER_ON_RESET; // Power on and reset.
+	TIMER_sleepMs(10);
 
-	REG_CFG9_CARD_POWER = CARD_POWER_ON; // Power on.
-	TIMER_sleep(27);
+	cfg9->card_power = CARD_POWER_ON; // Power on.
+	TIMER_sleepMs(27);
 
 	// Switch to NTRCARD controller.
-	REG_CFG9_CARDCTL = CARDCTL_NTRCARD;
+	cfg9->cardctl = CARDCTL_NTRCARD;
 	REG_NTRCARDMCNT = 0xC000u;
 	REG_NTRCARDROMCNT = 0x20000000;
-	TIMER_sleep(120);
+	TIMER_sleepMs(120);
 
-	REG_CFG9_CARDCTL = CARDCTL_NSPI_SEL | CARDCTL_NTRCARD;
+	cfg9->cardctl = CARDCTL_NSPI_SEL | CARDCTL_NTRCARD;
 
 	IRQ_registerIsr(IRQ_CTR_CARD_1, NULL);
-	REG_NSPI_INT_MASK = NSPI_INT_TRANSF_END; // Disable interrupt 1
-	REG_NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END; // Aknowledge
+	Nspi *const nspi = getNspiRegs();
+	nspi->int_mask = NSPI_INT_TRANSF_END; // Disable interrupt 1.
+	nspi->int_stat = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END; // Aknowledge.
 }
 
-bool _SPICARD_autoPollBit(u32 params)
+bool SPICARD_autoPollBit(NspiClk clk, u32 ap_params)
 {
-	REG_NSPI_AUTOPOLL = NSPI_AUTOPOLL_START | params;
+	Nspi *const nspi = getNspiRegs();
+	nspi->cnt = clk;
+	nspi->autopoll = NSPI_AUTOPOLL_START | ap_params;
 
 	u32 res;
 	do
 	{
 		__wfi();
-		res = REG_NSPI_INT_STAT;
+		res = nspi->int_stat;
 	} while(!(res & (NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS)));
-	REG_NSPI_INT_STAT = res; // Aknowledge
+	nspi->int_stat = res; // Aknowledge.
 
-	return (res & NSPI_INT_AP_TIMEOUT) == 0; // Timeout error
+	return (res & NSPI_INT_AP_TIMEOUT) == 0; // Timeout error.
 }
 
-void SPICARD_writeRead(NspiClk clk, const u32 *in, u32 *out, u32 inSize, u32 outSize, bool done)
+void SPICARD_writeRead(NspiClk clk, const u32 *in, u32 *out, u32 inSize, u32 outSize)
 {
 	const u32 cntParams = NSPI_ENABLE | NSPI_BUS_1BIT | clk;
 
+	Nspi *const nspi = getNspiRegs();
 	if(in)
 	{
-		REG_NSPI_BLKLEN = inSize;
-		REG_NSPI_CNT = cntParams | NSPI_DIR_WRITE;
+		nspi->blklen = inSize;
+		nspi->cnt = cntParams | NSPI_DIR_WRITE;
 
 		u32 counter = 0;
 		do
 		{
 			if((counter & 31) == 0) nspiWaitFifoBusy();
-			REG_NSPI_FIFO = *in++;
+			nspi->fifo = *in++;
 			counter += 4;
 		} while(counter < inSize);
 
@@ -120,19 +140,22 @@ void SPICARD_writeRead(NspiClk clk, const u32 *in, u32 *out, u32 inSize, u32 out
 	}
 	if(out)
 	{
-		REG_NSPI_BLKLEN = outSize;
-		REG_NSPI_CNT = cntParams | NSPI_DIR_READ;
+		nspi->blklen = outSize;
+		nspi->cnt = cntParams | NSPI_DIR_READ;
 
 		u32 counter = 0;
 		do
 		{
 			if((counter & 31) == 0) nspiWaitFifoBusy();
-			*out++ = REG_NSPI_FIFO;
+			*out++ = nspi->fifo;
 			counter += 4;
 		} while(counter < outSize);
 
 		nspiWaitBusy();
 	}
+}
 
-	if(done) REG_NSPI_CS = NSPI_DESELECT;
+void SPICARD_deselect(void)
+{
+	getNspiRegs()->cs = NSPI_DESELECT;
 }

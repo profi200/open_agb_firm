@@ -32,7 +32,7 @@ void WEAK __systemInit(void)
 	leaveCriticalSection(0); // Enables interrupts
 	TIMER_init();
 	NDMA_init();
-	//DMA330_init();
+	DMA330_init();
 	//AES_init();
 	//RSA_init();
 	PXI_init();
@@ -40,6 +40,7 @@ void WEAK __systemInit(void)
 
 void WEAK __systemDeinit(void)
 {
+	DMA330_init();
 	NDMA_init();
 	IRQ_init();
 }

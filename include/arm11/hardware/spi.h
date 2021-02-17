@@ -40,8 +40,8 @@
 // REG_NSPI_INT_MASK Bit set = disabled.
 // REG_NSPI_INT_STAT Status and aknowledge.
 #define NSPI_INT_TRANSF_END  (1u)    // Also fires on each auto poll try.
-#define NSPI_INT_AP_SUCCESS  (1u<<1) // Auto poll
-#define NSPI_INT_AP_TIMEOUT  (1u<<2) // Auto poll
+#define NSPI_INT_AP_SUCCESS  (1u<<1) // Auto poll.
+#define NSPI_INT_AP_TIMEOUT  (1u<<2) // Auto poll.
 
 
 // Old interface clocks.
@@ -67,14 +67,21 @@ enum
 
 typedef enum
 {
-	NSPI_DEV_POWERMAN   = 0u, // Unused DS(i) mode power management
-	NSPI_DEV_NVRAM      = 1u, // WiFi SPI flash
+	NSPI_DEV_POWERMAN   = 0u, // Unused DS(i) mode power management.
+	NSPI_DEV_NVRAM      = 1u, // WiFi SPI flash.
 	NSPI_DEV_TWL_CODEC  = 2u,
 	NSPI_DEV_CTR_CODEC  = 3u,
 	NSPI_DEV_UNUSED5    = 4u, // Unused "CS2".
 	NSPI_DEV_UNUSED6    = 5u, // Unused "CS3".
 	NSPI_DEV_UNUSED7    = 6u  // Debugger?
 } SpiDevice;
+
+
+// cmd is the command byte to send.
+// timeout is the timeout. Must be 0-15. Tries = 31<<(NspiClk + timeout).
+// offset is the bit offset to poll for. Must be 0-7.
+// bitSet is what to poll for (0 or 1).
+#define MAKE_AP_PARAMS(cmd, timeout, offset, bitSet) ((u32)(bitSet)<<30 | (u32)(offset)<<24 | (u32)(timeout)<<16 | (cmd))
 
 
 
@@ -84,14 +91,14 @@ typedef enum
 void NSPI_init(void);
 
 /**
- * @brief      Automatically polls a bit of the command response. Use with the macro below.
+ * @brief      Automatically polls a bit of the command response.
  *
- * @param[in]  dev     The device ID. See table above.
- * @param[in]  params  The parameters. Use the macro below.
+ * @param[in]  dev        The device ID. See table above.
+ * @param[in]  ap_params  The parameters. Use the macro above.
  *
  * @return     Returns false on failure/timeout and true on success.
  */
-bool _NSPI_autoPollBit(SpiDevice dev, u32 params);
+bool NSPI_autoPollBit(SpiDevice dev, u32 ap_params);
 
 /**
  * @brief      Writes and/or reads data to/from a SPI device.
@@ -101,20 +108,12 @@ bool _NSPI_autoPollBit(SpiDevice dev, u32 params);
  * @param      out      Output data pointer for read.
  * @param[in]  inSize   Input size. Must be <= 0x1FFFFF.
  * @param[in]  outSize  Output size. Must be <= 0x1FFFFF.
- * @param[in]  done     Set to true if this is the last transfer (chip select).
  */
-void NSPI_writeRead(SpiDevice dev, const u32 *in, u32 *out, u32 inSize, u32 outSize, bool done);
-
+void NSPI_writeRead(SpiDevice dev, const u32 *in, u32 *out, u32 inSize, u32 outSize);
 
 /**
- * @brief      Automatically polls a bit of the command response.
+ * @brief      Deselect SPI device (chip select).
  *
- * @param[in]  dev      The device ID. See table above.
- * @param[in]  cmd      The command.
- * @param[in]  timeout  The timeout. Must be 0-15. Tries = 31<<NspiClk + timeout.
- * @param[in]  off      The bit offset. Must be 0-7.
- * @param[in]  bitSet   Poll for a set ur unset bit.
- *
- * @return     Returns false on failure/timeout and true on success.
+ * @param[in]  dev   The device ID. See table above.
  */
-#define NSPI_autoPollBit(dev, cmd, timeout, off, bitSet) _NSPI_autoPollBit(dev, (bitSet)<<30 | (off)<<24 | (timeout)<<16 | (cmd))
+void NSPI_deselect(SpiDevice dev);

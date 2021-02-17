@@ -34,7 +34,8 @@
 static void NAKED core23Entry(void)
 {
 	__cpsid(aif);
-	REG_GIC_CPU_CTRL = 1;
+	GicCpu *const gicCpu = getGicCpuRegs();
+	gicCpu->ctrl = 1;
 
 	// Tell core 0 we are here.
 	const u32 cpuId = __getCpuId();
@@ -46,8 +47,8 @@ static void NAKED core23Entry(void)
 	do
 	{
 		__wfi();
-		tmp = REG_GIC_CPU_INTACK;
-		REG_GIC_CPU_EOI = tmp;
+		tmp = gicCpu->intack;
+		gicCpu->eoi = tmp;
 	} while(tmp != cpuId);
 
 	// Jump to real entrypoint.
@@ -58,14 +59,16 @@ static void NAKED core23Entry(void)
 // This must be called before the MMU is enabled on any core or it will hang!
 void PDN_core123Init(void)
 {
-	if(REG_CFG11_SOCINFO & SOCINFO_LGR1)
+	Cfg11 *const cfg11 = getCfg11Regs();
+	if(cfg11->socinfo & SOCINFO_LGR1)
 	{
-		REG_GIC_CPU_CTRL = 1;
-		for(u32 i = 0; i < 4; i++) REGs_GIC_DIST_ENABLE_CLEAR[i] = 0xFFFFFFFFu; // Disable all interrupts.
-		REGs_GIC_DIST_PENDING_CLEAR[2] = 1u<<24; // Clear interrupt ID 88.
-		REGs_GIC_DIST_PRI[22] = 0;               // Id 88 highest priority.
-		REGs_GIC_DIST_TARGET[22] = 1;            // Id 88 target core 0.
-		REGs_GIC_DIST_ENABLE_SET[2] = 1u<<24;    // Enable interrupt ID 88.
+		getGicCpuRegs()->ctrl = 1;
+		GicDist *const gicDist = getGicDistRegs();
+		for(u32 i = 0; i < 4; i++) gicDist->enable_clear[i] = 0xFFFFFFFFu; // Disable all interrupts.
+		gicDist->pending_clear[2] = 1u<<24; // Clear interrupt ID 88.
+		gicDist->pri[22] = 0;               // Id 88 highest priority.
+		gicDist->target[22] = 1;            // Id 88 target core 0.
+		gicDist->enable_set[2] = 1u<<24;    // Enable interrupt ID 88.
 
 		// Certain bootloaders leave the ack bit set. Clear it.
 		REG_PDN_LGR_SOCMODE = REG_PDN_LGR_SOCMODE;
@@ -73,26 +76,26 @@ void PDN_core123Init(void)
 #ifdef CORE123_INIT
 		// Use 804 MHz for LGR2 and 536 for LGR1.
 		u16 socmode;
-		if(REG_CFG11_SOCINFO & SOCINFO_LGR2) socmode = SOCMODE_LGR2_804MHz;
-		else                                 socmode = SOCMODE_LGR1_536MHz;
+		if(cfg11->socinfo & SOCINFO_LGR2) socmode = SOCMODE_LGR2_804MHz;
+		else                              socmode = SOCMODE_LGR1_536MHz;
 
 		if((REG_PDN_LGR_SOCMODE & SOCMODE_MASK) != socmode)
 		{
 			// Enable L2 cache and/or extra WRAM.
-			if(REG_CFG11_SOCINFO & SOCINFO_LGR2) REG_PDN_LGR_CNT = PDN_LGR_CNT_L2C_E | PDN_LGR_CNT_WRAM_EXT_E;
-			else                                 REG_PDN_LGR_CNT = PDN_LGR_CNT_WRAM_EXT_E;
+			if(cfg11->socinfo & SOCINFO_LGR2) REG_PDN_LGR_CNT = PDN_LGR_CNT_L2C_E | PDN_LGR_CNT_WRAM_EXT_E;
+			else                              REG_PDN_LGR_CNT = PDN_LGR_CNT_WRAM_EXT_E;
 
 			// Necessary delay.
 			wait_cycles(403);
 
 			PDN_setSocmode(socmode);
-			REGs_GIC_DIST_PENDING_CLEAR[2] = 1u<<24; // Clear interrupt ID 88.
+			gicDist->pending_clear[2] = 1u<<24; // Clear interrupt ID 88.
 
 			// Fixes for the GPU to work in non-CTR mode.
-			REG_CFG11_GPU_N3DS_CNT = GPU_N3DS_CNT_TEX_FIX | GPU_N3DS_CNT_N3DS_MODE;
+			cfg11->gpu_n3ds_cnt = GPU_N3DS_CNT_TEX_FIX | GPU_N3DS_CNT_N3DS_MODE;
 		}
 
-		REG_CFG11_CDMA_PERIPHERALS = CDMA_PERIPHERALS_ALL; // Redirect all to CDMA2.
+		cfg11->cdma_peripherals = CDMA_PERIPHERALS_ALL; // Redirect all to CDMA2.
 
 		if((REG_SCU_CONFIG & 3) == 3)
 		{
@@ -101,17 +104,17 @@ void PDN_core123Init(void)
 
 			// Temporarily switch to 268 MHz for core 2/3 bringup.
 			u16 tmpSocmode;
-			if(REG_CFG11_SOCINFO & SOCINFO_LGR2) tmpSocmode = SOCMODE_LGR2_268MHz;
-			else                                 tmpSocmode = SOCMODE_LGR1_268MHz;
+			if(cfg11->socinfo & SOCINFO_LGR2) tmpSocmode = SOCMODE_LGR2_268MHz;
+			else                              tmpSocmode = SOCMODE_LGR1_268MHz;
 
 			if(socmode != tmpSocmode)
 			{
 				PDN_setSocmode(tmpSocmode);
-				REGs_GIC_DIST_PENDING_CLEAR[2] = 1u<<24; // Clear interrupt ID 88.
+				gicDist->pending_clear[2] = 1u<<24; // Clear interrupt ID 88.
 			}
 
-			REG_CFG11_BOOTROM_OVERLAY_CNT = BOOTROM_OVERLAY_CNT_E;
-			REG_CFG11_BOOTROM_OVERLAY_VAL = (u32)core23Entry;
+			cfg11->bootrom_overlay_cnt = BOOTROM_OVERLAY_CNT_E;
+			cfg11->bootrom_overlay_val = (u32)core23Entry;
 			// If not already done enable instruction and data overlays.
 			if(!(REGs_PDN_LGR_CPU_CNT[2] & LGR_CPU_CNT_RST_STAT))
 			{
@@ -126,13 +129,13 @@ void PDN_core123Init(void)
 			      != LGR_CPU_CNT_RST_STAT);
 			while((REGs_PDN_LGR_CPU_CNT[3] & (LGR_CPU_CNT_RST_STAT | LGR_CPU_CNT_D_OVERL_E))
 			      != LGR_CPU_CNT_RST_STAT);
-			REG_CFG11_BOOTROM_OVERLAY_CNT = 0; // Disable all overlays.
+			cfg11->bootrom_overlay_cnt = 0; // Disable all overlays.
 
 			// Switch back to highest clock.
 			if(socmode != tmpSocmode) PDN_setSocmode(socmode);
 		}
 
-		REGs_GIC_DIST_ENABLE_CLEAR[2] = 1u<<24; // Clear interrupt ID 88.
+		gicDist->enable_clear[2] = 1u<<24; // Clear interrupt ID 88.
 
 		// Wakeup core 2/3 and let them jump to their entrypoint.
 		IRQ_softwareInterrupt(2, 0b0100);
@@ -142,7 +145,7 @@ void PDN_core123Init(void)
 		if((REG_PDN_LGR_SOCMODE & SOCMODE_MASK) != SOCMODE_CTR_268MHz)
 		{
 			PDN_setSocmode(SOCMODE_CTR_268MHz);
-			REGs_GIC_DIST_ENABLE_CLEAR[2] = 1u<<24; // Clear interrupt ID 88.
+			gicDist->enable_clear[2] = 1u<<24; // Clear interrupt ID 88.
 		}
 #endif
 	}
@@ -166,17 +169,18 @@ void PDN_setSocmode(PdnSocmode socmode)
 
 void PDN_poweroffCore23(void)
 {
-	if(REG_CFG11_SOCINFO & SOCINFO_LGR1)
+	Cfg11 *const cfg11 = getCfg11Regs();
+	if(cfg11->socinfo & SOCINFO_LGR1)
 	{
 		REGs_PDN_LGR_CPU_CNT[2] = 0;
 		REGs_PDN_LGR_CPU_CNT[3] = 0;
 
-		REG_CFG11_CDMA_PERIPHERALS = 0;
-		REG_CFG11_GPU_N3DS_CNT = 0;
+		cfg11->cdma_peripherals = 0;
+		cfg11->gpu_n3ds_cnt = 0;
 
 		REG_PDN_LGR_CNT = 0;
-		if(REG_CFG11_SOCINFO & SOCINFO_LGR2) PDN_setSocmode(SOCMODE_LGR2_268MHz);
-		else                                 PDN_setSocmode(SOCMODE_LGR1_268MHz);
+		if(cfg11->socinfo & SOCINFO_LGR2) PDN_setSocmode(SOCMODE_LGR2_268MHz);
+		else                              PDN_setSocmode(SOCMODE_LGR1_268MHz);
 
 		REG_SCU_CPU_STAT |= 0b1111<<4;
 

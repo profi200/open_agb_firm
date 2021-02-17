@@ -11,29 +11,29 @@
 #define REG_HID_PADCNT     *((vu16*)(HID_REGS_BASE + 0x2))
 
 
-static u32 kHeld, kDown, kUp;
+static u32 g_kHeld, g_kDown, g_kUp;
 
 
 
 void hidScanInput(void)
 {
-	u32 kOld = kHeld;
-	kHeld = REG_HID_PAD;
-	kDown = (~kOld) & kHeld;
-	kUp = kOld & (~kHeld);
+	u32 kOld = g_kHeld;
+	g_kHeld = REG_HID_PAD;
+	g_kDown = (~kOld) & g_kHeld;
+	g_kUp = kOld & (~g_kHeld);
 }
 
 u32 hidKeysHeld(void)
 {
-	return kHeld;
+	return g_kHeld;
 }
 
 u32 hidKeysDown(void)
 {
-	return kDown;
+	return g_kDown;
 }
 
 u32 hidKeysUp(void)
 {
-	return kUp;
+	return g_kUp;
 }

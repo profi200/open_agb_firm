@@ -38,37 +38,38 @@
 
 // First 32 interrupts are private to each core (4 * 32).
 // 96 external interrupts (total 128).
-IrqIsr irqIsrTable[224] = {0};
+IrqIsr g_irqIsrTable[224] = {0};
 
 
 
 // Per core interrupts.
 static void configPrivateInterrupts(void)
 {
+	GicDist *const gicDist = getGicDistRegs();
 	// Disable first 32 interrupts.
 	// Interrupts 0-15 cant be disabled.
-	REGs_GIC_DIST_ENABLE_CLEAR[0] = 0xFFFFFFFFu;
+	gicDist->enable_clear[0] = 0xFFFFFFFFu;
 
 	// Set first 32 interrupts to inactive state.
 	// Interrupt 0-15 can't be set to inactive.
-	REGs_GIC_DIST_PENDING_CLEAR[0] = 0xFFFFFFFFu;
+	gicDist->pending_clear[0] = 0xFFFFFFFFu;
 
 	// Set first 32 interrupts to lowest priority.
-	for(u32 i = 0; i < 8; i++) REGs_GIC_DIST_PRI[i] = 0xF0F0F0F0u;
+	for(u32 i = 0; i < 8; i++) gicDist->pri[i] = 0xF0F0F0F0u;
 
 	// Interrupt target 0-31 can't be changed.
 
 	// Kernel11 config.
 	// Interrupts 0-15.
-	REGs_GIC_DIST_CONFIG[0] = MAKE_ICONF(ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN,  // 0-3
-	                                     ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN,  // 4-7
-	                                     ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN,  // 8-11
-	                                     ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN); // 12-15
+	gicDist->config[0] = MAKE_ICONF(ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN,  // 0-3
+	                                ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN,  // 4-7
+	                                ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN,  // 8-11
+	                                ICONF_E_NN, ICONF_E_NN, ICONF_E_NN, ICONF_E_NN); // 12-15
 	// Interrupts 16-31.
-	REGs_GIC_DIST_CONFIG[1] = MAKE_ICONF(ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_RSVD,  // 16-19
-	                                     ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_RSVD,  // 20-23
-	                                     ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_RSVD,  // 24-27
-	                                     ICONF_RSVD, ICONF_E_NN, ICONF_E_NN, ICONF_RSVD); // 28-31
+	gicDist->config[1] = MAKE_ICONF(ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_RSVD,  // 16-19
+	                                ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_RSVD,  // 20-23
+	                                ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_RSVD,  // 24-27
+	                                ICONF_RSVD, ICONF_E_NN, ICONF_E_NN, ICONF_RSVD); // 28-31
 }
 
 static void configExternalInterrupts(void)
@@ -142,13 +143,14 @@ static void configExternalInterrupts(void)
 		           ICONF_L_1N, ICONF_L_1N, ICONF_RSVD, ICONF_RSVD)  // 124-127
 	};
 
-	iomemcpy(&REGs_GIC_DIST_CONFIG[2], iconfTable, 24);
+	iomemcpy(&getGicDistRegs()->config[2], iconfTable, 24);
 }
 
 // Note: Core 0 must execute this last.
 void IRQ_init(void)
 {
-	REG_GIC_DIST_CTRL = 0; // Disable the global interrupt distributor.
+	GicDist *const gicDist = getGicDistRegs();
+	gicDist->ctrl = 0; // Disable the global interrupt distributor.
 
 	configPrivateInterrupts();
 
@@ -158,29 +160,32 @@ void IRQ_init(void)
 		// Set the remaining 96 pending interrupts to inactive state.
 		for(u32 i = 1; i < 4; i++)
 		{
-			REGs_GIC_DIST_ENABLE_CLEAR[i] = 0xFFFFFFFFu;
-			REGs_GIC_DIST_PENDING_CLEAR[i] = 0xFFFFFFFFu;
+			gicDist->enable_clear[i] = 0xFFFFFFFFu;
+			gicDist->pending_clear[i] = 0xFFFFFFFFu;
 		}
 
 		// Set the remaining 96 interrupts to lowest priority.
 		// Set the remaining 96 interrupts to target no CPU.
 		for(u32 i = 8; i < 32; i++)
 		{
-			REGs_GIC_DIST_PRI[i] = 0xF0F0F0F0u;
-			REGs_GIC_DIST_TARGET[i] = 0;
+			gicDist->pri[i] = 0xF0F0F0F0u;
+			gicDist->target[i] = 0;
 		}
 
 		configExternalInterrupts();
 
-		REG_GIC_DIST_CTRL = 1; // Enable the global interrupt distributor.
+		// TODO: This is a potential bug. If any other core executes this
+		// function the distributor will be disabled but not re-enabled.
+		gicDist->ctrl = 1; // Enable the global interrupt distributor.
 	}
 
 
-	REG_GIC_CPU_PRIMASK  = 0xF0; // Mask no interrupt.
-	REG_GIC_CPU_BINPOINT = 3;    // All priority bits are compared for pre-emption.
-	REG_GIC_CPU_CTRL     = 1;    // Enable the interrupt interface for this CPU.
+	GicCpu *const gicCpu = getGicCpuRegs();
+	gicCpu->primask  = 0xF0; // Mask no interrupt.
+	gicCpu->binpoint = 3;    // All priority bits are compared for pre-emption.
+	gicCpu->ctrl     = 1;    // Enable the interrupt interface for this CPU.
 
-	REG_CFG11_FIQ_MASK = FIQ_MASK_CPU3 | FIQ_MASK_CPU2 | FIQ_MASK_CPU1 | FIQ_MASK_CPU0; // Disable FIQs.
+	getCfg11Regs()->fiq_mask = FIQ_MASK_CPU3 | FIQ_MASK_CPU2 | FIQ_MASK_CPU1 | FIQ_MASK_CPU0; // Disable FIQs.
 }
 
 void IRQ_registerIsr(Interrupt id, u8 prio, u8 cpuMask, IrqIsr isr)
@@ -190,46 +195,48 @@ void IRQ_registerIsr(Interrupt id, u8 prio, u8 cpuMask, IrqIsr isr)
 
 	const u32 oldState = enterCriticalSection();
 
-	irqIsrTable[(id < 32 ? 32 * cpuId + id : 96u + id)] = isr;
+	g_irqIsrTable[(id < 32 ? 32 * cpuId + id : 96u + id)] = isr;
 
+	GicDist *const gicDist = getGicDistRegs();
 	// Priority
 	u32 shift = (id % 4 * 8) + 4;
-	u32 tmp = REGs_GIC_DIST_PRI[id / 4] & ~(0xFu<<shift);
-	REGs_GIC_DIST_PRI[id / 4] = tmp | (u32)prio<<shift;
+	u32 tmp = gicDist->pri[id / 4] & ~(0xFu<<shift);
+	gicDist->pri[id / 4] = tmp | (u32)prio<<shift;
 
 	// Target
 	shift = id % 4 * 8;
-	tmp = REGs_GIC_DIST_TARGET[id / 4] & ~(0xFu<<shift);
-	REGs_GIC_DIST_TARGET[id / 4] = tmp | (u32)cpuMask<<shift;
+	tmp = gicDist->target[id / 4] & ~(0xFu<<shift);
+	gicDist->target[id / 4] = tmp | (u32)cpuMask<<shift;
 
 	// Enable it.
-	REGs_GIC_DIST_ENABLE_SET[id / 32] = 1u<<(id % 32);
+	gicDist->enable_set[id / 32] = 1u<<(id % 32);
 
 	leaveCriticalSection(oldState);
 }
 
 void IRQ_enable(Interrupt id)
 {
-	REGs_GIC_DIST_ENABLE_SET[id / 32] = 1u<<(id % 32);
+	getGicDistRegs()->enable_set[id / 32] = 1u<<(id % 32);
 }
 
 void IRQ_disable(Interrupt id)
 {
-	REGs_GIC_DIST_ENABLE_CLEAR[id / 32] = 1u<<(id % 32);
+	getGicDistRegs()->enable_clear[id / 32] = 1u<<(id % 32);
 }
 
 void IRQ_softwareInterrupt(Interrupt id, u8 cpuMask)
 {
-	REG_GIC_DIST_SOFTINT = (u32)cpuMask<<16 | id;
+	getGicDistRegs()->softint = (u32)cpuMask<<16 | id;
 }
 
 void IRQ_setPriority(Interrupt id, u8 prio)
 {
 	const u32 oldState = enterCriticalSection();
 
+	GicDist *const gicDist = getGicDistRegs();
 	const u32 shift = (id % 4 * 8) + 4;
-	u32 tmp = REGs_GIC_DIST_PRI[id / 4] & ~(0xFu<<shift);
-	REGs_GIC_DIST_PRI[id / 4] = tmp | (u32)prio<<shift;
+	u32 tmp = gicDist->pri[id / 4] & ~(0xFu<<shift);
+	gicDist->pri[id / 4] = tmp | (u32)prio<<shift;
 
 	leaveCriticalSection(oldState);
 }
@@ -238,9 +245,9 @@ void IRQ_unregisterIsr(Interrupt id)
 {
 	const u32 oldState = enterCriticalSection();
 
-	REGs_GIC_DIST_ENABLE_CLEAR[id / 32] = 1u<<(id % 32);
+	getGicDistRegs()->enable_clear[id / 32] = 1u<<(id % 32);
 
-	irqIsrTable[(id < 32 ? 32 * __getCpuId() + id : 96u + id)] = (IrqIsr)NULL;
+	g_irqIsrTable[(id < 32 ? 32 * __getCpuId() + id : 96u + id)] = (IrqIsr)NULL;
 
 	leaveCriticalSection(oldState);
 }

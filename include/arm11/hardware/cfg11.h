@@ -18,29 +18,58 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+#include "types.h"
 #include "mem_map.h"
 
 
-#define CFG11_REGS_BASE                (IO_MEM_ARM9_ARM11 + 0x40000)
-#define REGs_CFG11_SHAREDWRAM_32K_CODE  ((       vu8*)(CFG11_REGS_BASE + 0x000)) // 8 regs.
-#define REGs_CFG11_SHAREDWRAM_32K_DATA  ((       vu8*)(CFG11_REGS_BASE + 0x008)) // 8 regs.
-#define REG_CFG11_UNK100               *((      vu32*)(CFG11_REGS_BASE + 0x100))
-#define REG_CFG11_FIQ_MASK             *((       vu8*)(CFG11_REGS_BASE + 0x104))
-#define REG_CFG11_UNK105               *((       vu8*)(CFG11_REGS_BASE + 0x105)) // Debug related? Mask?
-#define REG_CFG11_UNK108               *((       vu8*)(CFG11_REGS_BASE + 0x108)) // LGY gamecard related?
-#define REG_CFG11_CDMA_CNT             *((       vu8*)(CFG11_REGS_BASE + 0x10C))
-#define REG_CFG11_UNK110               *((       vu8*)(CFG11_REGS_BASE + 0x110)) // VRAM related?
-#define REG_CFG11_GPUPROT              *((      vu16*)(CFG11_REGS_BASE + 0x140))
-#define REG_CFG11_WIFI_POWER           *((       vu8*)(CFG11_REGS_BASE + 0x180)) // Used for flight mode?
-#define REG_CFG11_SPI_CNT              *((      vu16*)(CFG11_REGS_BASE + 0x1C0))
-#define REG_CFG11_UNK200               *((      vu32*)(CFG11_REGS_BASE + 0x200)) // GPIO3 related? 8x4 bits.
-#define REG_CFG11_GPU_N3DS_CNT         *((       vu8*)(CFG11_REGS_BASE + 0x400)) // New3DS-only.
-#define REG_CFG11_CDMA_PERIPHERALS     *((      vu32*)(CFG11_REGS_BASE + 0x410)) // New3DS-only.
-#define REG_CFG11_BOOTROM_OVERLAY_CNT  *((       vu8*)(CFG11_REGS_BASE + 0x420)) // New3DS-only.
-#define REG_CFG11_BOOTROM_OVERLAY_VAL  *((      vu32*)(CFG11_REGS_BASE + 0x424)) // New3DS-only.
-#define REG_CFG11_UNK428               *((       vu8*)(CFG11_REGS_BASE + 0x428)) // New3DS-only. 1 bit. Enable CPU core 1 access to overlay regs?
-#define REG_CFG11_SOCINFO              *((const vu16*)(CFG11_REGS_BASE + 0xFFC))
+#define CFG11_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x40000)
 
+typedef struct
+{
+	vu8 sharedwram_32k_code[8];
+	vu8 sharedwram_32k_data[8];
+	u8 _0x10[0xf0];
+	vu32 nullpage_cnt;
+	vu8 fiq_mask;
+	vu8 unk105;                 // Debug related? Mask?
+	u8 _0x106[2];
+	vu8 unk108;                 // LGY gamecard related?
+	u8 _0x109[3];
+	vu8 cdma_cnt;
+	u8 _0x10d[3];
+	vu8 unk110;                 // VRAM related?
+	u8 _0x111[0x2f];
+	vu16 gpuprot;
+	u8 _0x142[0x3e];
+	vu8 wifi_power;             // Used for flight mode?
+	u8 _0x181[0x3f];
+	vu16 spi_cnt;
+	u8 _0x1c2[0x3e];
+	vu32 unk200;                // GPIO3 related? 8x4 bits.
+	u8 _0x204[0x1fc];
+	vu8 gpu_n3ds_cnt;           // New3DS-only.
+	u8 _0x401[0xf];
+	vu32 cdma_peripherals;      // New3DS-only.
+	u8 _0x414[0xc];
+	vu8 bootrom_overlay_cnt;    // New3DS-only.
+	u8 _0x421[3];
+	vu32 bootrom_overlay_val;   // New3DS-only.
+	vu8 unk428;                 // New3DS-only. 1 bit. Enable CPU core 1 access to overlay regs?
+	u8 _0x429[0xbd3];
+	const vu16 socinfo;
+} Cfg11;
+static_assert(offsetof(Cfg11, socinfo) == 0xFFC, "Error: Member socinfo of Cfg11 is not at offset 0xFFC!");
+
+ALWAYS_INLINE Cfg11* getCfg11Regs(void)
+{
+	return (Cfg11*)CFG11_REGS_BASE;
+}
+
+
+// REG_CFG11_NULLPAGE_CNT
+#define NULLPAGE_CNT_FAULT_E    (1u)     // All data accesses to 0x0000-0x1000 generate faults.
+#define NULLPAGE_CNT_UNKBIT16   (1u<<16)
 
 // REG_CFG11_FIQ_MASK
 #define FIQ_MASK_CPU0           (1u)

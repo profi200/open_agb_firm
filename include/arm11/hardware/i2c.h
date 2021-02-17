@@ -18,26 +18,38 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include "types.h"
+#include "mem_map.h"
 
 
 #define I2C1_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x61000)
-#define REG_I2C1_DATA   *((vu8* )(I2C1_REGS_BASE + 0x0))
-#define REG_I2C1_CNT    *((vu8* )(I2C1_REGS_BASE + 0x1))
-#define REG_I2C1_CNTEX  *((vu16*)(I2C1_REGS_BASE + 0x2))
-#define REG_I2C1_SCL    *((vu16*)(I2C1_REGS_BASE + 0x4))
-
 #define I2C2_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x44000)
-#define REG_I2C2_DATA   *((vu8* )(I2C2_REGS_BASE + 0x0))
-#define REG_I2C2_CNT    *((vu8* )(I2C2_REGS_BASE + 0x1))
-#define REG_I2C2_CNTEX  *((vu16*)(I2C2_REGS_BASE + 0x2))
-#define REG_I2C2_SCL    *((vu16*)(I2C2_REGS_BASE + 0x4))
-
 #define I2C3_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x48000)
-#define REG_I2C3_DATA   *((vu8* )(I2C3_REGS_BASE + 0x0))
-#define REG_I2C3_CNT    *((vu8* )(I2C3_REGS_BASE + 0x1))
-#define REG_I2C3_CNTEX  *((vu16*)(I2C3_REGS_BASE + 0x2))
-#define REG_I2C3_SCL    *((vu16*)(I2C3_REGS_BASE + 0x4))
+
+typedef struct
+{
+	vu8  data;
+	vu8  cnt;
+	vu16 cntex;
+	vu16 scl;
+} I2cBus;
+static_assert(offsetof(I2cBus, scl) == 4, "Error: Member scl of I2cBus is not at offset 4!");
+
+ALWAYS_INLINE I2cBus* getI2cBusRegs(u8 busId)
+{
+	switch(busId)
+	{
+		case 1:
+			return (I2cBus*)I2C1_REGS_BASE;
+		case 2:
+			return (I2cBus*)I2C2_REGS_BASE;
+		case 3:
+			return (I2cBus*)I2C3_REGS_BASE;
+		default:
+			return NULL;
+	}
+}
 
 
 // REG_I2C_CNT

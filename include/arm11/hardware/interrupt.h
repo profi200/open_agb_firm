@@ -18,42 +18,73 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include "types.h"
 #include "mem_map.h"
 #include "arm.h"
 
 
 // Most register names from: https://github.com/torvalds/linux/blob/master/include/linux/irqchip/arm-gic.h
-#define GIC_CPU_REGS_BASE            (MPCORE_PRIV_REG_BASE + 0x100)
-#define REG_GIC_CPU_CTRL             *((      vu32*)(GIC_CPU_REGS_BASE + 0x00)) // Control Register.
-#define REG_GIC_CPU_PRIMASK          *((      vu32*)(GIC_CPU_REGS_BASE + 0x04)) // Priority Mask Register.
-#define REG_GIC_CPU_BINPOINT         *((      vu32*)(GIC_CPU_REGS_BASE + 0x08)) // Binary Point Register.
-#define REG_GIC_CPU_INTACK           *((const vu32*)(GIC_CPU_REGS_BASE + 0x0C)) // Interrupt Acknowledge Register.
-#define REG_GIC_CPU_EOI              *((      vu32*)(GIC_CPU_REGS_BASE + 0x10)) // End of Interrupt Register.
-#define REG_GIC_CPU_RUNNINGPRI       *((const vu32*)(GIC_CPU_REGS_BASE + 0x14)) // Running Priority Register.
-#define REG_GIC_CPU_HIGHPRI          *((const vu32*)(GIC_CPU_REGS_BASE + 0x18)) // Highest Pending Interrupt Register.
+#define GIC_CPU_REGS_BASE   (MPCORE_PRIV_REG_BASE + 0x100)
+#define GIC_DIST_REGS_BASE  (MPCORE_PRIV_REG_BASE + 0x1000)
 
-#define GIC_DIST_REGS_BASE           (MPCORE_PRIV_REG_BASE + 0x1000)
-#define REG_GIC_DIST_CTRL            *((      vu32*)(GIC_DIST_REGS_BASE + 0x000)) // Interrupt Distributor Control Register.
-#define REG_GIC_DIST_CTR             *((const vu32*)(GIC_DIST_REGS_BASE + 0x004)) // Interrupt Controller Type Register.
-#define REGs_GIC_DIST_ENABLE_SET      ((      vu32*)(GIC_DIST_REGS_BASE + 0x100)) // Interrupt Enable set Registers.
-#define REGs_GIC_DIST_ENABLE_CLEAR    ((      vu32*)(GIC_DIST_REGS_BASE + 0x180)) // Interrupt Enable clear Registers.
-#define REGs_GIC_DIST_PENDING_SET     ((      vu32*)(GIC_DIST_REGS_BASE + 0x200)) // Interrupt Pending set Registers.
-#define REGs_GIC_DIST_PENDING_CLEAR   ((      vu32*)(GIC_DIST_REGS_BASE + 0x280)) // Interrupt Pending clear Registers.
-#define REGs_GIC_DIST_ACTIVE_SET      ((const vu32*)(GIC_DIST_REGS_BASE + 0x300)) // Interrupt Active Bit Registers.
-#define REGs_GIC_DIST_PRI             ((      vu32*)(GIC_DIST_REGS_BASE + 0x400)) // Interrupt Priority Registers.
-#define REGs_GIC_DIST_TARGET          ((      vu32*)(GIC_DIST_REGS_BASE + 0x800)) // Interrupt CPU targets Registers.
-#define REGs_GIC_DIST_CONFIG          ((      vu32*)(GIC_DIST_REGS_BASE + 0xC00)) // Interrupt Configuration Registers.
-#define REGs_GIC_DIST_LINE_LEVEL      ((const vu32*)(GIC_DIST_REGS_BASE + 0xD00)) // Interrupt Line Level Registers.
-#define REG_GIC_DIST_SOFTINT         *((      vu32*)(GIC_DIST_REGS_BASE + 0xF00)) // Software Interrupt Register.
-#define REG_GIC_DIST_PERIPH_IDENT0   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFE0)) // Periphal Identification Register 0.
-#define REG_GIC_DIST_PERIPH_IDENT1   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFE4)) // Periphal Identification Register 1.
-#define REG_GIC_DIST_PERIPH_IDENT2   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFE8)) // Periphal Identification Register 2.
-#define REG_GIC_DIST_PERIPH_IDENT3   *((const vu32*)(GIC_DIST_REGS_BASE + 0xFEC)) // Periphal Identification Register 3.
-#define REG_GIC_DIST_PRIMECELL0      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFF0)) // PrimeCell Identification Register 0.
-#define REG_GIC_DIST_PRIMECELL1      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFF4)) // PrimeCell Identification Register 0.
-#define REG_GIC_DIST_PRIMECELL2      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFF8)) // PrimeCell Identification Register 0.
-#define REG_GIC_DIST_PRIMECELL3      *((const vu32*)(GIC_DIST_REGS_BASE + 0xFFC)) // PrimeCell Identification Register 0.
+typedef struct
+{
+	vu32 ctrl;             // Control Register.
+	vu32 primask;          // Priority Mask Register.
+	vu32 binpoint;         // Binary Point Register.
+	const vu32 intack;     // Interrupt Acknowledge Register.
+	vu32 eoi;              // End of Interrupt Register.
+	const vu32 runningpri; // Running Priority Register.
+	const vu32 highpri;    // Highest Pending Interrupt Register.
+} GicCpu;
+static_assert(offsetof(GicCpu, highpri) == 0x18, "Error: Member highpri of GicCpu is not at offset 0x18!");
+
+typedef struct
+{
+	vu32 ctrl;                // Interrupt Distributor Control Register.
+	const vu32 ctr;           // Interrupt Controller Type Register.
+	u8 _0x8[0xf8];
+	vu32 enable_set[8];       // Interrupt Enable set Registers.
+	u8 _0x120[0x60];
+	vu32 enable_clear[8];     // Interrupt Enable clear Registers.
+	u8 _0x1a0[0x60];
+	vu32 pending_set[8];      // Interrupt Pending set Registers.
+	u8 _0x220[0x60];
+	vu32 pending_clear[8];    // Interrupt Pending clear Registers.
+	u8 _0x2a0[0x60];
+	const vu32 active_set[8]; // Interrupt Active Bit Registers.
+	u8 _0x320[0xe0];
+	vu32 pri[64];             // Interrupt Priority Registers.
+	u8 _0x500[0x300];
+	vu32 target[64];          // Interrupt CPU targets Registers.
+	u8 _0x900[0x300];
+	vu32 config[16];          // Interrupt Configuration Registers.
+	u8 _0xc40[0xc0];
+	const vu32 line_level[8]; // Interrupt Line Level Registers.
+	u8 _0xd20[0x1e0];
+	vu32 softint;             // Software Interrupt Register.
+	u8 _0xf04[0xdc];
+	const vu32 periph_ident0; // Periphal Identification Register 0.
+	const vu32 periph_ident1; // Periphal Identification Register 1.
+	const vu32 periph_ident2; // Periphal Identification Register 2.
+	const vu32 periph_ident3; // Periphal Identification Register 3.
+	const vu32 primecell0;    // PrimeCell Identification Register 0.
+	const vu32 primecell1;    // PrimeCell Identification Register 1.
+	const vu32 primecell2;    // PrimeCell Identification Register 2.
+	const vu32 primecell3;    // PrimeCell Identification Register 3.
+} GicDist;
+static_assert(offsetof(GicDist, primecell3) == 0xFFC, "Error: Member primecell3 of GicDist is not at offset 0xFFC!");
+
+ALWAYS_INLINE GicCpu* getGicCpuRegs(void)
+{
+	return (GicCpu*)GIC_CPU_REGS_BASE;
+}
+
+ALWAYS_INLINE GicDist* getGicDistRegs(void)
+{
+	return (GicDist*)GIC_DIST_REGS_BASE;
+}
 
 
 typedef enum

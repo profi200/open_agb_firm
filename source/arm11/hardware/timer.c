@@ -17,60 +17,62 @@
  */
 
 #include "types.h"
-#include "mem_map.h"
 #include "arm11/hardware/timer.h"
 #include "arm11/hardware/interrupt.h"
 #include "fb_assert.h"
 #include "arm.h"
 
 
-#define TIMER_REGS_BASE     (MPCORE_PRIV_REG_BASE + 0x600)
-#define REG_TIMER_LOAD      *((vu32*)(TIMER_REGS_BASE + 0x00))
-#define REG_TIMER_COUNTER   *((vu32*)(TIMER_REGS_BASE + 0x04))
-#define REG_TIMER_CNT       *((vu32*)(TIMER_REGS_BASE + 0x08))
-#define REG_TIMER_INT_STAT  *((vu32*)(TIMER_REGS_BASE + 0x0C))
-
-
 
 void TIMER_init(void)
 {
-	REG_TIMER_CNT = 0;
-	REG_TIMER_INT_STAT = 1;
+	// Timer.
+	Timer *const timer = getTimerRegs();
+	timer->cnt      = 0;
+	timer->int_stat = 1;
+
+	// Watchdog.
+	timer->wd_cnt      = 0;
+	timer->wd_disable  = WD_DISABLE_MAGIC1;
+	timer->wd_disable  = WD_DISABLE_MAGIC2;
+	timer->wd_int_stat = 1;
 
 	IRQ_registerIsr(IRQ_TIMER, 12, 0, NULL);
 }
 
-void TIMER_start(u8 prescaler, u32 ticks, bool autoReload, bool enableIrq)
+void TIMER_start(u16 prescaler, u32 ticks, u8 params)
 {
-	fb_assert(prescaler > 0);
+	fb_assert(prescaler > 0 && prescaler <= 256);
 
-	REG_TIMER_LOAD = ticks;
-	REG_TIMER_CNT = (prescaler - 1u)<<8 | (enableIrq ? TIMER_IRQ_ENABLE : 0u) |
-	                (autoReload ? TIMER_AUTO_RELOAD : TIMER_SINGLE_SHOT) | TIMER_ENABLE;
+	Timer *const timer = getTimerRegs();
+	timer->load = ticks;
+	timer->cnt = (prescaler - 1)<<8 | params | TIMER_ENABLE;
 }
 
 u32 TIMER_getTicks(void)
 {
-	return REG_TIMER_COUNTER;
+	return getTimerRegs()->counter;
 }
 
 u32 TIMER_stop(void)
 {
-	REG_TIMER_CNT = 0;
-	REG_TIMER_INT_STAT = 1;
+	Timer *const timer = getTimerRegs();
+	timer->cnt = 0;
+	timer->int_stat = 1;
 
-	return REG_TIMER_COUNTER;
+	return timer->counter;
 }
 
 void TIMER_sleepTicks(u32 ticks)
 {
-	REG_TIMER_LOAD = ticks;
-	REG_TIMER_CNT = TIMER_IRQ_ENABLE | TIMER_SINGLE_SHOT | TIMER_ENABLE;
+	Timer *const timer = getTimerRegs();
+	timer->load = ticks;
+	timer->cnt = TIMER_IRQ_ENABLE | TIMER_SINGLE_SHOT | TIMER_ENABLE; // Prescaler 1.
 
 	do
 	{
 		__wfi();
-	} while(REG_TIMER_COUNTER); // Checking the REG_TIMER_CNT enable bit is broken.
+	} while(timer->counter); // Checking the REG_TIMER_CNT enable bit is broken.
 
-	REG_TIMER_INT_STAT = 1;
+	timer->int_stat = 1;
 }

@@ -22,7 +22,7 @@
 #include "types.h"
 #include "arm_intrinsic.h"
 #include "util.h"
-#include "arm11/hardware/hash.h"
+#include "arm11/hardware/sha.h"
 #include "arm11/hardware/hid.h"
 #include "hardware/lgy.h"
 #include "arm11/hardware/lgyfb.h"
@@ -320,7 +320,7 @@ static u16 saveDbDebug(const char *const savePath, u32 romSize)
 
 	// TODO: Check for homebrew before searching the db.
 	u64 sha1[3];
-	hash((u32*)ROM_LOC, romSize, (u32*)sha1, HASH_INPUT_BIG | HASH_MODE_1, HASH_OUTPUT_BIG);
+	sha((u32*)ROM_LOC, romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
 
 	Result res;
 	GameDbEntry dbEntry;

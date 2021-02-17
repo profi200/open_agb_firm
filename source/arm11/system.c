@@ -56,6 +56,7 @@ void WEAK __systemInit(void)
 
 void WEAK __systemDeinit(void)
 {
+	DMA330_init();
 	__cpsid(if);
 	IRQ_init();
 }

@@ -17,32 +17,14 @@
  */
 
 #include <stdatomic.h>
-#include "mem_map.h"
 #include "types.h"
 #include "arm9/hardware/timer.h"
 #include "arm9/hardware/interrupt.h"
 #include "arm.h"
 
 
-#define TIMER_REGS_BASE   (IO_MEM_ARM9_ONLY + 0x3000)
-#define REG_TIMER0_VAL    *((vu16*)(TIMER_REGS_BASE + 0x00))
-#define REG_TIMER0_CNT    *((vu16*)(TIMER_REGS_BASE + 0x02))
-
-#define REG_TIMER1_VAL    *((vu16*)(TIMER_REGS_BASE + 0x04))
-#define REG_TIMER1_CNT    *((vu16*)(TIMER_REGS_BASE + 0x06))
-
-#define REG_TIMER2_VAL    *((vu16*)(TIMER_REGS_BASE + 0x08))
-#define REG_TIMER2_CNT    *((vu16*)(TIMER_REGS_BASE + 0x0A))
-
-#define REG_TIMER3_VAL    *((vu16*)(TIMER_REGS_BASE + 0x0C))
-#define REG_TIMER3_CNT    *((vu16*)(TIMER_REGS_BASE + 0x0E))
-
-#define REG_TIMER_VAL(n)  *((vu16*)(TIMER_REGS_BASE + 0x00 + ((n) * 4)))
-#define REG_TIMER_CNT(n)  *((vu16*)(TIMER_REGS_BASE + 0x02 + ((n) * 4)))
-
-
-// For TIMER_sleep()
-static u32 overflows;
+// For TIMER_sleepMs().
+static u32 g_overflows;
 
 
 
@@ -52,51 +34,54 @@ void TIMER_init(void)
 {
 	for(u32 i = 0; i < 4; i++)
 	{
-		REG_TIMER_CNT(i) = 0;
+		getTimerRegs(i)->cnt = 0;
 	}
 
 	IRQ_registerIsr(IRQ_TIMER_3, timerSleepHandler);
 }
 
-void TIMER_start(Timer timer, TimerPrescaler prescaler, u16 ticks, bool enableIrq)
+void TIMER_start(u8 tmr, u16 ticks, u8 params)
 {
-	REG_TIMER_VAL(timer) = ticks;
-	REG_TIMER_CNT(timer) = TIMER_ENABLE | (enableIrq ? TIMER_IRQ_ENABLE : 0) | prescaler;
+	Timer *const timer = getTimerRegs(tmr);
+	timer->val = ticks;
+	timer->cnt = TIMER_ENABLE | params;
 }
 
-u16 TIMER_getTicks(Timer timer)
+u16 TIMER_getTicks(u8 tmr)
 {
-	return REG_TIMER_VAL(timer);
+	return getTimerRegs(tmr)->val;
 }
 
-u16 TIMER_stop(Timer timer)
+u16 TIMER_stop(u8 tmr)
 {
-	REG_TIMER_CNT(timer) = 0;
+	Timer *const timer = getTimerRegs(tmr);
+	timer->cnt = 0;
 
-	return REG_TIMER_VAL(timer);
+	return timer->val;
 }
 
-void TIMER_sleep(u32 ms)
+void TIMER_sleepMs(u32 ms)
 {
-	REG_TIMER3_VAL = TIMER_FREQ_64(1000);
-	overflows = ms;
-	atomic_signal_fence(memory_order_release); // Don't move the write to overflows.
+	Timer *const timer = getTimerRegs(3);
+	timer->val = TIMER_FREQ_64(1000);
+	g_overflows = ms;
+	atomic_signal_fence(memory_order_release); // Don't move the write to g_overflows.
 
-	REG_TIMER3_CNT = TIMER_ENABLE | TIMER_IRQ_ENABLE | TIMER_PRESCALER_64;
+	timer->cnt = TIMER_ENABLE | TIMER_IRQ_ENABLE | TIMER_PRESCALER_64;
 
 	do
 	{
 		__wfi();
-	} while(REG_TIMER3_CNT & TIMER_ENABLE);
+	} while(timer->cnt & TIMER_ENABLE);
 }
 
 static void timerSleepHandler(UNUSED u32 id)
 {
-	u32 tmp = overflows;
-	if(!--tmp)
+	u32 tmp = g_overflows;
+	if(--tmp == 0)
 	{
-		REG_TIMER3_CNT = 0;
+		getTimerRegs(3)->cnt = 0;
 		return;
 	}
-	overflows = tmp;
+	g_overflows = tmp;
 }
