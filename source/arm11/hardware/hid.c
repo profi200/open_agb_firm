@@ -34,8 +34,8 @@
 
 static u32 g_kHeld = 0, g_kDown = 0, g_kUp = 0;
 static u32 g_extraKeys = 0;
-TouchPos tPos = {0};
-CpadPos cPos = {0};
+TouchPos g_tPos = {0};
+CpadPos g_cPos = {0};
 
 
 
@@ -82,23 +82,23 @@ static u32 rawCodec2Hid(void)
 	// TODO: Calibration
 	const u16 tx = __builtin_bswap16(adc.touchX[0]);
 	u32 fakeKeys = (~tx & 1u<<12)<<8; // KEY_TOUCH
-	tPos.x = tx * 320u / 4096u;
-	tPos.y = __builtin_bswap16(adc.touchY[0]) * 240u / 4096u;
+	g_tPos.x = tx * 320u / 4096u;
+	g_tPos.y = __builtin_bswap16(adc.touchY[0]) * 240u / 4096u;
 
 	// Circle-Pad
 	// TODO: Calibration
-	cPos.y = (__builtin_bswap16(adc.cpadY[0]) & 0xFFFu) - 2048u;
-	cPos.x = -((__builtin_bswap16(adc.cpadX[0]) & 0xFFFu) - 2048u); // X axis is inverted.
+	g_cPos.y = (__builtin_bswap16(adc.cpadY[0]) & 0xFFFu) - 2048u;
+	g_cPos.x = -((__builtin_bswap16(adc.cpadX[0]) & 0xFFFu) - 2048u); // X axis is inverted.
 
-	if((cPos.x >= 0 ? cPos.x : -cPos.x) > CPAD_THRESHOLD)
+	if((g_cPos.x >= 0 ? g_cPos.x : -g_cPos.x) > CPAD_THRESHOLD)
 	{
-		if(cPos.x >= 0) fakeKeys |= KEY_CPAD_RIGHT;
-		else            fakeKeys |= KEY_CPAD_LEFT;
+		if(g_cPos.x >= 0) fakeKeys |= KEY_CPAD_RIGHT;
+		else              fakeKeys |= KEY_CPAD_LEFT;
 	}
-	if((cPos.y >= 0 ? cPos.y : -cPos.y) > CPAD_THRESHOLD)
+	if((g_cPos.y >= 0 ? g_cPos.y : -g_cPos.y) > CPAD_THRESHOLD)
 	{
-		if(cPos.y >= 0) fakeKeys |= KEY_CPAD_UP;
-		else            fakeKeys |= KEY_CPAD_DOWN;
+		if(g_cPos.y >= 0) fakeKeys |= KEY_CPAD_UP;
+		else              fakeKeys |= KEY_CPAD_DOWN;
 	}
 
 	fakeKeysCache = fakeKeys;
@@ -132,12 +132,12 @@ u32 hidKeysUp(void)
 
 const TouchPos* hidGetTouchPosPtr(void)
 {
-	return &tPos;
+	return &g_tPos;
 }
 
 const CpadPos* hidGetCpadPosPtr(void)
 {
-	return &cPos;
+	return &g_cPos;
 }
 
 u32 hidGetExtraKeys(u32 clearMask)

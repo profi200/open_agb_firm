@@ -31,33 +31,42 @@ void CSND_init(void)
 
 	CODEC_init();
 
+	Csnd *const csnd = getCsndRegs();
 	//static const u8 sliderBounds[2] = {0xE, 0xF6}; // Volume slider 0% and 100% offset
 	//I2C_writeRegBuf(I2C_DEV_CTR_MCU, 0x58, sliderBounds, 2);
-	REG_CSND_MASTER_VOL = 0x8000;
-	REG_CSND_UNK_CNT = 1u<<15 | 1u<<14;
+	csnd->master_vol = 0x8000;
+	csnd->unk_cnt    = 1u<<15 | 1u<<14;
 
-	for(u32 i = 0; i < 32; i++) REG_CSND_CH_CNT(i) = 0;
-	for(u32 i = 0; i < 2; i++) REG_CSND_CAP_CNT(i) = 0;
+	// Stop all channels.
+	CsndCh *const csndCh = csnd->ch;
+	for(u32 i = 0; i < 32; i++) csndCh[i].cnt = 0;
+
+	// Stop all captures.
+	CsndCap *const csndCap = csnd->cap;
+	csndCap[0].cnt = 0;
+	csndCap[1].cnt = 0;
 }
 
 void CSND_setupCh(u8 ch, s16 sampleRate, u32 vol, const u32 *const data, const u32 *const data2, u32 size, u16 flags)
 {
-	REG_CSND_CH_SR(ch) = sampleRate;
-	REG_CSND_CH_VOL(ch) = vol;
-	REG_CSND_CH_CAPVOL(ch) = vol;
-	REG_CSND_CH_ST_ADDR(ch) = (u32)data;
-	REG_CSND_CH_SIZE(ch) = size;
-	REG_CSND_CH_LP_ADDR(ch) = (u32)data2;
-	REG_CSND_CH_ST_ADPCM(ch) = 0; // Hardcoded for now. TODO
-	REG_CSND_CH_LP_ADPCM(ch) = 0; // Hardcoded for now. TODO
-	REG_CSND_CH_CNT(ch) = CSND_CH_START | flags; // Start in paused state.
+	CsndCh *const csndCh = getCsndChRegs(ch);
+	csndCh->sr       = sampleRate;
+	csndCh->vol      = vol;
+	csndCh->capvol   = vol;
+	csndCh->st_addr  = (u32)data;
+	csndCh->size     = size;
+	csndCh->lp_addr  = (u32)data2;
+	csndCh->st_adpcm = 0;                     // TODO: Hardcoded for now.
+	csndCh->lp_adpcm = 0;                     // TODO: Hardcoded for now.
+	csndCh->cnt      = CSND_CH_START | flags; // Start in paused state.
 }
 
 
 void CSND_startCap(u8 ch, s16 sampleRate, u32 *const data, u32 size, u16 flags)
 {
-	REG_CSND_CAP_SR(ch) = sampleRate;
-	REG_CSND_CAP_SIZE(ch) = size;
-	REG_CSND_CAP_ADDR(ch) = (u32)data;
-	REG_CSND_CAP_CNT(ch) = CSND_CAP_START | flags;
+	CsndCap *const csndCap = getCsndCapRegs(ch);
+	csndCap->sr   = sampleRate;
+	csndCap->size = size;
+	csndCap->addr = (u32)data;
+	csndCap->cnt  = CSND_CAP_START | flags;
 }

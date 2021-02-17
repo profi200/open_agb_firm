@@ -40,8 +40,8 @@
 // REG_NSPI_INT_MASK Bit set = disabled.
 // REG_NSPI_INT_STAT Status and aknowledge.
 #define NSPI_INT_TRANSF_END  (1u)    // Also fires on each auto poll try.
-#define NSPI_INT_AP_SUCCESS  (1u<<1) // Auto poll
-#define NSPI_INT_AP_TIMEOUT  (1u<<2) // Auto poll
+#define NSPI_INT_AP_SUCCESS  (1u<<1) // Auto poll.
+#define NSPI_INT_AP_TIMEOUT  (1u<<2) // Auto poll.
 
 
 typedef enum
@@ -55,6 +55,13 @@ typedef enum
 } NspiClk;
 
 
+// cmd is the command byte to send.
+// timeout is the timeout. Must be 0-15. Tries = 31<<(NspiClk + timeout).
+// offset is the bit offset to poll for. Must be 0-7.
+// bitSet is what to poll for (0 or 1).
+#define MAKE_AP_PARAMS(cmd, timeout, offset, bitSet) ((u32)(bitSet)<<30 | (u32)(offset)<<24 | (u32)(timeout)<<16 | (cmd))
+
+
 
 /**
  * @brief      Initializes the SPI buses. Call this only once.
@@ -62,13 +69,14 @@ typedef enum
 void SPICARD_init(void);
 
 /**
- * @brief      Automatically polls a bit of the command response. Use with the macro below.
+ * @brief      Automatically polls a bit of the command response.
  *
- * @param[in]  params  The parameters. Use the macro below.
+ * @param[in]  clk        The clock frequency to use.
+ * @param[in]  ap_params  The parameters. Use the macro above.
  *
  * @return     Returns false on failure/timeout and true on success.
  */
-bool _SPICARD_autoPollBit(u32 params);
+bool SPICARD_autoPollBit(NspiClk clk, u32 ap_params);
 
 /**
  * @brief      Writes and/or reads data to/from a SPI device.
@@ -78,19 +86,10 @@ bool _SPICARD_autoPollBit(u32 params);
  * @param      out      Output data pointer for read.
  * @param[in]  inSize   Input size. Must be <= 0x1FFFFF.
  * @param[in]  outSize  Output size. Must be <= 0x1FFFFF.
- * @param[in]  done     Set to true if this is the last transfer (chip select).
  */
-void SPICARD_writeRead(NspiClk clk, const u32 *in, u32 *out, u32 inSize, u32 outSize, bool done);
-
+void SPICARD_writeRead(NspiClk clk, const u32 *in, u32 *out, u32 inSize, u32 outSize);
 
 /**
- * @brief      Automatically polls a bit of the command response.
- *
- * @param[in]  cmd      The command.
- * @param[in]  timeout  The timeout. Must be 0-15. Tries = 31<<NspiClk + timeout.
- * @param[in]  off      The bit offset. Must be 0-7.
- * @param[in]  bitSet   Poll for a set ur unset bit.
- *
- * @return     Returns false on failure/timeout and true on success.
+ * @brief      Deselect gamecard SPI flash (chip select).
  */
-#define SPICARD_autoPollBit(cmd, timeout, off, bitSet) _SPICARD_autoPollBit((bitSet)<<30 | (off)<<24 | (timeout)<<16 | (cmd))
+void SPICARD_deselect(void);

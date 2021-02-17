@@ -73,7 +73,7 @@ BEGIN_ASM_FUNC irqHandler
 		bics r1, r1, r3, lsr r2
 		bne irqHandler_find_first_lp
 	mov r1, r3, lsr r2
-	ldr r3, =irqIsrTable
+	ldr r3, =g_irqIsrTable
 	rsb r0, r2, #31                  @ r0 = 31 - r2
 	str r1, [r12, #4]                @ REG_IRQ_IF
 	ldr r2, [r3, r0, lsl #2]

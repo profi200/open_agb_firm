@@ -64,7 +64,7 @@ typedef struct
 	u32 l2Axiwram[256]; // L2 table for AXIWRAM
 	u32 l2Boot11[256];  // L2 table for boot11 (high vectors)
 } MmuTables;
-static MmuTables *const mmuTables = (MmuTables*)A11_MMU_TABLES_BASE;
+static MmuTables *const g_mmuTables = (MmuTables*)A11_MMU_TABLES_BASE;
 
 
 
@@ -84,7 +84,7 @@ static void mmuMapSupersections(u32 va, u32 pa, u32 num, u8 access, bool xn, u32
 	fb_assert(!(pa & ~0xFF000000));
 	fb_assert(num < 256);
 
-	u32 *const l1Table = mmuTables->l1;
+	u32 *const l1Table = g_mmuTables->l1;
 	for(u32 i = 0; i < 0x1000000 * num; i += 0x1000000)
 	{
 		const u32 l1Ss = (va + i)>>20;
@@ -113,7 +113,7 @@ static void mmuMapSections(u32 va, u32 pa, u32 num, bool shared, u8 access, u8 d
 	fb_assert(!(pa & ~0xFFF00000));
 	fb_assert(num < 4096);
 
-	u32 *const l1Table = mmuTables->l1;
+	u32 *const l1Table = g_mmuTables->l1;
 	for(u32 i = 0; i < 0x100000 * num; i += 0x100000)
 	{
 		l1Table[(va + i)>>20] = (pa + i) | shared<<16 | access<<10 |
@@ -147,7 +147,7 @@ static void mmuMapPages(u32 va, u32 pa, u32 num, u32 *const l2Table, bool shared
 		l2Table[(va + i)>>12 & 0xFF] = ((pa + i) & 0xFFFFF000) | shared<<10 | access<<4 | attr<<2 | 0b10u | xn;
 	}
 
-	mmuTables->l1[va>>20] = (u32)l2Table | domain<<5 | 0b01u;
+	g_mmuTables->l1[va>>20] = (u32)l2Table | domain<<5 | 0b01u;
 }
 
 void setupMmu(void)
@@ -158,7 +158,7 @@ void setupMmu(void)
 	// Context ID Register (ASID = 0, PROCID = 0)
 	__setCidr(0);
 	// TTBR0 address shared page table walk and outer cachable write-through, no allocate on write
-	__setTtbr0((u32)mmuTables->l1 | 0x12);
+	__setTtbr0((u32)g_mmuTables->l1 | 0x12);
 	// Use the 16 KiB L1 table only
 	__setTtbcr(0);
 	// Domain 0 = client, remaining domains all = no access
@@ -169,7 +169,7 @@ void setupMmu(void)
 	if(!__getCpuId())
 	{
 		// Clear L1 and L2 tables
-		iomemset((u32*)mmuTables, 0, sizeof(MmuTables));
+		iomemset((u32*)g_mmuTables, 0, sizeof(MmuTables));
 
 		// IO mem mapping
 		mmuMapSections(IO_MEM_ARM9_ARM11, IO_MEM_ARM9_ARM11, 4, true,
@@ -177,7 +177,7 @@ void setupMmu(void)
 
 		// MPCore private region mapping
 		mmuMapPages(MPCORE_PRIV_REG_BASE, MPCORE_PRIV_REG_BASE, 2,
-		            mmuTables->l2PrivReg, false, PERM_PRIV_RW_USR_NA,
+		            g_mmuTables->l2PrivReg, false, PERM_PRIV_RW_USR_NA,
 		            0, true, L1_TO_L2(ATTR_SHARED_DEVICE));
 
 		// VRAM mapping
@@ -185,12 +185,12 @@ void setupMmu(void)
 		               true, ATTR_NORM_WRITE_TROUGH_NO_ALLOC);
 
 		// AXIWRAM core 0/1 stack mapping
-		mmuMapPages(A11_C0_STACK_START, A11_C0_STACK_START, 4, mmuTables->l2Axiwram,
+		mmuMapPages(A11_C0_STACK_START, A11_C0_STACK_START, 4, g_mmuTables->l2Axiwram,
 		            true, PERM_PRIV_RW_USR_NA, 0, true, L1_TO_L2(ATTR_NORM_WRITE_BACK_ALLOC));
 
 		// AXIWRAM MMU table mapping
 		const u32 mmuTablesPages = ((sizeof(MmuTables) + 0xFFFu) & ~0xFFFu) / 0x1000;
-		mmuMapPages((u32)mmuTables, (u32)mmuTables, mmuTablesPages, mmuTables->l2Axiwram, true,
+		mmuMapPages((u32)g_mmuTables, (u32)g_mmuTables, mmuTablesPages, g_mmuTables->l2Axiwram, true,
 		            PERM_PRIV_RO_USR_NA, 0, true, L1_TO_L2(ATTR_NORM_WRITE_TROUGH_NO_ALLOC));
 
 		extern const u32 __start__[];
@@ -202,15 +202,15 @@ void setupMmu(void)
 
 		// text
 		mmuMapPages((u32)__start__, (u32)__start__, (u32)__text_pages__,
-		            mmuTables->l2Axiwram, true, PERM_PRIV_RO_USR_NA, 0, false,
+		            g_mmuTables->l2Axiwram, true, PERM_PRIV_RO_USR_NA, 0, false,
 		            L1_TO_L2(ATTR_NORM_WRITE_BACK_ALLOC));
 		// rodata
 		mmuMapPages((u32)__rodata_start__, (u32)__rodata_start__, (u32)__rodata_pages__,
-		            mmuTables->l2Axiwram, true, PERM_PRIV_RO_USR_NA, 0, true,
+		            g_mmuTables->l2Axiwram, true, PERM_PRIV_RO_USR_NA, 0, true,
 		            L1_TO_L2(ATTR_NORM_WRITE_BACK_ALLOC));
 		// data, bss and heap
 		mmuMapPages((u32)__data_start__, (u32)__data_start__, dataPages,
-		            mmuTables->l2Axiwram, true, PERM_PRIV_RW_USR_NA, 0, true,
+		            g_mmuTables->l2Axiwram, true, PERM_PRIV_RW_USR_NA, 0, true,
 		            L1_TO_L2(ATTR_NORM_WRITE_BACK_ALLOC));
 
 		// FCRAM with New 3DS extension
@@ -218,7 +218,7 @@ void setupMmu(void)
 		                    ATTR_NORM_WRITE_BACK_ALLOC);
 
 		// Map fastboot executable start to boot11 mirror (exception vectors)
-		mmuMapPages(BOOT11_MIRROR2, (u32)__start__, 1, mmuTables->l2Boot11, true,
+		mmuMapPages(BOOT11_MIRROR2, (u32)__start__, 1, g_mmuTables->l2Boot11, true,
 		            PERM_PRIV_RO_USR_NA, 0, false, L1_TO_L2(ATTR_NORM_WRITE_BACK_ALLOC));
 
 		// Invalidate tag RAMs before enabling SMP as recommended by the MPCore doc.

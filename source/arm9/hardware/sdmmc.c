@@ -452,7 +452,7 @@ int Nand_Init()
 
 int SD_Init()
 {
-	REG_CFG9_SDMMCCTL = SDMMCCTL_SD_TMIO1_SEL | SDMMCCTL_TMIO3_MAP11 | SDMMCCTL_UNKBIT6;
+	getCfg9Regs()->sdmmcctl = SDMMCCTL_SD_TMIO1_SEL | SDMMCCTL_TMIO3_MAP11 | SDMMCCTL_UNKBIT6;
 	u32 timeout = 10; // In ms.
 	do 
 	{
@@ -460,7 +460,7 @@ int SD_Init()
 		if(sdmmc_read16(REG_SDSTATUS0) & TMIO_STAT0_SIGSTATE)
 			break;
 
-		TIMER_sleep(2);
+		TIMER_sleepMs(2);
 		timeout -= 2;
 	} while(timeout);
 		

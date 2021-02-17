@@ -17,20 +17,11 @@
  */
 
 #include "types.h"
-#include "mem_map.h"
 #include "arm11/hardware/i2c.h"
 #include "kevent.h"
 #include "kmutex.h"
 #include "arm11/hardware/interrupt.h"
 
-
-typedef struct
-{
-	vu8  I2C_DATA;
-	vu8  I2C_CNT;
-	vu16 I2C_CNTEX;
-	vu16 I2C_SCL;
-} I2cRegs;
 
 enum
 {
@@ -43,7 +34,7 @@ static const struct
 {
 	u8 busId;
 	u8 devAddr;
-} i2cDevTable[] =
+} g_i2cDevTable[] =
 {
 	{I2C_BUS1, 0x4A},
 	{I2C_BUS1, 0x7A},
@@ -67,40 +58,40 @@ static const struct
 
 typedef struct
 {
-	I2cRegs *const regs;
-	KEvent *event;
 	KMutex *mutex;
+	I2cBus *const i2cBus;
+	KEvent *event;
 } I2cState;
-static I2cState g_i2cState[3] = {{(I2cRegs*)I2C1_REGS_BASE, NULL, NULL},
-                                 {(I2cRegs*)I2C2_REGS_BASE, NULL, NULL},
-                                 {(I2cRegs*)I2C3_REGS_BASE, NULL, NULL}};
+static I2cState g_i2cState[3] = {{NULL, (I2cBus*)I2C1_REGS_BASE, NULL},
+                                 {NULL, (I2cBus*)I2C2_REGS_BASE, NULL},
+                                 {NULL, (I2cBus*)I2C3_REGS_BASE, NULL}};
 
 
 
-static bool checkAck(I2cRegs *const regs)
+static bool checkAck(I2cBus *const i2cBus)
 {
 	// If we received a NACK stop the transfer.
-	if((regs->I2C_CNT & I2C_ACK) == 0u)
+	if((i2cBus->cnt & I2C_ACK) == 0u)
 	{
-		regs->I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_ERROR | I2C_STOP;
+		i2cBus->cnt = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_ERROR | I2C_STOP;
 		return false;
 	}
 
 	return true;
 }
 
-static void sendByte(I2cRegs *const regs, u8 data, u8 params, KEvent *const event)
+static void sendByte(I2cBus *const i2cBus, u8 data, u8 params, KEvent *const event)
 {
-	regs->I2C_DATA = data;
-	regs->I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIR_WRITE | params;
+	i2cBus->data = data;
+	i2cBus->cnt = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIR_WRITE | params;
 	waitForEvent(event);
 }
 
-static u8 recvByte(I2cRegs *const regs, u8 params, KEvent *const event)
+static u8 recvByte(I2cBus *const i2cBus, u8 params, KEvent *const event)
 {
-	regs->I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIR_READ | params;
+	i2cBus->cnt = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIR_READ | params;
 	waitForEvent(event);
-	return regs->I2C_DATA;
+	return i2cBus->data;
 }
 
 void I2C_init(void)
@@ -110,32 +101,20 @@ void I2C_init(void)
 	inited = true;
 
 
-	KEvent *tmp = createEvent(true);
-	bindInterruptToEvent(tmp, IRQ_I2C1, 14);
-	g_i2cState[0].event = tmp;
-	tmp = createEvent(true);
-	bindInterruptToEvent(tmp, IRQ_I2C2, 14);
-	g_i2cState[1].event = tmp;
-	tmp = createEvent(true);
-	bindInterruptToEvent(tmp, IRQ_I2C3, 14);
-	g_i2cState[2].event = tmp;
-
 	for(u32 i = 0; i < 3; i++)
 	{
+		static const Interrupt i2cIrqs[3] = {IRQ_I2C1, IRQ_I2C2, IRQ_I2C3};
+		KEvent *const event = createEvent(true);
+		bindInterruptToEvent(event, i2cIrqs[i], 14);
+		g_i2cState[i].event = event;
+
 		g_i2cState[i].mutex = createMutex();
+
+		I2cBus *const i2cBus = g_i2cState[i].i2cBus;
+		while(i2cBus->cnt & I2C_ENABLE);
+		i2cBus->cntex = I2C_CLK_STRETCH;
+		i2cBus->scl = I2C_DELAYS(5u, 0u);
 	}
-
-	while(REG_I2C1_CNT & I2C_ENABLE);
-	REG_I2C1_CNTEX = I2C_CLK_STRETCH;
-	REG_I2C1_SCL = I2C_DELAYS(5u, 0u);
-
-	while(REG_I2C2_CNT & I2C_ENABLE);
-	REG_I2C2_CNTEX = I2C_CLK_STRETCH;
-	REG_I2C2_SCL = I2C_DELAYS(5u, 0u);
-
-	while(REG_I2C3_CNT & I2C_ENABLE);
-	REG_I2C3_CNTEX = I2C_CLK_STRETCH;
-	REG_I2C3_SCL = I2C_DELAYS(5u, 0u);
 }
 
 static bool startTransfer(u8 devAddr, u8 regAddr, bool read, const I2cState *const state)
@@ -143,29 +122,29 @@ static bool startTransfer(u8 devAddr, u8 regAddr, bool read, const I2cState *con
 	u32 tries = 8;
 	do
 	{
-		I2cRegs *const regs = state->regs;
+		I2cBus *const i2cBus = state->i2cBus;
 		KEvent *const event = state->event;
 
 		// Edge case on previous transfer error (NACK).
 		// This is a special case where we can't predict when or if
 		// the IRQ has fired. If it fires after checking but
 		// before a wfi this would hang.
-		if(regs->I2C_CNT & I2C_ENABLE) waitForEvent(event);
+		if(i2cBus->cnt & I2C_ENABLE) waitForEvent(event);
 		clearEvent(event);
 
 		// Select device and start.
-		sendByte(regs, devAddr, I2C_START, event);
-		if(!checkAck(regs)) continue;
+		sendByte(i2cBus, devAddr, I2C_START, event);
+		if(!checkAck(i2cBus)) continue;
 
 		// Select register.
-		sendByte(regs, regAddr, 0, event);
-		if(!checkAck(regs)) continue;
+		sendByte(i2cBus, regAddr, 0, event);
+		if(!checkAck(i2cBus)) continue;
 
 		// Select device in read mode for read transfer.
 		if(read)
 		{
-			sendByte(regs, devAddr | 1u, I2C_START, event);
-			if(!checkAck(regs)) continue;
+			sendByte(i2cBus, devAddr | 1u, I2C_START, event);
+			if(!checkAck(i2cBus)) continue;
 		}
 
 		break;
@@ -176,9 +155,9 @@ static bool startTransfer(u8 devAddr, u8 regAddr, bool read, const I2cState *con
 
 bool I2C_readRegBuf(I2cDevice devId, u8 regAddr, u8 *out, u32 size)
 {
-	const u8 devAddr = i2cDevTable[devId].devAddr;
-	const I2cState *const state = &g_i2cState[i2cDevTable[devId].busId];
-	I2cRegs *const regs = state->regs;
+	const u8 devAddr = g_i2cDevTable[devId].devAddr;
+	const I2cState *const state = &g_i2cState[g_i2cDevTable[devId].busId];
+	I2cBus *const i2cBus = state->i2cBus;
 	KEvent *const event = state->event;
 	KMutex *const mutex = state->mutex;
 
@@ -187,10 +166,10 @@ bool I2C_readRegBuf(I2cDevice devId, u8 regAddr, u8 *out, u32 size)
 	lockMutex(mutex);
 	if(startTransfer(devAddr, regAddr, true, state))
 	{
-		while(--size) *out++ = recvByte(regs, I2C_ACK, event);
+		while(--size) *out++ = recvByte(i2cBus, I2C_ACK, event);
 
 		// Last byte transfer.
-		*out = recvByte(regs, I2C_STOP, event);
+		*out = recvByte(i2cBus, I2C_STOP, event);
 	}
 	else res = false;
 	unlockMutex(mutex);
@@ -200,9 +179,9 @@ bool I2C_readRegBuf(I2cDevice devId, u8 regAddr, u8 *out, u32 size)
 
 bool I2C_writeRegBuf(I2cDevice devId, u8 regAddr, const u8 *in, u32 size)
 {
-	const u8 devAddr = i2cDevTable[devId].devAddr;
-	const I2cState *const state = &g_i2cState[i2cDevTable[devId].busId];
-	I2cRegs *const regs = state->regs;
+	const u8 devAddr = g_i2cDevTable[devId].devAddr;
+	const I2cState *const state = &g_i2cState[g_i2cDevTable[devId].busId];
+	I2cBus *const i2cBus = state->i2cBus;
 	KEvent *const event = state->event;
 	KMutex *const mutex = state->mutex;
 
@@ -216,8 +195,8 @@ bool I2C_writeRegBuf(I2cDevice devId, u8 regAddr, const u8 *in, u32 size)
 
 	while(--size)
 	{
-		sendByte(regs, *in++, 0, event);
-		if(!checkAck(regs))
+		sendByte(i2cBus, *in++, 0, event);
+		if(!checkAck(i2cBus))
 		{
 			unlockMutex(mutex);
 			return false;
@@ -225,8 +204,8 @@ bool I2C_writeRegBuf(I2cDevice devId, u8 regAddr, const u8 *in, u32 size)
 	}
 
 	// Last byte transfer.
-	sendByte(regs, *in, I2C_STOP, event);
-	if(!checkAck(regs))
+	sendByte(i2cBus, *in, I2C_STOP, event);
+	if(!checkAck(i2cBus))
 	{
 		unlockMutex(mutex);
 		return false;
@@ -248,59 +227,59 @@ bool I2C_writeReg(I2cDevice devId, u8 regAddr, u8 data)
 	return I2C_writeRegBuf(devId, regAddr, &data, 1);
 }
 
-static I2cRegs* i2cGetBusRegsBase(u8 busId)
+static I2cBus* i2cGetBusRegs(u8 busId)
 {
-	I2cRegs *base;
+	I2cBus *i2cBus;
 	switch(busId)
 	{
 		case I2C_BUS1:
-			base = (I2cRegs*)I2C1_REGS_BASE;
+			i2cBus = (I2cBus*)I2C1_REGS_BASE;
 			break;
 		case I2C_BUS2:
-			base = (I2cRegs*)I2C2_REGS_BASE;
+			i2cBus = (I2cBus*)I2C2_REGS_BASE;
 			break;
 		case I2C_BUS3:
-			base = (I2cRegs*)I2C3_REGS_BASE;
+			i2cBus = (I2cBus*)I2C3_REGS_BASE;
 			break;
 		default:
-			base = NULL;
+			i2cBus = NULL;
 	}
 
-	return base;
+	return i2cBus;
 }
 
 bool I2C_writeRegIntSafe(I2cDevice devId, u8 regAddr, u8 data)
 {
-	const u8 devAddr = i2cDevTable[devId].devAddr;
-	I2cRegs *const regs = i2cGetBusRegsBase(i2cDevTable[devId].busId);
+	const u8 devAddr = g_i2cDevTable[devId].devAddr;
+	I2cBus *const i2cBus = i2cGetBusRegs(g_i2cDevTable[devId].busId);
 
 
 	u32 tries = 8;
 	do
 	{
-		while(regs->I2C_CNT & I2C_ENABLE);
+		while(i2cBus->cnt & I2C_ENABLE);
 
 		// Select device and start.
-		regs->I2C_DATA = devAddr;
-		regs->I2C_CNT = I2C_ENABLE | I2C_DIR_WRITE | I2C_START;
-		while(regs->I2C_CNT & I2C_ENABLE);
-		if(!checkAck(regs)) continue;
+		i2cBus->data = devAddr;
+		i2cBus->cnt = I2C_ENABLE | I2C_DIR_WRITE | I2C_START;
+		while(i2cBus->cnt & I2C_ENABLE);
+		if(!checkAck(i2cBus)) continue;
 
 		// Select register.
-		regs->I2C_DATA = regAddr;
-		regs->I2C_CNT = I2C_ENABLE | I2C_DIR_WRITE;
-		while(regs->I2C_CNT & I2C_ENABLE);
-		if(!checkAck(regs)) continue;
+		i2cBus->data = regAddr;
+		i2cBus->cnt = I2C_ENABLE | I2C_DIR_WRITE;
+		while(i2cBus->cnt & I2C_ENABLE);
+		if(!checkAck(i2cBus)) continue;
 
 		break;
 	} while(--tries > 0);
 
 	if(tries == 0) return false;
 
-	regs->I2C_DATA = data;
-	regs->I2C_CNT = I2C_ENABLE | I2C_DIR_WRITE | I2C_STOP;
-	while(regs->I2C_CNT & I2C_ENABLE);
-	if(!checkAck(regs)) return false;
+	i2cBus->data = data;
+	i2cBus->cnt = I2C_ENABLE | I2C_DIR_WRITE | I2C_STOP;
+	while(i2cBus->cnt & I2C_ENABLE);
+	if(!checkAck(i2cBus)) return false;
 
 	return true;
 }

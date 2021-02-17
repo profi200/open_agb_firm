@@ -200,17 +200,20 @@ bool AES_ccm(const AES_ctx *const ctx, const u32 *const in, u32 *const out, u32 
 //             SHA              //
 //////////////////////////////////
 
-#define SHA_ENABLE         (1u) // Also used as busy flag
-#define SHA_FINAL_ROUND    (1u<<1)
-#define SHA_IN_DMA_ENABLE  (1u<<2) // Without this NDMA startup is never fires
-#define SHA_INPUT_BIG      (1u<<3)
-#define SHA_INPUT_LITTLE   (0u)
-#define SHA_OUTPUT_BIG     (SHA_INPUT_BIG)
-#define SHA_OUTPUT_LITTLE  (SHA_INPUT_LITTLE)
-#define SHA_MODE_256       (0u)
-#define SHA_MODE_224       (1u<<4)
-#define SHA_MODE_1         (2u<<4)
-#define SHA_MODE_MASK      (SHA_MODE_1 | SHA_MODE_224 | SHA_MODE_256)
+#define SHA_ENABLE       (1u)     // Also used as busy flag.
+#define SHA_FINAL_ROUND  (1u<<1)
+#define SHA_I_DMA_E      (1u<<2)  // Input DMA enable.
+#define SHA_IN_BIG       (1u<<3)
+#define SHA_IN_LITTLE    (0u)
+#define SHA_OUT_BIG      (SHA_IN_BIG)
+#define SHA_OUT_LITTLE   (SHA_IN_LITTLE)
+#define SHA_256_MODE     (0u)
+#define SHA_224_MODE     (1u<<4)
+#define SHA_1_MODE       (2u<<4)
+#define SHA_MODE_MASK    (SHA_1_MODE | SHA_224_MODE | SHA_256_MODE)
+#define SHA_RB_MODE      (1u<<8)  // Readback mode.
+#define SHA_RB_FIFO_NE   (1u<<9)  // Readback mode FIFO not empty status.
+#define SHA_O_DMA_E      (1u<<10) // Output DMA enable (readback mode).
 
 
 /**
@@ -218,7 +221,7 @@ bool AES_ccm(const AES_ctx *const ctx, const u32 *const in, u32 *const out, u32 
  *
  * @param[in]  params  Mode and input endianess bitmask.
  */
-void SHA_start(u8 params);
+void SHA_start(u16 params);
 
 /**
  * @brief      Hashes the data pointed to.
@@ -234,7 +237,7 @@ void SHA_update(const u32 *data, u32 size);
  * @param      hash       Pointer to memory to copy the hash to.
  * @param[in]  endianess  Endianess bitmask for the hash.
  */
-void SHA_finish(u32 *const hash, u8 endianess);
+void SHA_finish(u32 *const hash, u16 endianess);
 
 /**
  * @brief      Returns the current SHA engine state.
@@ -252,11 +255,10 @@ void SHA_getState(u32 *const out);
  * @param[in]  params         Mode and input endianess bitmask.
  * @param[in]  hashEndianess  Endianess bitmask for the hash.
  */
-void sha(const u32 *data, u32 size, u32 *const hash, u8 params, u8 hashEndianess);
+void sha(const u32 *data, u32 size, u32 *const hash, u16 params, u16 hashEndianess);
 
 /**
  * @brief      Hashes a single block of data with DMA and outputs the hash.
- * @brief      Note: Not recommended. It's way slower than CPU based SHA.
  *
  * @param[in]  data           Pointer to data to hash.
  * @param[in]  size           Size of the data to hash. Must be 64 bytes aligned.
@@ -264,7 +266,7 @@ void sha(const u32 *data, u32 size, u32 *const hash, u8 params, u8 hashEndianess
  * @param[in]  params         Mode and input endianess bitmask.
  * @param[in]  hashEndianess  Endianess bitmask for the hash.
  */
-//void sha_dma(const u32 *data, u32 size, u32 *const hash, u8 params, u8 hashEndianess);
+//void sha_dma(const u32 *data, u32 size, u32 *const hash, u16 params, u16 hashEndianess);
 
 
 

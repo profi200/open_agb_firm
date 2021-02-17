@@ -45,7 +45,8 @@
 #define REG_GPIO3_DAT2  *((     vu16*)(GPIO_REGS_BASE + 0x28)) // WiFi.
 
 
-static vu16 *const datRegs[5] = {(vu16*)&REG_GPIO1_DAT, (vu16*)&REG_GPIO2_DAT, &REG_GPIO2_DAT2, &REG_GPIO3_DAT, &REG_GPIO3_DAT2};
+static vu16 *const g_datRegs[5] = {(vu16*)&REG_GPIO1_DAT, (vu16*)&REG_GPIO2_DAT,
+                                   &REG_GPIO2_DAT2, &REG_GPIO3_DAT, &REG_GPIO3_DAT2};
 
 
 
@@ -86,7 +87,7 @@ bool GPIO_read(Gpio gpio)
 
 	if(regIdx > 4) return 0;
 
-	return *datRegs[regIdx]>>pinNum & 1u;
+	return *g_datRegs[regIdx]>>pinNum & 1u;
 }
 
 void GPIO_write(Gpio gpio, bool val)
@@ -96,9 +97,9 @@ void GPIO_write(Gpio gpio, bool val)
 
 	if(regIdx == 0 || regIdx > 4) return;
 
-	u16 tmp = *datRegs[regIdx];
+	u16 tmp = *g_datRegs[regIdx];
 	tmp &= ~(1u<<pinNum) | (u16)val<<pinNum;
-	*datRegs[regIdx] = tmp;
+	*g_datRegs[regIdx] = tmp;
 }
 
 /*#include "arm11/fmt.h"

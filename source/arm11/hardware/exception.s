@@ -75,7 +75,7 @@ BEGIN_ASM_FUNC irqHandler
 	cps #PSR_SYS_MODE
 	stmfd sp!, {r0-r3, r12, lr}
 	ldr r12, =MPCORE_PRIV_REG_BASE
-	ldr r2, =irqIsrTable
+	ldr r2, =g_irqIsrTable
 	ldr r0, [r12, #0x10C]        @ REG_GIC_CPU_INTACK
 	and r1, r0, #0x7F
 	cmp r1, #32

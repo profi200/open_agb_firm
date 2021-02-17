@@ -66,11 +66,12 @@
 
 static void setupKeys(void)
 {
+	Cfg9 *const cfg9 = getCfg9Regs();
 	// Setup TWL unit info and console ID
-	const bool isDevUnit = REG_CFG9_UNITINFO != 0;
+	const bool isDevUnit = cfg9->unitinfo != 0;
 	const u64 twlConsoleId = (isDevUnit ? (*((vu64*)0x10012000)) :
 	                                      ((*((vu64*)0x01FFB808) ^ 0x8C267B7B358A6AFULL) | 0x80000000ULL));
-	REG_CFG9_TWLUNITINFO = REG_CFG9_UNITINFO;
+	cfg9->twlunitinfo = cfg9->unitinfo;
 	*((vu64*)0x10012100) = twlConsoleId;
 
 
@@ -113,7 +114,7 @@ static void setupKeys(void)
 
 
 	// 3DS key init
-	if(REG_CFG9_SOCINFO & 2) // New 3DS
+	if(cfg9->socinfo & 2) // New 3DS
 	{
 		alignas(4) static const u8 keyY0x05[16] = {
 		0x4D, 0x80, 0x4F, 0x4E, 0x99, 0x90, 0x19, 0x46, 0x13, 0xA2, 0x04, 0xAC, 0x58, 0x44, 0x60, 0xBE};
@@ -169,13 +170,15 @@ static void setupKeys(void)
 void AES_init(void)
 {
 	REG_AESCNT = AES_MAC_SIZE(4) | AES_FLUSH_WRITE_FIFO | AES_FLUSH_READ_FIFO;
-	REG_CFG9_XDMA_PERIPHALS = 0; // Use NDMA for AES.
+	getCfg9Regs()->xdma_req = 0; // Use NDMA only for AES.
 
-	REG_NDMA0_DST_ADDR = REG_AESWRFIFO;
-	REG_NDMA0_INT_CNT = NDMA_INT_SYS_FREQ;
+	NdmaCh *const ndmaCh0 = getNdmaChRegs(0);
+	ndmaCh0->dst_addr = REG_AESWRFIFO;
+	ndmaCh0->int_cnt  = NDMA_INT_SYS_FREQ;
 
-	REG_NDMA1_SRC_ADDR = REG_AESRDFIFO;
-	REG_NDMA1_INT_CNT = NDMA_INT_SYS_FREQ;
+	NdmaCh *const ndmaCh1 = getNdmaChRegs(1);
+	ndmaCh1->src_addr = REG_AESRDFIFO;
+	ndmaCh1->int_cnt  = NDMA_INT_SYS_FREQ;
 
 	IRQ_registerIsr(IRQ_AES, NULL);
 
@@ -309,17 +312,19 @@ static void aesProcessBlocksDma(const u32 *in, u32 *out, u32 blocks)
 	// Check block alignment
 	const u8 aesFifoSize = (blocks & 1u ? 0u : 1u); // 1 = 32 bytes, 0 = 16 bytes
 
-	REG_NDMA0_SRC_ADDR = (u32)in;
-	REG_NDMA0_TOTAL_CNT = blocks<<2;
-	REG_NDMA0_LOG_BLK_CNT = aesFifoSize * 4 + 4;
-	REG_NDMA0_CNT = NDMA_ENABLE | NDMA_TOTAL_CNT_MODE | NDMA_STARTUP_AES_IN |
-	                NDMA_BURST_WORDS(4) | NDMA_SRC_UPDATE_INC | NDMA_DST_UPDATE_FIXED;
+	NdmaCh *const ndmaCh0 = getNdmaChRegs(0);
+	ndmaCh0->src_addr    = (u32)in;
+	ndmaCh0->total_cnt   = blocks<<2;
+	ndmaCh0->log_blk_cnt = aesFifoSize * 4 + 4;
+	ndmaCh0->cnt         = NDMA_ENABLE | NDMA_TOTAL_CNT_MODE | NDMA_STARTUP_AES_IN |
+	                       NDMA_BURST_WORDS(4) | NDMA_SRC_UPDATE_INC | NDMA_DST_UPDATE_FIXED;
 
-	REG_NDMA1_DST_ADDR = (u32)out;
-	REG_NDMA1_TOTAL_CNT = blocks<<2;
-	REG_NDMA1_LOG_BLK_CNT = aesFifoSize * 4 + 4;
-	REG_NDMA1_CNT = NDMA_ENABLE | NDMA_TOTAL_CNT_MODE | NDMA_STARTUP_AES_OUT |
-	                NDMA_BURST_WORDS(4) | NDMA_SRC_UPDATE_FIXED | NDMA_DST_UPDATE_INC;
+	NdmaCh *const ndmaCh1 = getNdmaChRegs(1);
+	ndmaCh1->dst_addr    = (u32)out;
+	ndmaCh1->total_cnt   = blocks<<2;
+	ndmaCh1->log_blk_cnt = aesFifoSize * 4 + 4;
+	ndmaCh1->cnt         = NDMA_ENABLE | NDMA_TOTAL_CNT_MODE | NDMA_STARTUP_AES_OUT |
+	                       NDMA_BURST_WORDS(4) | NDMA_SRC_UPDATE_FIXED | NDMA_DST_UPDATE_INC;
 
 	REG_AES_BLKCNT_HIGH = blocks;
 	REG_AESCNT |= AES_ENABLE | AES_IRQ_ENABLE | aesFifoSize<<14 | (3 - aesFifoSize)<<12 |
@@ -498,9 +503,9 @@ bool AES_ccm(const AES_ctx *const ctx, const u32 *const in, u32 *const out, u32 
 #define REGs_SHA_INFIFO   ((vu32*)(SHA_REGS_BASE + 0x80))
 
 
-void SHA_start(u8 params)
+void SHA_start(u16 params)
 {
-	REG_SHA_CNT = params | SHA_IN_DMA_ENABLE | SHA_ENABLE;
+	REG_SHA_CNT = params | SHA_ENABLE;
 }
 
 void SHA_update(const u32 *data, u32 size)
@@ -516,7 +521,7 @@ void SHA_update(const u32 *data, u32 size)
 	if(size) iomemcpy(REGs_SHA_INFIFO, data, size);
 }
 
-void SHA_finish(u32 *const hash, u8 endianess)
+void SHA_finish(u32 *const hash, u16 endianess)
 {
 	REG_SHA_CNT = (REG_SHA_CNT & SHA_MODE_MASK) | endianess | SHA_FINAL_ROUND;
 	while(REG_SHA_CNT & SHA_ENABLE);
@@ -529,13 +534,13 @@ void SHA_getState(u32 *const out)
 	u32 size;
 	switch(REG_SHA_CNT & SHA_MODE_MASK)
 	{
-		case SHA_MODE_256:
+		case SHA_256_MODE:
 			size = 32;
 			break;
-		case SHA_MODE_224:
+		case SHA_224_MODE:
 			size = 28;
 			break;
-		case SHA_MODE_1:
+		case SHA_1_MODE:
 		default:           // 2 and 3 are both SHA1
 			size = 20;
 	}
@@ -543,25 +548,32 @@ void SHA_getState(u32 *const out)
 	iomemcpy(out, REGs_SHA_HASH, size);
 }
 
-void sha(const u32 *data, u32 size, u32 *const hash, u8 params, u8 hashEndianess)
+void sha(const u32 *data, u32 size, u32 *const hash, u16 params, u16 hashEndianess)
 {
 	SHA_start(params);
 	SHA_update(data, size);
 	SHA_finish(hash, hashEndianess);
 }
 
-/*void sha_dma(const u32 *data, u32 size, u32 *const hash, u8 params, u8 hashEndianess)
+/*void sha_dma(const u32 *data, u32 size, u32 *const hash, u16 params, u16 hashEndianess)
 {
-	REG_NDMA2_SRC_ADDR = (u32)data;
-	REG_NDMA2_DST_ADDR = REG_SHA_INFIFO;
-	REG_NDMA2_TOTAL_CNT = size / 4;
-	REG_NDMA2_LOG_BLK_CNT = 64 / 4;
-	REG_NDMA2_INT_CNT = NDMA_INT_SYS_FREQ;
-	REG_NDMA2_CNT = NDMA_DST_UPDATE_INC | NDMA_DST_ADDR_RELOAD | NDMA_SRC_UPDATE_INC |
-	                NDMA_BURST_WORDS(64 / 4) | NDMA_TOTAL_CNT_MODE | NDMA_STARTUP_SHA | NDMA_ENABLE;
+	IRQ_registerIsr(IRQ_DMAC_1_2, NULL);
 
-	SHA_start(params);
-	while(REG_NDMA2_CNT & NDMA_ENABLE);
+	// Note: XDMA is quite a bit faster.
+	NdmaCh *const ndmaCh = getNdmaChRegs(2);
+	ndmaCh->src_addr    = (u32)data;
+	ndmaCh->dst_addr    = (u32)REGs_SHA_INFIFO;
+	ndmaCh->total_cnt   = size / 4;
+	ndmaCh->log_blk_cnt = 64 / 4;
+	ndmaCh->int_cnt     = NDMA_INT_SYS_FREQ;
+	ndmaCh->cnt         = NDMA_ENABLE | NDMA_IRQ_ENABLE | NDMA_STARTUP_SHA_IN | NDMA_TOTAL_CNT_MODE |
+	                      NDMA_BURST_WORDS(64 / 4) | NDMA_SRC_UPDATE_INC | NDMA_DST_UPDATE_FIXED;
+
+	SHA_start(params | SHA_I_DMA_E);
+	do
+	{
+		__wfi();
+	} while(ndmaCh->cnt & NDMA_ENABLE);
 	while(REG_SHA_CNT & SHA_ENABLE);
 	SHA_finish(hash, hashEndianess);
 }*/
@@ -671,7 +683,7 @@ bool RSA_verify2048(const u32 *const encSig, const u32 *const data, u32 size)
 	// and hardcode the hash location.
 
 	u32 calcHash[8];
-	sha(data, size, calcHash, SHA_INPUT_BIG | SHA_MODE_256, SHA_OUTPUT_BIG);
+	sha(data, size, calcHash, SHA_IN_BIG | SHA_256_MODE, SHA_OUT_BIG);
 
 	// Compare hash
 	u32 res = 0;

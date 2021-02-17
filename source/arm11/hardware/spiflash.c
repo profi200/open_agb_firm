@@ -27,7 +27,8 @@ bool spiflash_get_status(void)
 	alignas(4) u8 cmd[4];
 
 	cmd[0] = SPIFLASH_CMD_RDSR;
-	NSPI_writeRead(NSPI_DEV_NVRAM, (u32*)cmd, (u32*)cmd, 1, 1, true);
+	NSPI_writeRead(NSPI_DEV_NVRAM, (u32*)cmd, (u32*)cmd, 1, 1);
+	NSPI_deselect(NSPI_DEV_NVRAM);
 
 	if(cmd[0] & 1) return false;
 	return true;
@@ -37,5 +38,6 @@ void spiflash_read(u32 offset, u32 size, u32 *buf)
 {
 	offset = __builtin_bswap32(offset & 0x00FFFFFFu) | SPIFLASH_CMD_READ;
 
-	NSPI_writeRead(NSPI_DEV_NVRAM, &offset, buf, 4, size, true);
+	NSPI_writeRead(NSPI_DEV_NVRAM, &offset, buf, 4, size);
+	NSPI_deselect(NSPI_DEV_NVRAM);
 }

@@ -41,14 +41,14 @@
 
 static struct
 {
-	u8 lcdPower;           // 1 = on. Bit 4 top light, bit 2 bottom light, bit 0 LCDs.
-	u8 lcdLights[2];       // LCD backlight brightness. Top, bottom.
-	KEvent *events[6];
 	u32 swap;              // Currently active framebuffer.
 	void *framebufs[2][4]; // For each screen A1, A2, B1, B2
+	KEvent *events[6];
 	u8 doubleBuf[2];       // Top, bottom, 1 = enable.
-	u16 strides[2];        // Top, bottom
+	u8 lcdPower;           // 1 = on. Bit 4 top light, bit 2 bottom light, bit 0 LCDs.
+	u8 lcdLights[2];       // LCD backlight brightness. Top, bottom.
 	u32 formats[2];        // Top, bottom
+	u16 strides[2];        // Top, bottom
 } g_gfxState = {0};
 
 
@@ -69,33 +69,37 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	TIMER_sleepMs(50);
 	(void)MCU_getEvents(0x3Fu<<24); // Discard any screen init events.
 
-	REG_CFG11_GPUPROT = 0;
+	getCfg11Regs()->gpuprot = 0;
 
-	// Reset
+	// Reset the whole GX block.
 	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E;
 	wait_cycles(12);
 	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E | PDN_GPU_CNT_NORST_ALL;
-	REG_GX_GPU_CLK = 0x100;
-	REG_GX_PSC_VRAM = 0;
+	REG_GX_GPU_CLK = 0x100; // P3D
+	REG_GX_PSC_VRAM = 0;    // All VRAM banks enabled.
+
+	// These 3 reg writes are normally done way later in the
+	// init but we will be fine doing it early.
 	REG_GX_PSC_FILL0_CNT = 0;
 	REG_GX_PSC_FILL1_CNT = 0;
 	REG_GX_PPF_CNT = 0;
 
-	// LCD framebuffer setup.
+	// PDC/framebuffer setup. This must be done before LCD init.
 	setupDislayController(0);
 	setupDislayController(1);
 	REG_LCD_PDC0_SWAP = 0; // Select framebuf 0.
-	REG_LCD_PDC1_SWAP = 0;
+	REG_LCD_PDC1_SWAP = 0; // Select framebuf 0.
 	REG_LCD_PDC0_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ERR | PDC_CNT_I_MASK_H | PDC_CNT_E; // Start
-	REG_LCD_PDC1_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ALL | PDC_CNT_E;
+	REG_LCD_PDC1_CNT = PDC_CNT_OUT_E | PDC_CNT_I_MASK_ALL | PDC_CNT_E;                    // Start
 
 	// LCD reg setup.
-	REG_LCD_ABL0_FILL = 1u<<24; // Force blackscreen
-	REG_LCD_ABL1_FILL = 1u<<24; // Force blackscreen
+	REG_LCD_ABL0_FILL = 1u<<24;       // Force blackscreen.
+	REG_LCD_ABL1_FILL = 1u<<24;       // Force blackscreen.
 	REG_LCD_PARALLAX_CNT = 0;
 	REG_LCD_PARALLAX_PWM = 0xA390A39;
-	REG_LCD_RST = 0;
-	REG_LCD_UNK00C = 0x10001;
+	REG_LCD_RST = 0;                  // Reset LCD drivers. Unknown for how long this must be low.
+	                                  // GSP seems to rely on boot11/previous FIRM having set it to 0 already.
+	REG_LCD_UNK00C = 0x10001;         // Stops H-/V-sync control signals?
 
 	// Create IRQ events.
 	// PSC0, PSC1, PDC0, PDC1, PPF, P3D
@@ -118,11 +122,17 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_ABL1_CNT = 0;
 	REG_LCD_ABL1_LIGHT_PWM = 0;
 
-	REG_LCD_RST = 1;
-	REG_LCD_UNK00C = 0;
-	TIMER_sleepMs(10);
-	LCDI2C_init();
-	MCU_controlLCDPower(2u); // Power on LCDs.
+	// Timing critical part start.
+	// This must be done within 4 frames.
+	REG_LCD_RST = 1;         // Take LCD drivers out of reset.
+	// At this point the output must be forced black or
+	// the LCD drivers will not sync. Already done above.
+	REG_LCD_UNK00C = 0;      // Starts H-/V-sync control signals?
+	TIMER_sleepMs(10);       // Wait for power supply (which?) to stabilize and LCD drivers to finish resetting.
+	LCDI2C_init();           // Initialize LCD drivers.
+	MCU_controlLCDPower(2u); // Power on LCDs (MCU --> PMIC).
+	// Timing critical part end.
+	// Wait 50 us for LCD sync. The MCU event wait will cover this.
 	if(MCU_waitEvents(0x3Fu<<24) != 2u<<24) panic();
 
 	// The transfer engine is (sometimes) borked on screen init.
@@ -131,8 +141,10 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	//GX_textureCopy((u32*)RENDERBUF_TOP, 0, (u32*)RENDERBUF_BOT, 0, 16);
 
 	LCDI2C_waitBacklightsOn();
-	REG_LCD_ABL0_LIGHT_PWM = 0x1023E;
-	REG_LCD_ABL1_LIGHT_PWM = 0x1023E;
+	REG_LCD_ABL0_LIGHT_PWM = 0x1023E; // TODO: Figure out how this works.
+	REG_LCD_ABL0_LIGHT = 1;
+	REG_LCD_ABL1_LIGHT_PWM = 0x1023E; // TODO: Figure out how this works.
+	REG_LCD_ABL1_LIGHT = 1;
 	MCU_controlLCDPower(0x28u); // Power on backlights.
 	if(MCU_waitEvents(0x3Fu<<24) != 0x28u<<24) panic();
 
@@ -159,22 +171,41 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 
 void GFX_deinit(void)
 {
+	// Power off backlights if on.
 	const u8 power = g_gfxState.lcdPower;
-	if(power & ~1u) // Poweroff backlights if on.
+	if(power & ~1u)
 	{
 		MCU_controlLCDPower(power & ~1u);
 		if(MCU_waitEvents(0x3Fu<<24) != (u32)(power & ~1u)<<24) panic();
 	}
-	if(power & 1u) // Poweroff LCDs if on.
+	GFX_setBrightness(0, 0);
+	REG_LCD_ABL0_LIGHT_PWM = 0;
+	REG_LCD_ABL1_LIGHT_PWM = 0;
+
+	// Make sure the LCDs are completely black.
+	REG_LCD_ABL0_FILL = 1u<<24; // Force blackscreen.
+	REG_LCD_ABL1_FILL = 1u<<24; // Force blackscreen.
+	GFX_waitForVBlank0();
+	GFX_waitForVBlank0();
+
+	// Reset the LCD drivers.
+	// And stop the H-/V-sync control signals?
+	REG_LCD_RST = 0;
+	REG_LCD_UNK00C = 0x10001;
+
+	// Power off LCDs if on.
+	if(power & 1u)
 	{
 		MCU_controlLCDPower(1u);
 		if(MCU_waitEvents(0x3Fu<<24) != 1u<<24) panic();
 	}
-	GFX_setBrightness(0, 0);
-	REG_LCD_ABL0_LIGHT_PWM = 0;
-	REG_LCD_ABL1_LIGHT_PWM = 0;
-	REG_LCD_UNK00C = 0x10001;
-	REG_LCD_RST = 0;
+
+	// TODO: Wait until PDC is not reading any data from mem.
+	REG_LCD_PDC0_CNT = PDC_CNT_I_MASK_ALL;                  // Stop
+	REG_LCD_PDC0_SWAP = PDC_SWAP_RST_FIFO | PDC_SWAP_I_ALL; // Reset FIFO and clear IRQs.
+	REG_LCD_PDC1_CNT = PDC_CNT_I_MASK_ALL;                  // Start
+	REG_LCD_PDC1_SWAP = PDC_SWAP_RST_FIFO | PDC_SWAP_I_ALL; // Reset FIFO and clear IRQs.
+
 	REG_GX_PSC_VRAM = 0xF00;
 	REG_GX_GPU_CLK = 0;
 	REG_PDN_GPU_CNT = PDN_GPU_CNT_CLK_E | PDN_GPU_CNT_NORST_REGS;

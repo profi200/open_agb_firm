@@ -30,17 +30,18 @@
 
 typedef struct
 {
-	vu32 NSPI_CNT;
-	vu8  NSPI_CS;        // 32 bit but can be accessed as u8
-	u8 padd1[3];
-	vu32 NSPI_BLKLEN;
-	vu32 NSPI_FIFO;
-	vu8  NSPI_FIFO_STAT; // 32 bit but can be accessed as u8
-	u8 padd2[3];
-	vu32 NSPI_AUTOPOLL;
-	vu32 NSPI_INT_MASK;
-	vu32 NSPI_INT_STAT;
-} SpiRegs;
+	vu32 cnt;
+	vu8  cs;        // 32 bit but can be accessed as u8.
+	u8 _0x5[3];
+	vu32 blklen;
+	vu32 fifo;
+	vu8  fifo_stat; // 32 bit but can be accessed as u8.
+	u8 _0x11[3];
+	vu32 autopoll;
+	vu32 int_mask;
+	vu32 int_stat;
+} NspiBus;
+static_assert(offsetof(NspiBus, int_stat) == 0x1C, "Error: Member int_stat of NspiBus is not at offset 0x1C!");
 
 enum
 {
@@ -61,7 +62,7 @@ static const struct
 {
 	u8 busId;
 	u8 csClk;
-} spiDevTable[] =
+} g_spiDevTable[] =
 {
 	{SPI_BUS3, SPI_CS_0 | NSPI_CLK_2MHz},
 	{SPI_BUS3, SPI_CS_1 | NSPI_CLK_4MHz},
@@ -74,35 +75,35 @@ static const struct
 
 
 
-static SpiRegs* nspiGetBusRegsBase(u8 busId)
+static NspiBus* getNspiBusRegs(u8 busId)
 {
-	SpiRegs *base;
+	NspiBus *nspiBus;
 	switch(busId)
 	{
 		case SPI_BUS1:
-			base = (SpiRegs*)NSPI1_REGS_BASE;
+			nspiBus = (NspiBus*)NSPI1_REGS_BASE;
 			break;
 		case SPI_BUS2:
-			base = (SpiRegs*)NSPI2_REGS_BASE;
+			nspiBus = (NspiBus*)NSPI2_REGS_BASE;
 			break;
 		case SPI_BUS3:
-			base = (SpiRegs*)NSPI3_REGS_BASE;
+			nspiBus = (NspiBus*)NSPI3_REGS_BASE;
 			break;
 		default:
-			base = NULL;
+			nspiBus = NULL;
 	}
 
-	return base;
+	return nspiBus;
 }
 
-static inline void nspiWaitBusy(const SpiRegs *const regs)
+static inline void nspiWaitBusy(const NspiBus *const nspiBus)
 {
-	while(regs->NSPI_CNT & NSPI_ENABLE);
+	while(nspiBus->cnt & NSPI_ENABLE);
 }
 
-static inline void nspiWaitFifoBusy(const SpiRegs *const regs)
+static inline void nspiWaitFifoBusy(const NspiBus *const nspiBus)
 {
-	while(regs->NSPI_FIFO_STAT & NSPI_FIFO_BUSY);
+	while(nspiBus->fifo_stat & NSPI_FIFO_BUSY);
 }
 
 void NSPI_init(void)
@@ -111,78 +112,82 @@ void NSPI_init(void)
 	if(inited) return;
 	inited = true;
 
-	// Switch all 3 buses to the new interface
-	REG_CFG11_SPI_CNT = SPI_CNT_SPI3_NEW_IF | SPI_CNT_SPI2_NEW_IF | SPI_CNT_SPI1_NEW_IF;
+	// Switch all 3 buses to the new interface.
+	getCfg11Regs()->spi_cnt = SPI_CNT_SPI3_NEW_IF | SPI_CNT_SPI2_NEW_IF | SPI_CNT_SPI1_NEW_IF;
 
-	SpiRegs *regs = nspiGetBusRegsBase(SPI_BUS1);
-	regs->NSPI_INT_MASK = NSPI_INT_TRANSF_END; // Disable interrupt 1
-	regs->NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END; // Aknowledge
+	NspiBus *nspiBus = getNspiBusRegs(SPI_BUS1);
+	nspiBus->int_mask = NSPI_INT_TRANSF_END; // Disable interrupt 1.
+	nspiBus->int_stat = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END; // Aknowledge.
 
-	regs = nspiGetBusRegsBase(SPI_BUS2);
-	regs->NSPI_INT_MASK = NSPI_INT_TRANSF_END;
-	regs->NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END;
+	nspiBus = getNspiBusRegs(SPI_BUS2);
+	nspiBus->int_mask = NSPI_INT_TRANSF_END;
+	nspiBus->int_stat = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END;
 
-	regs = nspiGetBusRegsBase(SPI_BUS3);
-	regs->NSPI_INT_MASK = NSPI_INT_TRANSF_END;
-	regs->NSPI_INT_STAT = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END;
+	nspiBus = getNspiBusRegs(SPI_BUS3);
+	nspiBus->int_mask = NSPI_INT_TRANSF_END;
+	nspiBus->int_stat = NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS | NSPI_INT_TRANSF_END;
 
 	IRQ_registerIsr(IRQ_SPI2, 14, 0, NULL);
 	IRQ_registerIsr(IRQ_SPI3, 14, 0, NULL);
 	IRQ_registerIsr(IRQ_SPI1, 14, 0, NULL);
 }
 
-bool _NSPI_autoPollBit(SpiDevice dev, u32 params)
+bool NSPI_autoPollBit(SpiDevice dev, u32 ap_params)
 {
-	SpiRegs *const regs = nspiGetBusRegsBase(spiDevTable[dev].busId);
+	NspiBus *const nspiBus = getNspiBusRegs(g_spiDevTable[dev].busId);
 
-	regs->NSPI_AUTOPOLL = NSPI_AUTOPOLL_START | params;
+	nspiBus->cnt = g_spiDevTable[dev].csClk;
+	nspiBus->autopoll = NSPI_AUTOPOLL_START | ap_params;
 
 	u32 res;
 	do
 	{
 		__wfi();
-		res = regs->NSPI_INT_STAT;
+		res = nspiBus->int_stat;
 	} while(!(res & (NSPI_INT_AP_TIMEOUT | NSPI_INT_AP_SUCCESS)));
-	regs->NSPI_INT_STAT = res; // Aknowledge
+	nspiBus->int_stat = res; // Aknowledge.
 
-	return (res & NSPI_INT_AP_TIMEOUT) == 0; // Timeout error
+	return (res & NSPI_INT_AP_TIMEOUT) == 0; // Timeout error.
 }
 
-void NSPI_writeRead(SpiDevice dev, const u32 *in, u32 *out, u32 inSize, u32 outSize, bool done)
+void NSPI_writeRead(SpiDevice dev, const u32 *in, u32 *out, u32 inSize, u32 outSize)
 {
-	SpiRegs *const regs = nspiGetBusRegsBase(spiDevTable[dev].busId);
-	const u32 cntParams = NSPI_ENABLE | spiDevTable[dev].csClk;
+	NspiBus *const nspiBus = getNspiBusRegs(g_spiDevTable[dev].busId);
+	const u32 cntParams = NSPI_ENABLE | g_spiDevTable[dev].csClk;
 
 	if(in)
 	{
-		regs->NSPI_BLKLEN = inSize;
-		regs->NSPI_CNT = cntParams | NSPI_DIR_WRITE;
+		nspiBus->blklen = inSize;
+		nspiBus->cnt = cntParams | NSPI_DIR_WRITE;
 
 		u32 counter = 0;
 		do
 		{
-			if((counter & 31) == 0) nspiWaitFifoBusy(regs);
-			regs->NSPI_FIFO = *in++;
+			if((counter & 31) == 0) nspiWaitFifoBusy(nspiBus);
+			nspiBus->fifo = *in++;
 			counter += 4;
 		} while(counter < inSize);
 
-		nspiWaitBusy(regs);
+		nspiWaitBusy(nspiBus);
 	}
 	if(out)
 	{
-		regs->NSPI_BLKLEN = outSize;
-		regs->NSPI_CNT = cntParams | NSPI_DIR_READ;
+		nspiBus->blklen = outSize;
+		nspiBus->cnt = cntParams | NSPI_DIR_READ;
 
 		u32 counter = 0;
 		do
 		{
-			if((counter & 31) == 0) nspiWaitFifoBusy(regs);
-			*out++ = regs->NSPI_FIFO;
+			if((counter & 31) == 0) nspiWaitFifoBusy(nspiBus);
+			*out++ = nspiBus->fifo;
 			counter += 4;
 		} while(counter < outSize);
 
-		nspiWaitBusy(regs);
+		nspiWaitBusy(nspiBus);
 	}
+}
 
-	if(done) regs->NSPI_CS = NSPI_DESELECT;
+void NSPI_deselect(SpiDevice dev)
+{
+	getNspiBusRegs(g_spiDevTable[dev].busId)->cs = NSPI_DESELECT;
 }

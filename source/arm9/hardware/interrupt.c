@@ -26,7 +26,7 @@
 #define REG_IRQ_IF     *((vu32*)(IRQ_REGS_BASE + 0x04))
 
 
-IrqIsr irqIsrTable[32] = {0};
+IrqIsr g_irqIsrTable[32] = {0};
 
 
 
@@ -40,7 +40,7 @@ void IRQ_registerIsr(Interrupt id, IrqIsr isr)
 {
 	const u32 oldState = enterCriticalSection();
 
-	irqIsrTable[id] = isr;
+	g_irqIsrTable[id] = isr;
 	REG_IRQ_IE |= 1u<<id;
 
 	leaveCriticalSection(oldState);
@@ -51,7 +51,7 @@ void IRQ_unregisterIsr(Interrupt id)
 	const u32 oldState = enterCriticalSection();
 
 	REG_IRQ_IE &= ~(1u<<id);
-	irqIsrTable[id] = (IrqIsr)NULL;
+	g_irqIsrTable[id] = (IrqIsr)NULL;
 
 	leaveCriticalSection(oldState);
 }

@@ -55,7 +55,7 @@ typedef struct
 } CodecCal;
 
 
-alignas(4) static CodecCal fallbackCal =
+alignas(4) static CodecCal g_fallbackCal =
 {
 	0u,
 	1u,
@@ -95,7 +95,8 @@ static void codecSwitchBank(u8 bank)
 		alignas(4) u8 inBuf[4];
 		inBuf[0] = 0; // Write
 		inBuf[1] = bank;
-		NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, NULL, 2, 0, true);
+		NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, NULL, 2, 0);
+		NSPI_deselect(NSPI_DEV_CTR_CODEC);
 	}
 }
 
@@ -105,7 +106,8 @@ static void codecReadRegBuf(u8 bank, u8 reg, u32 *buf, u32 size)
 
 	alignas(4) u8 inBuf[4];
 	inBuf[0] = reg<<1 | 1u;
-	NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, buf, 1, size, true);
+	NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, buf, 1, size);
+	NSPI_deselect(NSPI_DEV_CTR_CODEC);
 }
 
 static u8 codecReadReg(u8 bank, u8 reg)
@@ -122,8 +124,9 @@ static void codecWriteRegBuf(u8 bank, u8 reg, u32 *buf, u32 size)
 
 	alignas(4) u8 inBuf[4];
 	inBuf[0] = reg<<1; // Write
-	NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, NULL, 1, 0, false);
-	NSPI_writeRead(NSPI_DEV_CTR_CODEC, buf, NULL, size, 0, true);
+	NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, NULL, 1, 0);
+	NSPI_writeRead(NSPI_DEV_CTR_CODEC, buf, NULL, size, 0);
+	NSPI_deselect(NSPI_DEV_CTR_CODEC);
 }
 
 static void codecWriteReg(u8 bank, u8 reg, u8 val)
@@ -133,7 +136,8 @@ static void codecWriteReg(u8 bank, u8 reg, u8 val)
 	alignas(4) u8 inBuf[4];
 	inBuf[0] = reg<<1; // Write
 	inBuf[1] = val;
-	NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, NULL, 2, 0, true);
+	NSPI_writeRead(NSPI_DEV_CTR_CODEC, (u32*)inBuf, NULL, 2, 0);
+	NSPI_deselect(NSPI_DEV_CTR_CODEC);
 }
 
 static void codecMaskReg(u8 bank, u8 reg, u8 val, u8 mask)
@@ -237,7 +241,7 @@ void CODEC_init(void)
 	NSPI_init();
 
 	// TODO: Load calibration from HWCAL files on eMMC.
-	CodecCal *const cal = &fallbackCal;
+	CodecCal *const cal = &g_fallbackCal;
 	codecSwapCalibrationData(cal); // Come the fuck on. Why is this not stored in the correct endianness?
 
 	// General codec reset + init?
@@ -379,17 +383,17 @@ void CODEC_init(void)
 	codecEnableTouchscreen();
 }
 
-bool touchscreenState = false;
-bool legacySwitchState = false;
+bool g_touchscreenState = false;
+bool g_legacySwitchState = false;
 
 void CODEC_deinit(void)
 {
 	GPIO_write(GPIO_3_0, 1); // GPIO bitmask 0x40
 	TIMER_sleepMs(10); // Fixed 10 ms delay when setting this GPIO.
-	legacySwitchState = (codecReadReg(0x67, 0x25) & 0x40u) != 0;
-	if(!legacySwitchState) codecLegacyStuff(true);
+	g_legacySwitchState = (codecReadReg(0x67, 0x25) & 0x40u) != 0;
+	if(!g_legacySwitchState) codecLegacyStuff(true);
 	codecMaskReg(0x67, 0x25, 0, 3);
-	touchscreenState = (codecReadReg(0x67, 0x24)>>7) == 0;
+	g_touchscreenState = (codecReadReg(0x67, 0x24)>>7) == 0;
 	codecDisableTouchscreen();
 	codecMaskReg(0x64, 0x76, 0, 0xC0);
 	TIMER_sleepMs(30);
@@ -437,8 +441,8 @@ void CODEC_wakeup(void)
 		TIMER_sleepMs(1);
 	}
 	codecMaskReg(0x67, 0x25, 3, 3);
-	codecLegacyStuff(legacySwitchState);
-	if(touchscreenState) codecEnableTouchscreen();
+	codecLegacyStuff(g_legacySwitchState);
+	if(g_touchscreenState) codecEnableTouchscreen();
 	GPIO_write(GPIO_3_0, 0); // GPIO bitmask 0x40
 	TIMER_sleepMs(18); // Fixed 18 ms delay when unsetting this GPIO.
 }

@@ -18,37 +18,42 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include "types.h"
+#include "mem_map.h"
 
 
-#define TIMER_BASE_FREQ     (67027964)
+#define TIMER_REGS_BASE  (IO_MEM_ARM9_ONLY + 0x3000)
 
-#define TIMER_COUNT_UP      (1u<<2) // For cascading at least 2 timers
-#define TIMER_IRQ_ENABLE    (1u<<6)
-#define TIMER_ENABLE        (1u<<7)
-
-// Convenience macros for calculating the ticks. Based on libnds
-#define TIMER_FREQ(n)       (-TIMER_BASE_FREQ / (n))
-#define TIMER_FREQ_64(n)    (-(TIMER_BASE_FREQ / 64) / (n))
-#define TIMER_FREQ_256(n)   (-(TIMER_BASE_FREQ / 256) / (n))
-#define TIMER_FREQ_1024(n)  (-(TIMER_BASE_FREQ / 1024) / (n))
-
-
-typedef enum
+typedef struct
 {
-	TIMER_0 = 0u,
-	TIMER_1 = 1u,
-	TIMER_2 = 2u,
-	TIMER_3 = 3u
+	vu16 val;
+	vu16 cnt;
 } Timer;
+static_assert(offsetof(Timer, cnt) == 2, "Error: Member cnt of Timer is not at offset 2!");
 
-typedef enum
+ALWAYS_INLINE Timer* getTimerRegs(u8 timer)
 {
-	TIMER_PRESCALER_1    = 0u,
-	TIMER_PRESCALER_64   = 1u,
-	TIMER_PRESCALER_256  = 2u,
-	TIMER_PRESCALER_1024 = 3u
-} TimerPrescaler;
+	return &((Timer*)TIMER_REGS_BASE)[timer];
+}
+
+
+#define TIMER_BASE_FREQ       (67027964)
+
+// REG_TIMER_CNT
+#define TIMER_PRESCALER_1     (0u)
+#define TIMER_PRESCALER_64    (1u)
+#define TIMER_PRESCALER_256   (2u)
+#define TIMER_PRESCALER_1024  (3u)
+#define TIMER_COUNT_UP        (1u<<2) // For cascading at least 2 timers.
+#define TIMER_IRQ_ENABLE      (1u<<6)
+#define TIMER_ENABLE          (1u<<7)
+
+// Convenience macros for calculating the ticks. Based on libnds.
+#define TIMER_FREQ(n)         (-TIMER_BASE_FREQ / (n))
+#define TIMER_FREQ_64(n)      (-(TIMER_BASE_FREQ / 64) / (n))
+#define TIMER_FREQ_256(n)     (-(TIMER_BASE_FREQ / 256) / (n))
+#define TIMER_FREQ_1024(n)    (-(TIMER_BASE_FREQ / 1024) / (n))
 
 
 
@@ -60,35 +65,34 @@ void TIMER_init(void);
 /**
  * @brief      Starts a timer.
  *
- * @param[in]  timer      The timer to start.
- * @param[in]  prescaler  The prescaler to use.
- * @param[in]  ticks      The initial number of ticks. This is also the reload
- *                        value on overflow.
- * @param[in]  enableIrq  Timer fires IRQs if true.
+ * @param[in]  tmr     The timer to start (0-3). Timer 3 is reserved.
+ * @param[in]  ticks   The initial number of ticks. This is also the reload
+ *                     value on overflow.
+ * @param[in]  params  The parameters. See REG_TIMER_CNT defines above.
  */
-void TIMER_start(Timer timer, TimerPrescaler prescaler, u16 ticks, bool enableIrq);
+void TIMER_start(u8 tmr, u16 ticks, u8 params);
 
 /**
  * @brief      Returns the current number of ticks of the timer.
  *
- * @param[in]  timer  The timer get the ticks from.
+ * @param[in]  tmr   The timer get the ticks from (0-3). Timer 3 is reserved.
  *
  * @return     The number of ticks.
  */
-u16 TIMER_getTicks(Timer timer);
+u16 TIMER_getTicks(u8 tmr);
 
 /**
  * @brief      Stops a timer and returns the current number of ticks.
  *
- * @param[in]  timer  The timer to stop.
+ * @param[in]  tmr   The timer to stop (0-3). Timer 3 is reserved.
  *
  * @return     The number of ticks.
  */
-u16 TIMER_stop(Timer timer);
+u16 TIMER_stop(u8 tmr);
 
 /**
  * @brief      Halts the CPU for the specified number of milliseconds.
  *
  * @param[in]  ms    The number of milliseconds to sleep.
  */
-void TIMER_sleep(u32 ms);
+void TIMER_sleepMs(u32 ms);

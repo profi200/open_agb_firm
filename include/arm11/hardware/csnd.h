@@ -18,35 +18,81 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include "types.h"
 #include "mem_map.h"
 
 
+#define CSND_REGS_BASE  (IO_MEM_ARM9_ARM11 + 0x3000)
 
-#define CSND_REGS_BASE           (IO_MEM_ARM9_ARM11 + 0x3000)
-#define REG_CSND_MASTER_VOL      *((vu16*)(CSND_REGS_BASE + 0x000)) // CSND master volume 0-0x8000
-#define REG_CSND_UNK_CNT         *((vu16*)(CSND_REGS_BASE + 0x002))
+typedef struct
+{
+	vu16 cnt;
+	vs16 sr;               // Samplerate.
+	union
+	{
+		struct
+		{
+			vu16 vol_r;    // 0-0x8000.
+			vu16 vol_l;    // 0-0x8000.
+		};
+		vu32 vol;          // R and L combined.
+	};
+	union
+	{
+		struct
+		{
+			vu16 capvol_r; // Unconfirmed. 0-0x8000.
+			vu16 capvol_l; // Unconfirmed. 0-0x8000.
+		};
+		vu32 capvol;       // R and L combined.
+	};
+	vu32 st_addr;          // Start address and playback position.
+	vu32 size;             // Size in bytes.
+	vu32 lp_addr;          // Loop restart address.
+	vu32 st_adpcm;         // Start IMA-ADPCM state.
+	vu32 lp_adpcm;         // Loop Restart IMA-ADPCM state.
+} CsndCh;
+static_assert(offsetof(CsndCh, lp_adpcm) == 0x1C, "Error: Member lp_adpcm of CsndCh is not at offset 0x1C!");
 
-// 32 sound channels. PSG on channel 8-13 and noise 14-15.
-#define REG_CSND_CH_CNT(n)       *((vu16*)(CSND_REGS_BASE + 0x400 + ((n) * 32)))
-#define REG_CSND_CH_SR(n)        *((vs16*)(CSND_REGS_BASE + 0x402 + ((n) * 32))) // Samplerate
-#define REG_CSND_CH_VOL_R(n)     *((vu16*)(CSND_REGS_BASE + 0x404 + ((n) * 32))) // 0-0x8000
-#define REG_CSND_CH_VOL_L(n)     *((vu16*)(CSND_REGS_BASE + 0x406 + ((n) * 32))) // 0-0x8000
-#define REG_CSND_CH_VOL(n)       *((vu32*)(CSND_REGS_BASE + 0x404 + ((n) * 32))) // R and L combined
-#define REG_CSND_CH_CAPVOL_R(n)  *((vu16*)(CSND_REGS_BASE + 0x408 + ((n) * 32))) // Unconfirmed. 0-0x8000
-#define REG_CSND_CH_CAPVOL_L(n)  *((vu16*)(CSND_REGS_BASE + 0x40A + ((n) * 32))) // Unconfirmed. 0-0x8000
-#define REG_CSND_CH_CAPVOL(n)    *((vu32*)(CSND_REGS_BASE + 0x408 + ((n) * 32))) // R and L combined
-#define REG_CSND_CH_ST_ADDR(n)   *((vu32*)(CSND_REGS_BASE + 0x40C + ((n) * 32))) // Start address and playback position
-#define REG_CSND_CH_SIZE(n)      *((vu32*)(CSND_REGS_BASE + 0x410 + ((n) * 32))) // Size in bytes
-#define REG_CSND_CH_LP_ADDR(n)   *((vu32*)(CSND_REGS_BASE + 0x414 + ((n) * 32))) // Loop restart address
-#define REG_CSND_CH_ST_ADPCM(n)  *((vu32*)(CSND_REGS_BASE + 0x418 + ((n) * 32))) // Start IMA-ADPCM state
-#define REG_CSND_CH_LP_ADPCM(n)  *((vu32*)(CSND_REGS_BASE + 0x41C + ((n) * 32))) // Loop Restart IMA-ADPCM state
+typedef struct
+{
+	vu16 cnt;
+	u8 _0x2[2];
+	vs16 sr;   // Samplerate.
+	u8 _0x6[2];
+	vu32 size; // Capture length in bytes.
+	vu32 addr; // Address.
+} CsndCap;
+static_assert(offsetof(CsndCap, addr) == 0xC, "Error: Member addr of CsndCap is not at offset 0xC!");
 
-// 2 capture units for right and left side.
-#define REG_CSND_CAP_CNT(n)      *((vu16*)(CSND_REGS_BASE + 0x800 + ((n) * 16)))
-#define REG_CSND_CAP_SR(n)       *((vs16*)(CSND_REGS_BASE + 0x804 + ((n) * 16))) // Samplerate
-#define REG_CSND_CAP_SIZE(n)     *((vu32*)(CSND_REGS_BASE + 0x808 + ((n) * 16))) // Capture length in bytes
-#define REG_CSND_CAP_ADDR(n)     *((vu32*)(CSND_REGS_BASE + 0x80C + ((n) * 16))) // Address
+typedef struct
+{
+	vu16 master_vol; // CSND master volume 0-0x8000.
+	vu16 unk_cnt;
+	u8 _0x4[0xc];
+	vu32 unk010;     // FIFO related?
+	vu8  unk014;     // FIFO related?
+	u8 _0x15[0x3eb];
+	CsndCh ch[32];   // 32 sound channels. PSG on channel 8-13 and noise 14-15.
+	CsndCap cap[2];  // 2 capture units for right and left side.
+} Csnd;
+static_assert(offsetof(Csnd, cap[1].addr) == 0x81C, "Error: Member cap[1].addr of Csnd is not at offset 0x81C!");
+
+ALWAYS_INLINE Csnd* getCsndRegs(void)
+{
+	return (Csnd*)CSND_REGS_BASE;
+}
+
+ALWAYS_INLINE CsndCh* getCsndChRegs(u8 ch)
+{
+	return &getCsndRegs()->ch[ch];
+}
+
+ALWAYS_INLINE CsndCap* getCsndCapRegs(u8 ch)
+{
+	return &getCsndRegs()->cap[ch];
+}
 
 
 // REG_CSND_CH_CNT
@@ -126,7 +172,8 @@ void CSND_setupCh(u8 ch, s16 sampleRate, u32 vol, const u32 *const data, const u
  */
 static inline void CSND_setChState(u8 ch, bool playing)
 {
-	REG_CSND_CH_CNT(ch) = (REG_CSND_CH_CNT(ch) & ~CSND_CH_PLAYING) | ((u16)playing<<14);
+	CsndCh *const csndCh = getCsndChRegs(ch);
+	csndCh->cnt = (csndCh->cnt & ~CSND_CH_PLAYING) | ((u16)playing<<14);
 }
 
 /**
@@ -138,7 +185,7 @@ static inline void CSND_setChState(u8 ch, bool playing)
  */
 static inline u32 CSND_getChPos(u8 ch)
 {
-	return REG_CSND_CH_ST_ADDR(ch);
+	return getCsndChRegs(ch)->st_addr;
 }
 
 /**
@@ -148,7 +195,7 @@ static inline u32 CSND_getChPos(u8 ch)
  */
 static inline void CSND_stopCh(u8 ch)
 {
-	REG_CSND_CH_CNT(ch) = 0; // Stop
+	getCsndChRegs(ch)->cnt = 0; // Stop.
 }
 
 
@@ -172,7 +219,7 @@ void CSND_startCap(u8 ch, s16 sampleRate, u32 *const data, u32 size, u16 flags);
  */
 static inline u32 CSND_getCapPos(u8 ch)
 {
-	return REG_CSND_CAP_ADDR(ch);
+	return getCsndCapRegs(ch)->addr;
 }
 
 /**
@@ -182,5 +229,5 @@ static inline u32 CSND_getCapPos(u8 ch)
  */
 static inline void CSND_stopCap(u8 ch)
 {
-	REG_CSND_CAP_CNT(ch) = 0;
+	getCsndCapRegs(ch)->cnt = 0;
 }

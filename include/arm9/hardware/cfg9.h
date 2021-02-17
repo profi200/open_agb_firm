@@ -18,27 +18,52 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+#include "types.h"
 #include "mem_map.h"
 
 
-#define CFG9_REGS_BASE              (IO_MEM_ARM9_ONLY)
-#define REG_CFG9_SYSPROT9           *((      vu8* )(CFG9_REGS_BASE + 0x00000))
-#define REG_CFG9_SYSPROT11          *((      vu8* )(CFG9_REGS_BASE + 0x00001))
-#define REG_CFG9_UNK00002           *((      vu8* )(CFG9_REGS_BASE + 0x00002)) // Bit 0 bootrom write enable? Cleared immediately in boot9.
-#define REG_CFG9_UNK00004           *((      vu16*)(CFG9_REGS_BASE + 0x00004)) // JTAG related?
-#define REG_CFG9_XDMA_PERIPHALS     *((      vu8* )(CFG9_REGS_BASE + 0x00008)) // DMA request each bit 0 = NDMA, 1 = XDMA.
-#define REG_CFG9_CARDCTL            *((      vu16*)(CFG9_REGS_BASE + 0x0000C))
-#define REG_CFG9_CARD_POWER         *((      vu8* )(CFG9_REGS_BASE + 0x00010))
-#define REG_CFG9_CARD_INSERT_DELAY  *((      vu16*)(CFG9_REGS_BASE + 0x00012)) // Insert delay in 0x400 cycle units.
-#define REG_CFG9_CARD_PWROFF_DELAY  *((      vu16*)(CFG9_REGS_BASE + 0x00014)) // Power off delay in 0x400 cycle units.
-#define REG_CFG9_SDMMCCTL           *((      vu16*)(CFG9_REGS_BASE + 0x00020))
-#define REG_CFG9_UNK00100           *((      vu16*)(CFG9_REGS_BASE + 0x00100)) // Similar to SCFG_EXT regs on DSi?
-#define REG_CFG9_EXTMEMCNT9         *((      vu8* )(CFG9_REGS_BASE + 0x00200))
-#define REG_CFG9_SOCINFO            *((const vu16*)(CFG9_REGS_BASE + 0x00FFC)) // Same as REG_CFG11_SOCINFO.
-#define REG_CFG9_BOOTENV            *((      vu32*)(CFG9_REGS_BASE + 0x10000))
-#define REG_CFG9_UNITINFO           *((const vu8* )(CFG9_REGS_BASE + 0x10010))
-#define REG_CFG9_TWLUNITINFO        *((      vu8* )(CFG9_REGS_BASE + 0x10014)) // Writable reg for TWL mode.
-#define REG_CFG9_UNK10020           *((      vu8* )(CFG9_REGS_BASE + 0x10020)) // Bootrom related?
+#define CFG9_REGS_BASE  (IO_MEM_ARM9_ONLY)
+
+typedef struct
+{
+	vu8 sysprot9;
+	vu8 sysprot11;
+	vu8 unk00002;           // Bit 0 bootrom write enable? Cleared immediately in boot9.
+	u8 _0x3;
+	vu16 unk00004;          // JTAG related?
+	u8 _0x6[2];
+	vu8 xdma_req;           // Enable requests for XDMA. Each bit 1 = enabled.
+	u8 _0x9[3];
+	vu16 cardctl;
+	u8 _0xe[2];
+	vu8 card_power;
+	u8 _0x11;
+	vu16 card_insert_delay; // Insert delay in 0x400 cycle units.
+	vu16 card_pwroff_delay; // Power off delay in 0x400 cycle units.
+	u8 _0x16[0xa];
+	vu16 sdmmcctl;
+	u8 _0x22[0xde];
+	vu16 unk00100;          // Similar to SCFG_EXT regs on DSi?
+	u8 _0x102[0xfe];
+	vu8 extmemcnt9;
+	u8 _0x201[0xdfb];
+	const vu16 socinfo;     // Same as REG_CFG11_SOCINFO.
+	u8 _0xffe[0xf002];
+	vu32 bootenv;
+	u8 _0x10004[0xc];
+	const vu8 unitinfo;
+	u8 _0x10011[3];
+	vu8 twlunitinfo;        // Writable reg for TWL mode.
+	u8 _0x10015[0xb];
+	vu8 unk10020;           // Bootrom related?
+} Cfg9;
+static_assert(offsetof(Cfg9, unk10020) == 0x10020, "Error: Member unk10020 of Cfg9 is not at offset 0x10020!");
+
+ALWAYS_INLINE Cfg9* getCfg9Regs(void)
+{
+	return (Cfg9*)CFG9_REGS_BASE;
+}
 
 
 // REG_CFG9_SYSPROT9
@@ -48,11 +73,11 @@
 // REG_CFG9_SYSPROT11
 #define SYSPROT11_ROM_H2_LOCK   (1u) // Disables access to the second half of the ARM11 bootrom. Also enables FCRAM access.
 
-// REG_CFG9_XDMA_PERIPHALS
-#define XDMA_PERIPHALS_TMIO1    (1u)    // TMIO controller 1 (SD/eMMC).
-#define XDMA_PERIPHALS_TMIO3    (1u<<1) // TMIO controller 3.
-#define XDMA_PERIPHALS_AES_IN   (1u<<2)
-#define XDMA_PERIPHALS_AES_OUT  (1u<<3)
+// REG_CFG9_XDMA_REQ
+#define XDMA_REQ_TMIO1          (1u)    // TMIO controller 1 (SD/eMMC).
+#define XDMA_REQ_TMIO3          (1u<<1) // TMIO controller 3.
+#define XDMA_REQ_AES_IN         (1u<<2)
+#define XDMA_REQ_AES_OUT        (1u<<3)
 
 // REG_CFG9_CARDCTL
 #define CARDCTL_NTRCARD         (0u)    // Controller at 0x10164000.
