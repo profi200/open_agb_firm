@@ -217,8 +217,11 @@ static u16 checkSaveOverride(u32 gameCode)
 		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew (TODO: Set WAITCNT to 0x4014?)
 		
 		// Games
+		{"BTA\0",    SAVE_TYPE_EEPROM_64k}, // Astro Boy - Omega Factor
+		{"B2D\0",    SAVE_TYPE_EEPROM_64k}, // Donkey Kong Country 2
 		{"AZL\0",    SAVE_TYPE_EEPROM_64k}, // Legend of Zelda, The - A Link to the Past & Four Swords
 		{"A88\0",    SAVE_TYPE_EEPROM_64k}, // Mario & Luigi - Superstar Saga
+		{"B8M\0",    SAVE_TYPE_EEPROM_64k}, // Mario Party Advance
 		{"A6M\0",    SAVE_TYPE_EEPROM_64k}, // Mega Man & Bass
 		{"BIJE",     SAVE_TYPE_EEPROM_64k}, // Sonic The Hedgehog - Genesis
 		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2
@@ -270,8 +273,8 @@ static u16 tryDetectSaveType(u32 romSize)
 				// Assume common sizes.
 				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},
 				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},
-				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k},
-				{"EEPROM_V122", SAVE_TYPE_EEPROM_64k},
+				{"EEPROM_V121", SAVE_TYPE_EEPROM_8k},
+				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},
 				{"EEPROM_V124", SAVE_TYPE_EEPROM_8k},
 				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},
 				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},
