@@ -380,7 +380,7 @@ void GFX_powerOffBacklights(GfxBlight mask)
 
 void GFX_setBrightness(u8 top, u8 bot)
 {
-	if(top > 64 || bot > 64) return;
+	if(top > 107 || bot > 107) return;
 
 	g_gfxState.lcdLights[0] = top;
 	g_gfxState.lcdLights[1] = bot;
