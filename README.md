@@ -13,7 +13,7 @@ To compile open_agb_firm, the following needs to be installed:
 * [Corelink DMA-330 assembler](https://github.com/profi200/dma330as)
 * [CTR firm builder](https://github.com/derrekr/ctr_firm_builder)
 
-Additionally, 7-Zip (or on Linux, p7zip) needs to be installed to make release builds. Also make sure the dma330as and CTR firm builder binaries are in the $PATH environment variable and accessible to the Makefile. Build open_agb_firm as a debug build via `make` or as a release build via `make release`.
+Additionally, 7-Zip (or on Linux, p7zip) needs to be installed to make release builds. Also, make sure that the dma330as and CTR firm builder binaries are in the $PATH environment variable and accessible to the Makefile. Build open_agb_firm as a debug build via `make` or as a release build via `make release`.
 
 ## How to use
 The process to set up and launch open_agb_firm is similar that of [GodMode9](https://github.com/d0k3/GodMode9).
@@ -35,7 +35,7 @@ Hold the power button to turn off the 3DS.
 Settings are stored in `/3ds/open_agb_firm/config.ini`.
 
 ### General
-`u8 backlight` - Backlight brightness (default: `40`, max: `64`)
+`u8 backlight` - Backlight brightness (default: `40`, max: `107`)
 
 `bool biosIntro` - Show GBA BIOS intro at game startup (default: `true`)
 
