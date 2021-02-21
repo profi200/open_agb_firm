@@ -213,11 +213,19 @@ static u16 checkSaveOverride(u32 gameCode)
 		u16 saveType;
 	} overrideLut[] =
 	{
-		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew. TODO: Set WAITCNT to 0x4014?
-		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color (Homebrew).
-		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2.
-		{"A3A\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 3.
-		{"AZL\0",    SAVE_TYPE_EEPROM_64k}, // Legend of Zelda, The - A Link to the Past & Four Swords.
+		// Generalizations
+		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew (TODO: Set WAITCNT to 0x4014?)
+		
+		// Games
+		{"AZL\0",    SAVE_TYPE_EEPROM_64k}, // Legend of Zelda, The - A Link to the Past & Four Swords
+		{"A88\0",    SAVE_TYPE_EEPROM_64k}, // Mario & Luigi - Superstar Saga
+		{"A6M\0",    SAVE_TYPE_EEPROM_64k}, // Mega Man & Bass
+		{"BIJE",     SAVE_TYPE_EEPROM_64k}, // Sonic The Hedgehog - Genesis
+		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2
+		{"A3A\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 3
+		
+		// Homebrew
+		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color (Homebrew)
 	};
 
 	for(u32 i = 0; i < sizeof(overrideLut) / sizeof(*overrideLut); i++)
@@ -259,13 +267,14 @@ static u16 tryDetectSaveType(u32 romSize)
 			} saveTypeLut[25] =
 			{
 				// EEPROM
-				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},  // Actually EEPROM 4k.
-				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},  // Confirmed.
-				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k}, // Confirmed.
-				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},  // Confirmed. Except Super Mario Advance 2/3.
-				{"EEPROM_V124", SAVE_TYPE_EEPROM_64k}, // Confirmed.
-				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},  // Confirmed.
-				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},  // Confirmed.
+				// Assume common sizes.
+				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},
+				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},
+				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k},
+				{"EEPROM_V122", SAVE_TYPE_EEPROM_64k},
+				{"EEPROM_V124", SAVE_TYPE_EEPROM_8k},
+				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},
+				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},
 
 				// FLASH
 				// Assume they all have RTC.
