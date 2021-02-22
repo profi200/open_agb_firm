@@ -1,4 +1,4 @@
-# open_agb_firm gba_db.bin Builder v1.1
+# open_agb_firm gba_db.bin Builder v1.2
 # By HTV04
 
 # This script parses MAME's gba.xml (found here: https://github.com/mamedev/mame/blob/master/hash/gba.xml) and converts it to a gba_db.bin file for open_agb_firm.
@@ -8,7 +8,7 @@ import math
 
 import xml.etree.ElementTree as ET
 
-# Use title, title ID, SHA-1, size, and save type to generate gba_db.bin entry as binary string
+# Use title, title ID, SHA-1, size, and save type to generate gba_db entry as binary string
 def gbadbentry(title, titleid, sha, size, savetype):
     entry = b''
     
@@ -17,7 +17,7 @@ def gbadbentry(title, titleid, sha, size, savetype):
     entry += bytes.fromhex(sha)
     entry += (int(math.log(size, 2)) << 27 | savetype).to_bytes(4, 'little') # Save type is stored weirdly
     
-    return entry
+    return entry # Entry size is 228 bytes in length
 
 if __name__ == '__main__':
     root = ET.parse('gba.xml').getroot()
@@ -54,7 +54,7 @@ if __name__ == '__main__':
                 
                 # Obtain save type
                 savetype = 15 # If a save type can't be found or is unknown, set to "SAVE_TYPE_NONE"
-                for feature in software.findall('feature'):
+                for feature in part.findall('feature'):
                     if feature.get('name') == 'slot':
                         slottype = feature.get('value')
                         if slottype == 'gba_eeprom_4k':
@@ -70,7 +70,7 @@ if __name__ == '__main__':
                         elif slottype == 'gba_flash_512':
                             savetype = 9 # SAVE_TYPE_FLASH_512k_PSC
                         elif slottype == 'gba_flash_1m_rtc':
-                            savetype = 10 #SAVE_TYPE_FLASH_1m_MRX_RTC
+                            savetype = 10 # SAVE_TYPE_FLASH_1m_MRX_RTC
                         elif slottype == 'gba_flash_1m':
                             savetype = 11 # SAVE_TYPE_FLASH_1m_MRX
                         elif slottype == 'gba_sram':
@@ -78,6 +78,7 @@ if __name__ == '__main__':
                         
                         break
         
+        # Expand gba_db with entry
         gbadb += gbadbentry(title, titleid, sha, size, savetype)
     
     # Create and write to gba_db.bin
