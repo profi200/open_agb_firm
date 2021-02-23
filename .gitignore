@@ -7,6 +7,7 @@ arm9/open_agb_firm9.bin
 arm11/open_agb_firm11.bin
 arm9/open_agb_firm9.elf
 arm11/open_agb_firm11.elf
+resources/gba.dat
 resources/gba.xml
 open_agb_firm.firm
 open_agb_firm*.7z
