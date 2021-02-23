@@ -216,19 +216,8 @@ static u16 checkSaveOverride(u32 gameCode)
 		// Generalizations
 		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew (TODO: Set WAITCNT to 0x4014?)
 		
-		// Games
-		{"BTA\0",    SAVE_TYPE_EEPROM_64k}, // Astro Boy - Omega Factor
-		{"B2D\0",    SAVE_TYPE_EEPROM_64k}, // Donkey Kong Country 2
-		{"AZL\0",    SAVE_TYPE_EEPROM_64k}, // Legend of Zelda, The - A Link to the Past & Four Swords
-		{"A88\0",    SAVE_TYPE_EEPROM_64k}, // Mario & Luigi - Superstar Saga
-		{"B8M\0",    SAVE_TYPE_EEPROM_64k}, // Mario Party Advance
-		{"A6M\0",    SAVE_TYPE_EEPROM_64k}, // Mega Man & Bass
-		{"BIJE",     SAVE_TYPE_EEPROM_64k}, // Sonic The Hedgehog - Genesis
-		{"AA2\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 2
-		{"A3A\0",    SAVE_TYPE_EEPROM_64k}, // Super Mario Advance 3
-		
 		// Homebrew
-		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color (Homebrew)
+		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color
 	};
 
 	for(u32 i = 0; i < sizeof(overrideLut) / sizeof(*overrideLut); i++)
