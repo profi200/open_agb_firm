@@ -197,16 +197,6 @@ static Result searchGameDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
 
 static u16 checkSaveOverride(u32 gameCode)
 {
-	switch (gameCode & 0xFFu)
-	{
-		case '1': return SAVE_TYPE_EEPROM_64k;         // Homebrew using EEPROM.
-		case '2': return SAVE_TYPE_SRAM_256k;          // Homebrew using SRAM.
-		case '3': return SAVE_TYPE_FLASH_512k_PSC_RTC; // Homebrew using FLASH-64.
-		case '4': return SAVE_TYPE_FLASH_1m_MRX_RTC;   // Homebrew using FLASH-128.
-		case 'F': return SAVE_TYPE_EEPROM_8k;          // Classic NES Series.
-		case 'S': return SAVE_TYPE_SRAM_256k;          // Homebrew using SRAM (Butano games).
-	}
-
 	static const struct
 	{
 		alignas(4) char gameCode[4];
@@ -215,7 +205,7 @@ static u16 checkSaveOverride(u32 gameCode)
 	{
 		// Generalizations
 		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew (TODO: Set WAITCNT to 0x4014?)
-		
+
 		// Homebrew
 		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color
 	};

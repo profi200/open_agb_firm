@@ -1,4 +1,4 @@
-# open_agb_firm gba_db.bin Builder v2.0
+# open_agb_firm gba_db.bin Builder v2.1
 # By HTV04
 # 
 # This script parses MAME's gba.xml (found here: https://github.com/mamedev/mame/blob/master/hash/gba.xml) and converts it to a gba_db.bin file for open_agb_firm.
@@ -14,12 +14,12 @@ import xml.etree.ElementTree as ET
 def gbadbentry(title, serial, sha, size, savetype):
     entry = b''
     
-    entry += title.encode().ljust(200, b'\x00')
-    entry += serial.encode().ljust(4, b'\x00')
-    entry += bytes.fromhex(sha).ljust(20, b'\x00')
+    entry += title.encode().ljust(200, b'\x00')[0:200]
+    entry += serial.encode().ljust(4, b'\x00')[0:4]
+    entry += bytes.fromhex(sha).ljust(20, b'\x00')[0:20]
     entry += (int(math.log(size, 2)) << 27 | savetype).to_bytes(4, 'little') # Save type is stored weirdly
     
-    return entry # Entry size is 228 bytes total
+    return entry
 
 if __name__ == '__main__':
     gbadb = b''
@@ -36,10 +36,10 @@ if __name__ == '__main__':
     for software in gba.findall('software'):
         for part in software.findall('part'):
             if part.get('name') == 'cart':
-                # Obtain CRC32 for No-Intro DAT matching
+                # Obtain SHA-1
                 for dataarea in part.findall('dataarea'):
                     if dataarea.get('name') == 'rom':
-                        crc = dataarea.find('rom').get('crc')
+                        sha = dataarea.find('rom').get('sha1')
                         
                         break
                 
@@ -47,14 +47,13 @@ if __name__ == '__main__':
                 matchfound = False
                 for game in nointro.findall('game'):
                     for rom in game.findall('rom'):
-                        if rom.get('crc') == crc.upper():
+                        if rom.get('sha1') == sha.upper():
                             matchfound = True
                             
                             title = game.get('name')
                             serial = rom.get('serial')
                             if serial in (None, 'N/A'):
                                 serial = '\x00\x00\x00\x00' # If a serial can't be found, default to null bytes
-                            sha = rom.get('sha1')
                             size = int(rom.get('size'))
                 
                 # If not in No-Intro DAT, skip entry
@@ -62,17 +61,17 @@ if __name__ == '__main__':
                     break
                 
                 # Obtain save type
-                savetype = 15 # If a save type can't be found or is unknown, set to "SAVE_TYPE_NONE"
+                savetype = 15 # SAVE_TYPE_NONE
                 for feature in part.findall('feature'):
                     if feature.get('name') == 'slot':
                         slottype = feature.get('value')
                         if slottype in ('gba_eeprom', 'gba_eeprom_4k'):
                             savetype = 0 # SAVE_TYPE_EEPROM_8k
-                            if size > 0x1000000: # If greater than 16 MB, change save type
+                            if size > 0x1000000:
                                 savetype += 1 # SAVE_TYPE_EEPROM_8k_2
                         elif slottype == 'gba_eeprom_64k':
                             savetype = 2 # SAVE_TYPE_EEPROM_64k
-                            if size > 0x1000000: # If greater than 16 MB, change save type
+                            if size > 0x1000000:
                                 savetype += 1 # SAVE_TYPE_EEPROM_64k_2
                         elif slottype == 'gba_flash_rtc':
                             savetype = 8 # SAVE_TYPE_FLASH_512k_PSC_RTC
@@ -102,7 +101,10 @@ if __name__ == '__main__':
     
     # Add additional entries
     if addentries == True:
-        gbadbentries = ([['Example Game', 'WIP', '', 0x1000000, 14]])
+        # Example entries for demonstration purposes (to do: replace with valid entries)
+        gbadbentries = ([['AAAA - A', 'AAAA', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', 0x1000000, 0],
+                         ['BBBB - B', 'BBBB', 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', 0x1000000, 14],
+                         ['CCCC - C', 'CCCC', 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC', 0x1000000, 15]])
         
         print()
         
@@ -115,8 +117,8 @@ if __name__ == '__main__':
     # Create and write to gba_db.bin
     with open('gba_db.bin', 'wb') as f:
         f.write(gbadb)
-
-if addentries == True:
-    print('\n' + str(count) + ' entries added, ' + str(addcount) + ' additional entries added, ' + str(skipcount) + ' entries skipped')
-else:
-    print('\n' + str(count) + ' entries added, ' + str(skipcount) + ' entries skipped')
+    
+    if addentries == True:
+        print('\n' + str(count) + ' entries added, ' + str(addcount) + ' additional entries added, ' + str(skipcount) + ' entries skipped')
+    else:
+        print('\n' + str(count) + ' entries added, ' + str(skipcount) + ' entries skipped')
