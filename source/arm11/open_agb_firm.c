@@ -50,7 +50,9 @@
                            "inGamma=2.2\n"      \
                            "outGamma=1.54\n"    \
                            "contrast=1.0\n"     \
-                           "brightness=0.0\n"
+                           "brightness=0.0\n\n" \
+                           "[advanced]\n"       \
+                           "backlightRange=0\n" \
 
 
 typedef struct
@@ -65,6 +67,9 @@ typedef struct
 	float outGamma;
 	float contrast;
 	float brightness;
+
+	// [advanced]
+	u8 backlightRange;
 } OafConfig;
 
 typedef struct
@@ -91,7 +96,8 @@ static OafConfig g_oafConfig =
 	2.2f,
 	1.54f,
 	1.f,
-	0.f
+	0.f,
+	0
 };
 static KHandle g_frameReadyEvent = 0;
 
@@ -526,6 +532,11 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	else if(strcmp(section, "input") == 0)
 	{
 	}*/
+	else if(strcmp(section, "advanced") == 0)
+	{
+		if(strcmp(name, "backlightRange") == 0)
+			config->backlightRange = (u8)strtoul(value, NULL, 10);
+	}
 	else return 0; // Error.
 
 	return 1; // 1 is no error? Really?
@@ -595,8 +606,29 @@ static Result handleFsStuff(char romAndSavePath[512])
 			// Parse config.
 			parseConfig("config.ini", /* 0, */ &g_oafConfig);
 			{ // TODO: Move this elsewhere?
+				const u8 backlightRange = g_oafConfig.backlightRange;
+				u8 backlightMax;
+				u8 backlightMin;
+				switch(backlightRange)
+				{
+					case 1:
+						backlightMax = 117;
+						backlightMin = 20;
+						break;
+					case 2:
+						backlightMax = 142;
+						backlightMin = 16;
+						break;
+					default:
+						backlightMax = 64;
+						backlightMin = 20;
+						break;
+				}
+
 				const u8 backlight = g_oafConfig.backlight;
-				GFX_setBrightness(backlight, backlight);
+				if (backlight > backlightMax) GFX_setBrightness(backlightMax, backlightMax);
+				else if (backlight < backlightMin) GFX_setBrightness(backlightMin, backlightMin);
+				else GFX_setBrightness(backlight, backlight);
 			}
 
 			// Get last ROM launch path.
