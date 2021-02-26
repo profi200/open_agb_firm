@@ -4,7 +4,7 @@ open_agb_firm is a bare metal interface for natively running GBA games and homeb
 open_gba_firm is a complete and better alternative to GBA VC injects, allowing for:
 * Launching GBA files directly from the SD card
 * Writing save files directly to the SD card
-* Automatic save file configuration using an included database
+* Automatic save type configuration using an included database
 * Screenshots via pressing SELECT+Y
 * User configuration, such as gamma settings
 * And more to come!
@@ -14,12 +14,12 @@ open_agb_firm is currently in alpha. While open_agb_firm is relatively stable an
 
 Additionally, we are not responsible for any damage that may occur to your system as a direct or indirect result of you using open_agb_firm.
 
-## How to Use
+## Setup
 The process to set up and launch open_agb_firm is similar that of [GodMode9](https://github.com/d0k3/GodMode9).
 * Download the [latest release](https://github.com/profi200/open_agb_firm/releases/latest) and extract it to obtain `open_agb_firm.firm`.
 * Copy the `open_agb_firm.firm` file to your 3DS's SD card at `/luma/payloads` if using Luma3DS or elsewhere if using fastboot3DS.
-* Launch open_agb_firm using Luma3DS by holding START while booting your 3DS or assign the firm to a slot if you're using fastboot3DS.
-* After open_agb_firm launches, use the file browser to navigate to a .GBA ROM to run.
+* Launch open_agb_firm using Luma3DS by holding START while booting your 3DS or assign it to a slot if you're using fastboot3DS.
+* After open_agb_firm launches, use the file browser to navigate to a GBA ROM to run.
 
 ## Controls
 A/B/L/R/START/SELECT - GBA buttons, respectively
@@ -33,29 +33,45 @@ Hold the power button to turn off the 3DS.
 Settings are stored in `/3ds/open_agb_firm/config.ini`.
 
 ### General
-`u8 backlight` - Backlight brightness (default: `40`, max: `107`)
+General settings.
+
+`u8 backlight` - Backlight brightness (default: `40`)
 
 `bool biosIntro` - Show GBA BIOS intro at game startup (default: `true`)
 
 ### Video
+Video-related settings.
+
 `float inGamma` - Screen input gamma (default: `2.2`)
 
 `float outGamma` - Screen output gamma (default: `1.54`)*\
-*Default setting based on o3DS LCD. For raw GBA colors, set to the same value as `inGamma`.
+*Default setting based on the Old 3DS LCD. For raw GBA colors, set to the same value as `inGamma`.
 
 `float contrast` - Screen gain (default: `1.0`)
 
 `float brightness` - Screen lift (default: `0.0`)
 
-## How to Compile
-If you are using Windows 10, install and perform the following steps using [WSL 2](https://docs.microsoft.com/en-us/windows/wsl/install-win10).
+### Advanced
+Options for advanced users. No pun intended. **If you don't know what you're doing, leave these options on the default settings.**
+
+`u8 backlightRange` - Backlight range preset (default: `0`, max: `2`)
+* `0`: Recommended (`20`-`64`)
+* `1`: Old 3DS (`20`-`117`)
+* `2`: New 3DS (`16`-`142`)*
+
+*Please do not use the New 3DS range on an Old 3DS.
+
+## Compiling
+If you're using Windows 10, install and perform the following steps using [WSL 2](https://docs.microsoft.com/en-us/windows/wsl/install-win10).
 
 To compile open_agb_firm, the following needs to be installed:
-* [devkitARM](https://sourceforge.net/projects/devkitpro/)
+* [devkitARM](https://devkitpro.org/wiki/devkitPro_pacman)
 * [Corelink DMA-330 Assembler](https://github.com/profi200/dma330as)
 * [CTR Firm Builder](https://github.com/derrekr/ctr_firm_builder)
 
-Additionally, `zip` needs to be installed to make release builds. Also, make sure that the `dma330as` and `firmbuilder` binaries are in the PATH environment variable and accessible to the Makefile. Build open_agb_firm as a debug build via `make`, or as a release build via `make release`.
+Additionally, `zip` needs to be installed to make release builds. Also, make sure that the `dma330as` and `firmbuilder` binaries are in the PATH environment variable and accessible to the Makefile.
+
+Build open_agb_firm as a debug build via `make`, or as a release build via `make release`.
 
 ## Known Issues
 This section is reserved for a listing of known issues. At present only this remains:
@@ -80,7 +96,7 @@ This is a list of limitations we can't solve in software or are very hard to wor
 * GBA serial port (aka Link Cable).
 * 64+ KiB (512+ Kbit) SRAM (homebrew games/emulators). Not possible to support.
 * Reboots are required for switching between games.
-* Savestates. Very difficult to implement because no direct hardware access.
+* Save states. Very difficult to implement because no direct hardware access.
 
 ## License
 You may use this under the terms of the GNU General Public License GPL v3 or under the terms of any later revisions of the GPL. Refer to the provided `LICENSE.txt` file for further information.
