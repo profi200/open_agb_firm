@@ -54,12 +54,11 @@ Video-related settings.
 ### Advanced
 Options for advanced users. No pun intended. **If you don't know what you're doing, leave these options on the default settings.**
 
-`u8 backlightRange` - Backlight range preset (default: `0`, max: `2`)
-* `0`: Recommended (`20`-`64`)
-* `1`: Old 3DS (`20`-`117`)
-* `2`: New 3DS (`16`-`142`)*
-
-*Please do not use the New 3DS range on an Old 3DS.
+`bool maxBacklight` - Extend backlight limit (default: `false`)
+* `false`: `20`-`64`
+* `true`:
+  * Old 3DS: `20`-`117`
+  * New 3DS: `16`-`142`
 
 ## Compiling
 If you're using Windows 10, install and perform the following steps using [WSL 2](https://docs.microsoft.com/en-us/windows/wsl/install-win10).

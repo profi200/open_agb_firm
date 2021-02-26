@@ -52,7 +52,7 @@
                            "contrast=1.0\n"     \
                            "brightness=0.0\n\n" \
                            "[advanced]\n"       \
-                           "backlightRange=0\n" \
+                           "maxBacklight=false\n" \
 
 
 typedef struct
@@ -69,7 +69,7 @@ typedef struct
 	float brightness;
 
 	// [advanced]
-	u8 backlightRange;
+	bool maxBacklight;
 } OafConfig;
 
 typedef struct
@@ -97,7 +97,7 @@ static OafConfig g_oafConfig =
 	1.54f,
 	1.f,
 	0.f,
-	0
+	false
 };
 static KHandle g_frameReadyEvent = 0;
 
@@ -534,8 +534,8 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	}*/
 	else if(strcmp(section, "advanced") == 0)
 	{
-		if(strcmp(name, "backlightRange") == 0)
-			config->backlightRange = (u8)strtoul(value, NULL, 10);
+		if(strcmp(name, "maxBacklight") == 0)
+			config->maxBacklight = (strcmp(value, "true") == 0 ? true : false);
 	}
 	else return 0; // Error.
 
@@ -606,23 +606,26 @@ static Result handleFsStuff(char romAndSavePath[512])
 			// Parse config.
 			parseConfig("config.ini", /* 0, */ &g_oafConfig);
 			{ // TODO: Move this elsewhere?
-				const u8 backlightRange = g_oafConfig.backlightRange;
+				const bool maxBacklight = g_oafConfig.maxBacklight;
 				u8 backlightMax;
 				u8 backlightMin;
-				switch(backlightRange)
+				if(maxBacklight)
 				{
-					case 1:
-						backlightMax = 117;
-						backlightMin = 20;
-						break;
-					case 2:
-						backlightMax = 142;
-						backlightMin = 16;
-						break;
-					default:
-						backlightMax = 64;
-						backlightMin = 20;
-						break;
+					if(MCU_getSystemModel() >= 4)
+					{
+						backlightMax=142;
+						backlightMin=16;
+					}
+					else
+					{
+						backlightMax=117;
+						backlightMin=20;
+					}
+				}
+				else
+				{
+					backlightMax=64;
+					backlightMin=20;
 				}
 
 				const u8 backlight = g_oafConfig.backlight;
