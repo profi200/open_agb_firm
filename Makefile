@@ -53,17 +53,14 @@ arm11/$(TARGET)11.bin:
 clean:
 	@$(MAKE) --no-print-directory -C arm9 clean
 	@$(MAKE) --no-print-directory -C arm11 clean
-	rm -rf open_agb_firm $(TARGET).firm *.zip
+	rm -f $(TARGET).firm *.7z
 
 release: clean
 	@$(MAKE) -j4 --no-print-directory -C arm9 NO_DEBUG=1
 	@$(MAKE) -j4 --no-print-directory -C arm11 NO_DEBUG=1
 	firm_builder $(TARGET).firm $(ENTRY9) $(ENTRY11) $(SECTION0_ADR) $(SECTION0_TYPE) \
 		$(SECTION0_FILE) $(SECTION1_ADR) $(SECTION1_TYPE) $(SECTION1_FILE)
-	@mkdir open_agb_firm
-	@mkdir open_agb_firm/3ds
-	@cp LICENSE.txt open_agb_firm.firm README.md open_agb_firm
-	@cp resources/gba_db.bin open_agb_firm/3ds
-	@cp thirdparty/fatfs/LICENSE.txt open_agb_firm/LICENSE_fatfs.txt
-	@cp thirdparty/inih/LICENSE.txt open_agb_firm/LICENSE_inih.txt
-	@zip -r $(TARGET)$(VERS_STRING).zip open_agb_firm
+	@7z a -mx -m0=ARM -m1=LZMA $(TARGET)$(VERS_STRING).7z $(TARGET).firm
+	@7z u -mx -m0=LZMA $(TARGET)$(VERS_STRING).7z resources/gba_db.bin
+	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z LICENSE.txt thirdparty/fatfs/LICENSE.txt thirdparty/inih/LICENSE.txt README.md
+	@7z rn $(TARGET)$(VERS_STRING).7z resources/gba_db.bin 3ds/open_agb_firm/gba_db.bin thirdparty/fatfs/LICENSE.txt LICENSE_fatfs.txt thirdparty/inih/LICENSE.txt LICENSE_inih.txt

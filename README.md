@@ -69,7 +69,7 @@ To compile open_agb_firm, the following needs to be installed:
 * [Corelink DMA-330 Assembler](https://github.com/profi200/dma330as)
 * [CTR Firm Builder](https://github.com/derrekr/ctr_firm_builder)
 
-Additionally, `zip` needs to be installed to make release builds. Also, make sure that the `dma330as` and `firmbuilder` binaries are in the PATH environment variable and accessible to the Makefile.
+Additionally, `p7zip-full` needs to be installed to make release builds. Also, make sure that the `dma330as` and `firmbuilder` binaries are in the PATH environment variable and accessible to the Makefile.
 
 Build open_agb_firm as a debug build via `make`, or as a release build via `make release`.
 
