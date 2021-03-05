@@ -1,4 +1,4 @@
-# open_agb_firm gba_db.bin Builder v2.5
+# open_agb_firm gba_db.bin Builder v2.6
 # By HTV04
 # 
 # This script parses MAME's gba.xml (found here: https://github.com/mamedev/mame/blob/master/hash/gba.xml) and converts it to a gba_db.bin file for open_agb_firm.
@@ -8,41 +8,41 @@
 
 import math
 import re
-# import sys
+import sys
 
 import xml.etree.ElementTree as ET
 
 # Use title, serial, SHA-1, size, and save type to generate gba_db entry as binary string
-def gbadbentry(a, b, c, d, e):
+def gbadbentry(title, serial, sha, size, savetype):
     entry = []
     
-    if len(c) != 40:
-        c = '0000000000000000000000000000000000000000'
-    cbytes = bytes.fromhex(c)
+    if len(sha) != 40:
+        sha = '0000000000000000000000000000000000000000'
+    shabytes = bytes.fromhex(sha)
     
-    entry.append(int.from_bytes(cbytes[:8], 'little')) # Sorting key
-    entry.append(a.encode().ljust(200, b'\x00')[:200])
-    if len(b) != 4 or bool(re.search('[^A-Z0-9]', b)):
+    entry.append(int.from_bytes(shabytes[:8], 'little')) # Sorting key
+    entry.append(title.encode().ljust(200, b'\x00')[:200])
+    if len(serial) != 4 or bool(re.search('[^A-Z0-9]', serial)):
         entry.append(b'\x00\x00\x00\x00')
     else:
-        entry.append(b.encode())
-    entry.append(cbytes)
-    entry.append((int(math.log(d, 2)) << 27 | e).to_bytes(4, 'little')) # Save type is stored weirdly
+        entry.append(serial.encode())
+    entry.append(shabytes)
+    entry.append((int(math.log(size, 2)) << 27 | savetype).to_bytes(4, 'little')) # Save type is stored weirdly
     
     return entry
 
 # Prepare gba_db.bin binary string from gba_db list.
-def preparegbadbbin(a):
+def preparegbadbbin(gbadb):
     gbadbbin = b''
     
     # Use sort key to sort the gba_db list and delete it from each entry
-    a = sorted(a, key=lambda l:l[0])
-    length = len(a)
+    gbadb = sorted(gbadb, key=lambda l:l[0])
+    length = len(gbadb)
     for i in range(length):
-        a[i].pop(0)
+        gbadb[i].pop(0)
     
     # Compile gba_db binary
-    for i in a:
+    for i in gbadb:
         for j in i:
             gbadbbin += j
     
@@ -57,10 +57,10 @@ if __name__ == '__main__':
     gba = ET.parse('gba.xml').getroot() # MAME gba.xml
     nointro = ET.parse('gba.dat').getroot() # No-Intro GBA DAT
     
-    # # Arguments
-    # if sys.argv[1] == 'noaddentries': # Don't include additional entries
-    #     addentries = False
-    addentries = False # Leave as False for now since no additional entries have been added yet
+    # Arguments (could totally be done better but this will do for now)
+    puremode = False
+    if len(sys.argv) >= 2 and sys.argv[1] == 'pure': # Don't include anything that isn't in gba.xml and gba.dat
+        puremode = True
     
     # Start adding entries
     for software in gba.findall('software'):
@@ -95,7 +95,7 @@ if __name__ == '__main__':
                 for feature in part.findall('feature'):
                     if feature.get('name') == 'slot':
                         slottype = feature.get('value')
-                        if slottype in ('gba_eeprom', 'gba_eeprom_4k'):
+                        if slottype in ('gba_eeprom_4k', 'gba_eeprom'):
                             savetype = 0 # SAVE_TYPE_EEPROM_8k
                             if size > 0x1000000:
                                 savetype += 1 # SAVE_TYPE_EEPROM_8k_2
@@ -105,7 +105,7 @@ if __name__ == '__main__':
                                 savetype += 1 # SAVE_TYPE_EEPROM_64k_2
                         elif slottype == 'gba_flash_rtc':
                             savetype = 8 # SAVE_TYPE_FLASH_512k_PSC_RTC
-                        elif slottype == 'gba_flash_512':
+                        elif slottype in ('gba_flash', 'gba_flash_512'):
                             savetype = 9 # SAVE_TYPE_FLASH_512k_PSC
                         elif slottype == 'gba_flash_1m_rtc':
                             savetype = 10 # SAVE_TYPE_FLASH_1m_MRX_RTC
@@ -130,11 +130,8 @@ if __name__ == '__main__':
         count += 1
     
     # Add additional entries
-    if addentries == True:
-        # Example entries for demonstration purposes (to do: replace with valid entries)
-        gbadbentries = ([['AAAA - A', 'AAAA', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', 0x400000, 15],
-                         ['BBBB - B', 'BBBB', 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', 0x400000, 15],
-                         ['CCCC - C', 'CCCC', 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC', 0x400000, 15]])
+    if not puremode:
+        gbadbentries = ([['0246 - Kinniku Banzuke - Kimero! Kiseki no Kanzen Seiha (Japan)', 'AK5J', 'CF0A6C1C473BA6C85027B6071AA1CF6E21336974', 0x800000, 14]])
         
         print()
         
@@ -152,7 +149,7 @@ if __name__ == '__main__':
     with open('gba_db.bin', 'wb') as f:
         f.write(gbadbbin)
     
-    if addentries == True:
-        print(str(count) + ' entries added, ' + str(addcount) + ' additional entries added, ' + str(skipcount) + ' entries skipped')
-    else:
+    if puremode:
         print(str(count) + ' entries added, ' + str(skipcount) + ' entries skipped')
+    else:
+        print(str(count) + ' entries added, ' + str(addcount) + ' additional entries added, ' + str(skipcount) + ' entries skipped')

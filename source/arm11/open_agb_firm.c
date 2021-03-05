@@ -40,19 +40,20 @@
 #include "kevent.h"
 
 
-//#define OAF_SAVE_DB_DEBUG  (1)
 #define OAF_WORK_DIR       "sdmc:/3ds/open_agb_firm"
 #define INI_BUF_SIZE       (1024u)
 #define DEFAULT_CONFIG     "[general]\n"        \
-                           "backlight=40\n"     \
-                           "biosIntro=true\n\n" \
+                           "backlight=64\n"     \
+                           "biosIntro=true\n"   \
+						   "useGbaDb=true\n\n"     \
                            "[video]\n"          \
-                           "inGamma=2.2\n"      \
+                           "adjustGamma=true\n" \
+						   "inGamma=2.2\n"      \
                            "outGamma=1.54\n"    \
                            "contrast=1.0\n"     \
                            "brightness=0.0\n\n" \
                            "[advanced]\n"       \
-                           "maxBacklight=false\n" \
+                           "saveOverride=false\n" \
 
 
 typedef struct
@@ -60,16 +61,18 @@ typedef struct
 	// [general]
 	u8 backlight; // Both LCDs.
 	bool biosIntro;
+	bool useGbaDb;
 	// Setting to separate save and config files from the ROMs?
 
 	// [video]
+	bool adjustGamma;
 	float inGamma;
 	float outGamma;
 	float contrast;
 	float brightness;
 
 	// [advanced]
-	bool maxBacklight;
+	bool saveOverride;
 } OafConfig;
 
 typedef struct
@@ -82,7 +85,7 @@ typedef struct
 typedef struct
 {
 	char name[200];
-	char gameCode[4];
+	char serial[4];
 	u8 sha1[20];
 	u32 attr;
 } GameDbEntry;
@@ -92,6 +95,8 @@ typedef struct
 static OafConfig g_oafConfig =
 {
 	40,
+	true,
+	true,
 	true,
 	2.2f,
 	1.54f,
@@ -160,52 +165,11 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	return res;
 }
 
-// Search for entry with first u64 of the SHA1 = x using binary search.
-static Result searchGameDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
-{
-	debug_printf("Database search: '%016" PRIX64 "'\n", __builtin_bswap64(x));
-
-	Result res;
-	FHandle f;
-	if((res = fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
-	{
-		s32 l = 0;
-		s32 r = fSize(f) / sizeof(GameDbEntry) - 1; // TODO: Check for 0!
-		while(1)
-		{
-			const s32 mid = l + (r - l) / 2;
-			debug_printf("l: %ld r: %ld mid: %ld\n", l, r, mid);
-
-			if((res = fLseek(f, sizeof(GameDbEntry) * mid)) != RES_OK) break;
-			if((res = fRead(f, db, sizeof(GameDbEntry), NULL)) != RES_OK) break;
-			const u64 tmp = *(u64*)db->sha1; // Unaligned access.
-			if(tmp == x)
-			{
-				*entryPos = mid; // TODO: Remove.
-				break;
-			}
-
-			if(r <= l || r < 0)
-			{
-				res = RES_NOT_FOUND;
-				break;
-			}
-
-			if(tmp > x) r = mid - 1;
-			else        l = mid + 1;
-		}
-
-		fClose(f);
-	}
-
-	return res;
-}
-
-static u16 checkSaveOverride(u32 gameCode)
+static u16 checkSaveOverride(u32 serial)
 {
 	static const struct
 	{
-		alignas(4) char gameCode[4];
+		alignas(4) char serial[4];
 		u16 saveType;
 	} overrideLut[] =
 	{
@@ -218,8 +182,8 @@ static u16 checkSaveOverride(u32 gameCode)
 
 	for(u32 i = 0; i < sizeof(overrideLut) / sizeof(*overrideLut); i++)
 	{
-		// Compare Game Code without region.
-		if((gameCode & 0xFFFFFFu) == *((u32*)overrideLut[i].gameCode))
+		// Compare serial without region.
+		if((serial & 0xFFFFFFu) == *((u32*)overrideLut[i].serial))
 		{
 			return overrideLut[i].saveType;
 		}
@@ -228,13 +192,14 @@ static u16 checkSaveOverride(u32 gameCode)
 	return 0xFF;
 }
 
-static u16 tryDetectSaveType(u32 romSize)
+static u16 detectSaveType(u32 romSize)
 {
 	const u32 *romPtr = (u32*)ROM_LOC;
 	u16 saveType;
 	if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
 	{
-		debug_printf("Game Code in override list. Using save type %" PRIu16 ".\n", saveType);
+		debug_printf("Serial in override list.\n"
+		             "saveType: %u\n", saveType);
 		return saveType;
 	}
 
@@ -255,12 +220,12 @@ static u16 tryDetectSaveType(u32 romSize)
 			} saveTypeLut[25] =
 			{
 				// EEPROM
-				// Assume common sizes.
+				// Assume common sizes for popular games to aid ROM hacks.
 				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},
 				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},
-				{"EEPROM_V121", SAVE_TYPE_EEPROM_8k},
+				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k},
 				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},
-				{"EEPROM_V124", SAVE_TYPE_EEPROM_8k},
+				{"EEPROM_V124", SAVE_TYPE_EEPROM_64k},
 				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},
 				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},
 
@@ -301,26 +266,67 @@ static u16 tryDetectSaveType(u32 romSize)
 						// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
 						if(romSize > 0x1000000) tmpSaveType++;
 					}
-					saveType = tmpSaveType;
-					debug_printf("Detected SDK save type '%s'.\n", str);
-					goto saveTypeFound;
+					debug_printf("SDK save string: %s\n"
+					             "saveType: %u\n", str, tmpSaveType);
+					return tmpSaveType;
 				}
 			}
 		}
 	}
 
-saveTypeFound:
-
+	debug_printf("saveType: %u\n", saveType);
 	return saveType;
 }
 
-static u16 saveDbDebug(const char *const savePath, u32 romSize)
+// Search for entry with first u64 of the SHA1 = x using binary search.
+static Result searchGbaDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
+{
+	debug_printf("Database search: '%016" PRIX64 "'\n", __builtin_bswap64(x));
+
+	Result res;
+	FHandle f;
+	if((res = fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	{
+		s32 l = 0;
+		s32 r = fSize(f) / sizeof(GameDbEntry) - 1; // TODO: Check for 0!
+		while(1)
+		{
+			const s32 mid = l + (r - l) / 2;
+			debug_printf("l: %ld r: %ld mid: %ld\n", l, r, mid);
+
+			if((res = fLseek(f, sizeof(GameDbEntry) * mid)) != RES_OK) break;
+			if((res = fRead(f, db, sizeof(GameDbEntry), NULL)) != RES_OK) break;
+			const u64 tmp = *(u64*)db->sha1; // Unaligned access.
+			if(tmp == x)
+			{
+				*entryPos = mid; // TODO: Remove.
+				break;
+			}
+
+			if(r <= l)
+			{
+				debug_printf("Not found!");
+				res = RES_NOT_FOUND;
+				break;
+			}
+
+			if(tmp > x) r = mid - 1;
+			else        l = mid + 1;
+		}
+
+		fClose(f);
+	}
+
+	return res;
+}
+
+static u16 getSaveType(u32 romSize, const char *const savePath)
 {
 	FILINFO fi;
+	const bool saveOverride = g_oafConfig.saveOverride;
+	const u16 autoSaveType = detectSaveType(romSize);
 	const bool saveExists = fStat(savePath, &fi) == RES_OK;
-	const u16 autoSaveType = tryDetectSaveType(romSize);
 
-	// TODO: Check for homebrew before searching the db.
 	u64 sha1[3];
 	sha((u32*)ROM_LOC, romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
 
@@ -328,95 +334,85 @@ static u16 saveDbDebug(const char *const savePath, u32 romSize)
 	GameDbEntry dbEntry;
 	s32 dbPos = -1;
 	u16 saveType = SAVE_TYPE_NONE;
-	if((res = searchGameDb(*sha1, &dbEntry, &dbPos)) == RES_OK) saveType = dbEntry.attr & 0xFu;
-	else
+	res = searchGbaDb(*sha1, &dbEntry, &dbPos);
+	if(res == RES_OK) saveType = dbEntry.attr & 0xFu;
+	else if(!saveOverride && res == RES_NOT_FOUND) return autoSaveType;
+	else if(res != RES_NOT_FOUND)
 	{
-		ee_puts("Could not access the game db! Press the power button twice.");
+		ee_puts("Could not access gba_db.bin! Press any button to continue.");
 		printErrorWaitInput(res, 0);
-		return SAVE_TYPE_NONE;
+		return autoSaveType;
 	}
+	debug_printf("saveType: %u\n", saveType);
 
-	consoleClear();
-	ee_printf("Save file (Press (X) to delete): %s\n"
-	          "Save type (from db): %u\n"
-	          "Save type (auto detect): %u\n\n"
-	          " EEPROM 4k/8k (0, 1)\n"
-	          " EEPROM 64k (2, 3)\n"
-	          " Flash 512k RTC (4, 6, 8)\n"
-	          " Flash 512k (5, 7, 9)\n"
-	          " Flash 1m RTC (10, 12)\n"
-	          " Flash 1m (11, 13)\n"
-	          " SRAM 256k (14)\n"
-	          " None (15)\n\n\n", (saveExists ? "found" : "not found"), saveType, autoSaveType);
-	ee_puts("Please note:\n"
-	        "- Auto detection is broken for EEPROM save types.\n"
-	        "- Choose the lowest size save type first and work your way up until the game fully works.\n"
-	        "- If the game works with a Flash save type try without RTC first.\n"
-	        "- Delete the save before you try a new save type.\n"
-	        "- Make sure all your dumps are verified good dumps (no-intro.org)!");
-
-	static const u8 saveTypeCursorLut[16] = {0, 0, 1, 1, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7};
-	u8 oldCursor = 0;
-	u8 cursor = saveTypeCursorLut[saveType];
-	while(1)
+	if(saveOverride)
 	{
-		ee_printf("\x1b[%u;H ", oldCursor + 4);
-		ee_printf("\x1b[%u;H>", cursor + 4);
-		oldCursor = cursor;
-
-		u32 kDown;
-		do
-		{
-			GFX_waitForVBlank0();
-
-			hidScanInput();
-			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
-			kDown = hidKeysDown();
-		} while(kDown == 0);
-
-		if((kDown & KEY_DUP) && cursor > 0)        cursor--;
-		else if((kDown & KEY_DDOWN) && cursor < 7) cursor++;
-		else if(kDown & KEY_X)
-		{
-			fUnlink(savePath);
-			ee_printf("\x1b[0;33Hdeleted  ");
-		}
-		else if(kDown & KEY_A) break;
-	}
-
-	static const u8 cursorSaveTypeLut[8] = {0, 2, 8, 9, 10, 11, 14, 15};
-	saveType = cursorSaveTypeLut[cursor];
-	if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
-	{
-		// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
-		if(romSize > 0x1000000) saveType++;
-	}
-	if(dbEntry.attr != saveType)
-	{
-		if(dbPos > -1 || dbPos < 3253)
-		{
-			dbEntry.attr = (intLog2(romSize)<<27) | saveType;
-			FHandle f;
-			if(fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_WRITE) == RES_OK)
-			{
-				fLseek(f, (sizeof(GameDbEntry) * dbPos) + offsetof(GameDbEntry, attr));
-				fWrite(f, &dbEntry.attr, sizeof(dbEntry.attr), NULL);
-				fClose(f);
-			}
-			else
-			{
-				ee_puts("Could not open db for write!");
-				saveType = SAVE_TYPE_NONE;
-			}
-		}
+		consoleClear();
+		ee_printf("==Save Type Override Menu==\n"
+		          "Save file: %s\n"
+		          "Save type (autodetected): %u\n"
+				  "Save type (from gba_db.bin): ", (saveExists ? "Found" : "Not found"), autoSaveType);
+		if(res == RES_NOT_FOUND)
+			ee_puts("Not found");
 		else
+			ee_printf("%u\n", saveType);
+		ee_puts("\n"
+		        "=Save Types=\n"
+		        " EEPROM 4k/8k (0, 1)\n"
+		        " EEPROM 64k (2, 3)\n"
+		        " Flash 512k RTC (4, 6, 8)\n"
+		        " Flash 512k (5, 7, 9)\n"
+		        " Flash 1m RTC (10, 12)\n"
+		        " Flash 1m (11, 13)\n"
+		        " SRAM 256k (14)\n"
+		        " None (15)\n\n"
+		        "=Controls=\n"
+		        "Up/Down: Navigate\n"
+		        "A: Select\n"
+		        "X: Delete save file");
+
+		static const u8 saveTypeCursorLut[16] = {0, 0, 1, 1, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7};
+		u8 oldCursor = 0;
+		u8 cursor;
+		if(!g_oafConfig.useGbaDb || res == RES_NOT_FOUND)
+			cursor = saveTypeCursorLut[autoSaveType];
+		else
+			cursor = saveTypeCursorLut[saveType];
+		while(1)
 		{
-			ee_puts("Db position out of range!");
-			saveType = SAVE_TYPE_NONE;
+			ee_printf("\x1b[%u;H ", oldCursor + 6);
+			ee_printf("\x1b[%u;H>", cursor + 6);
+			oldCursor = cursor;
+	
+			u32 kDown;
+			do
+			{
+				GFX_waitForVBlank0();
+	
+				hidScanInput();
+				if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) return saveType;
+				kDown = hidKeysDown();
+			} while(kDown == 0);
+
+			if((kDown & KEY_DUP) && cursor > 0)        cursor--;
+			else if((kDown & KEY_DDOWN) && cursor < 7) cursor++;
+			else if(kDown & KEY_X)
+			{
+				fUnlink(savePath);
+				ee_printf("\x1b[1;11HDeleted  ");
+			}
+			else if(kDown & KEY_A) break;
+		}
+
+		static const u8 cursorSaveTypeLut[8] = {0, 2, 8, 9, 10, 11, 14, 15};
+		saveType = cursorSaveTypeLut[cursor];
+		if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
+		{
+			// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
+			if(romSize > 0x1000000) saveType++;
 		}
 	}
 
-end:
 	return saveType;
 }
 
@@ -514,10 +510,14 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 			config->backlight = (u8)strtoul(value, NULL, 10);
 		else if(strcmp(name, "biosIntro") == 0)
 			config->biosIntro = (strcmp(value, "true") == 0 ? true : false);
+		else if(strcmp(name, "useGbaDb") == 0)
+			config->useGbaDb = (strcmp(value, "true") == 0 ? true : false);
 	}
 	else if(strcmp(section, "video") == 0)
 	{
-		if(strcmp(name, "inGamma") == 0)
+		if(strcmp(name, "adjustGamma") == 0)
+			config->adjustGamma = (strcmp(value, "true") == 0 ? true : false);
+		else if(strcmp(name, "inGamma") == 0)
 			config->inGamma = str2float(value);
 		else if(strcmp(name, "outGamma") == 0)
 			config->outGamma = str2float(value);
@@ -534,8 +534,8 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	}*/
 	else if(strcmp(section, "advanced") == 0)
 	{
-		if(strcmp(name, "maxBacklight") == 0)
-			config->maxBacklight = (strcmp(value, "true") == 0 ? true : false);
+		if(strcmp(name, "saveOverride") == 0)
+			config->saveOverride = (strcmp(value, "true") == 0 ? true : false);
 	}
 	else return 0; // Error.
 
@@ -553,7 +553,9 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	}
 	else if(strcmp(section, "video") == 0)
 	{
-		if(strcmp(name, "inGamma") == 0)
+		if(strcmp(name, "adjustGamma") == 0)
+			config->adjustGamma = (strcmp(value, "true") == 0 ? true : false);
+		else if(strcmp(name, "inGamma") == 0)
 			config->inGamma = str2float(value);
 		else if(strcmp(name, "outGamma") == 0)
 			config->outGamma = str2float(value);
@@ -605,26 +607,18 @@ static Result handleFsStuff(char romAndSavePath[512])
 
 			// Parse config.
 			parseConfig("config.ini", /* 0, */ &g_oafConfig);
-			{ // TODO: Move this elsewhere?
-				const bool maxBacklight = g_oafConfig.maxBacklight;
+			{
+				// TODO: Move this elsewhere?
 				u8 backlightMax;
 				u8 backlightMin;
-				if(maxBacklight)
+				if(MCU_getSystemModel() >= 4)
 				{
-					if(MCU_getSystemModel() >= 4)
-					{
-						backlightMax=142;
-						backlightMin=16;
-					}
-					else
-					{
-						backlightMax=117;
-						backlightMin=20;
-					}
+					backlightMax=142;
+					backlightMin=16;
 				}
 				else
 				{
-					backlightMax=64;
+					backlightMax=117;
 					backlightMin=20;
 				}
 
@@ -685,14 +679,13 @@ Result oafInitAndRun(void)
 			u32 romSize;
 			if((res = loadGbaRom(romAndSavePath, &romSize)) != RES_OK) break;
 
-#ifndef OAF_SAVE_DB_DEBUG
-			// Detect save type and adjust path for the save file.
-			const u16 saveType = tryDetectSaveType(romSize);
+			// Adjust path for the save file and get save type.
 			strcpy(romAndSavePath + strlen(romAndSavePath) - 4, ".sav");
-#else
-			strcpy(romAndSavePath + strlen(romAndSavePath) - 4, ".sav");
-			const u16 saveType = saveDbDebug(romAndSavePath, romSize);
-#endif
+			u16 saveType;
+			if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
+				saveType = getSaveType(romSize, romAndSavePath);
+			else
+				saveType = detectSaveType(romSize);
 
 			// Prepare ARM9 for GBA mode + settings and save loading.
 			if((res = LGY_prepareGbaMode(g_oafConfig.biosIntro, saveType, romAndSavePath)) == RES_OK)
@@ -709,7 +702,7 @@ Result oafInitAndRun(void)
 				g_frameReadyEvent = frameReadyEvent;
 
 				// Adjust gamma table and sync LgyFb start with LCD VBlank.
-				adjustGammaTableForGba();
+				if(g_oafConfig.adjustGamma) adjustGammaTableForGba();
 				GFX_waitForVBlank0();
 				LGY_switchMode();
 			}
