@@ -42,18 +42,19 @@
 
 #define OAF_WORK_DIR       "sdmc:/3ds/open_agb_firm"
 #define INI_BUF_SIZE       (1024u)
-#define DEFAULT_CONFIG     "[general]\n"        \
-                           "backlight=64\n"     \
-                           "biosIntro=true\n"   \
-						   "useGbaDb=true\n\n"     \
-                           "[video]\n"          \
-                           "adjustGamma=true\n" \
-						   "inGamma=2.2\n"      \
-                           "outGamma=1.54\n"    \
-                           "contrast=1.0\n"     \
-                           "brightness=0.0\n\n" \
-                           "[advanced]\n"       \
+#define DEFAULT_CONFIG     "[general]\n"          \
+                           "backlight=64\n"       \
+                           "biosIntro=true\n"     \
+						   "useGbaDb=true\n\n"    \
+                           "[video]\n"            \
+                           "adjustGamma=true\n"   \
+						   "inGamma=2.2\n"        \
+                           "outGamma=1.54\n"      \
+                           "contrast=1.0\n"       \
+                           "brightness=0.0\n\n"   \
+                           "[advanced]\n"         \
                            "saveOverride=false\n" \
+						   "defaultSave=14\n"     \
 
 
 typedef struct
@@ -73,6 +74,7 @@ typedef struct
 
 	// [advanced]
 	bool saveOverride;
+	u16 defaultSave;
 } OafConfig;
 
 typedef struct
@@ -102,7 +104,8 @@ static OafConfig g_oafConfig =
 	1.54f,
 	1.f,
 	0.f,
-	false
+	false,
+	14
 };
 static KHandle g_frameReadyEvent = 0;
 
@@ -165,7 +168,8 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	return res;
 }
 
-static u16 checkSaveOverride(u32 serial)
+// Deprecated because of defaultSave.
+/*static u16 checkSaveOverride(u32 serial)
 {
 	static const struct
 	{
@@ -190,22 +194,38 @@ static u16 checkSaveOverride(u32 serial)
 	}
 
 	return 0xFF;
-}
+}*/
 
 static u16 detectSaveType(u32 romSize)
 {
 	const u32 *romPtr = (u32*)ROM_LOC;
 	u16 saveType;
-	if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
+	// Deprecated because of defaultSave.
+	/*if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
 	{
 		debug_printf("Serial in override list.\n"
 		             "saveType: %u\n", saveType);
 		return saveType;
-	}
+	}*/
 
 	// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 	romPtr += 0xE4 / 4; // Skip headers.
-	saveType = SAVE_TYPE_NONE;
+	const u16 defaultSave = g_oafConfig.defaultSave;
+	if(defaultSave > SAVE_TYPE_NONE)
+		saveType = SAVE_TYPE_NONE;
+	else
+	{
+		saveType = defaultSave;
+		if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
+		{
+			if(romSize > 0x1000000) saveType++;
+		}
+		else if(saveType == SAVE_TYPE_EEPROM_8k_2 || saveType == SAVE_TYPE_EEPROM_64k_2)
+		{
+			if(romSize <= 0x1000000) saveType--;
+		}
+	}
+	
 	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
 	{
 		u32 tmp = *romPtr;
@@ -358,7 +378,7 @@ static u16 getSaveType(u32 romSize, const char *const savePath)
 			ee_printf("%u\n", saveType);
 		ee_puts("\n"
 		        "=Save Types=\n"
-		        " EEPROM 4k/8k (0, 1)\n"
+		        " EEPROM 8k (0, 1)\n"
 		        " EEPROM 64k (2, 3)\n"
 		        " Flash 512k RTC (4, 6, 8)\n"
 		        " Flash 512k (5, 7, 9)\n"
@@ -536,6 +556,8 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	{
 		if(strcmp(name, "saveOverride") == 0)
 			config->saveOverride = (strcmp(value, "true") == 0 ? true : false);
+		if(strcmp(name, "defaultSave") == 0)
+			config->defaultSave = (u16)strtoul(value, NULL, 10);
 	}
 	else return 0; // Error.
 
