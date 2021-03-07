@@ -168,7 +168,7 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	return res;
 }
 
-// Deprecated because of defaultSave.
+// Deprecated due to gba_db.bin and defaultSave.
 /*static u16 checkSaveOverride(u32 serial)
 {
 	static const struct
@@ -200,7 +200,7 @@ static u16 detectSaveType(u32 romSize)
 {
 	const u32 *romPtr = (u32*)ROM_LOC;
 	u16 saveType;
-	// Deprecated because of defaultSave.
+	// Deprecated due to gba_db.bin and defaultSave.
 	/*if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
 	{
 		debug_printf("Serial in override list.\n"
