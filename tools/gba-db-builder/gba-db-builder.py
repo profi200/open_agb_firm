@@ -1,4 +1,6 @@
-# open_agb_firm gba_db.bin Builder v2.6
+#!/usr/bin/env python3
+
+# open_agb_firm gba_db.bin Builder v2.7
 # By HTV04
 # 
 # This script parses MAME's gba.xml (found here: https://github.com/mamedev/mame/blob/master/hash/gba.xml) and converts it to a gba_db.bin file for open_agb_firm.
@@ -49,19 +51,17 @@ def preparegbadbbin(gbadb):
     return gbadbbin
 
 if __name__ == '__main__':
-    gbadb = []
-    skipcount = 0
-    count = 0
-    addcount = 0
-    
-    gba = ET.parse('gba.xml').getroot() # MAME gba.xml
-    nointro = ET.parse('gba.dat').getroot() # No-Intro GBA DAT
-    
     # Arguments (could totally be done better but this will do for now)
     puremode = False
     if len(sys.argv) >= 2 and sys.argv[1] == 'pure': # Don't include anything that isn't in gba.xml and gba.dat
         puremode = True
     
+    gbadb = []
+    skipcount = 0
+    count = 0
+    addcount = 0
+    gba = ET.parse('gba.xml').getroot() # MAME gba.xml
+    nointro = ET.parse('gba.dat').getroot() # No-Intro GBA DAT
     # Start adding entries
     for software in gba.findall('software'):
         for part in software.findall('part'):
