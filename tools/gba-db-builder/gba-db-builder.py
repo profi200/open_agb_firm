@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-# open_agb_firm gba_db.bin Builder v2.7
+# open_agb_firm gba_db.bin Builder v2.8
 # By HTV04
 # 
 # This script parses MAME's gba.xml (found here: https://github.com/mamedev/mame/blob/master/hash/gba.xml) and converts it to a gba_db.bin file for open_agb_firm.
-# No-Intro's GBA DAT is also used for filtering and naming (found here: https://datomatic.no-intro.org/). The DAT should be renamed to "gba.dat".
+# No-Intro's GBA DAT (with scene numbers) is also used for filtering and naming (found here: https://datomatic.no-intro.org/). The DAT should be renamed to "gba.dat".
 # 
 # This script should work with any updates to MAME's gba.xml and the No-Intro DAT, unless something this script expects is changed.
 
@@ -129,8 +129,9 @@ if __name__ == '__main__':
         print('Added entry "' + software.find('description').text + '"')
         count += 1
     
-    # Add additional entries
+    # Add additional entries if "puremode" is false
     if not puremode:
+        # Title, serial, SHA-1, size, save type
         gbadbentries = ([['0246 - Kinniku Banzuke - Kimero! Kiseki no Kanzen Seiha (Japan)', 'AK5J', 'CF0A6C1C473BA6C85027B6071AA1CF6E21336974', 0x800000, 14]])
         
         print()
