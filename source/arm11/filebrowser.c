@@ -138,16 +138,7 @@ Result browseFiles(const char *const basePath, char selected[512])
 	if(dList == NULL) return RES_OUT_OF_MEM;
 
 	Result res;
-	if((res = scanDir(curDir, dList, ".gba")) != RES_OK)
-	{
-		free(dList);
-		free(curDir);
-
-		// Clear screen.
-		ee_printf("\x1b[2J");
-
-		return res;
-	}
+	if((res = scanDir(curDir, dList, ".gba")) != RES_OK) goto end;
 	showDirList(dList, 0);
 
 	s32 cursorPos = 0; // Within the entire list.
@@ -164,16 +155,7 @@ Result browseFiles(const char *const basePath, char selected[512])
 			GFX_waitForVBlank0();
 
 			hidScanInput();
-			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER))
-			{
-				free(dList);
-				free(curDir);
-
-				// Clear screen.
-				ee_printf("\x1b[2J");
-
-				return res;
-			}
+			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
 			kDown = hidKeysDown();
 		} while(kDown == 0);
 
@@ -240,6 +222,7 @@ Result browseFiles(const char *const basePath, char selected[512])
 		}
 	}
 
+end:
 	free(dList);
 	free(curDir);
 

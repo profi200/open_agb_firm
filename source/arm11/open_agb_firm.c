@@ -45,16 +45,15 @@
 #define DEFAULT_CONFIG     "[general]\n"          \
                            "backlight=64\n"       \
                            "biosIntro=true\n"     \
-						   "useGbaDb=true\n\n"    \
+                           "useGbaDb=true\n\n"    \
                            "[video]\n"            \
-                           "adjustGamma=true\n"   \
-						   "inGamma=2.2\n"        \
+                           "inGamma=2.2\n"        \
                            "outGamma=1.54\n"      \
                            "contrast=1.0\n"       \
                            "brightness=0.0\n\n"   \
                            "[advanced]\n"         \
                            "saveOverride=false\n" \
-						   "defaultSave=14\n"     \
+                           "defaultSave=14\n"     \
 
 
 typedef struct
@@ -66,7 +65,6 @@ typedef struct
 	// Setting to separate save and config files from the ROMs?
 
 	// [video]
-	bool adjustGamma;
 	float inGamma;
 	float outGamma;
 	float contrast;
@@ -97,7 +95,6 @@ typedef struct
 static OafConfig g_oafConfig =
 {
 	40,
-	true,
 	true,
 	true,
 	2.2f,
@@ -214,18 +211,8 @@ static u16 detectSaveType(u32 romSize)
 	if(defaultSave > SAVE_TYPE_NONE)
 		saveType = SAVE_TYPE_NONE;
 	else
-	{
 		saveType = defaultSave;
-		if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
-		{
-			if(romSize > 0x1000000) saveType++;
-		}
-		else if(saveType == SAVE_TYPE_EEPROM_8k_2 || saveType == SAVE_TYPE_EEPROM_64k_2)
-		{
-			if(romSize <= 0x1000000) saveType--;
-		}
-	}
-	
+
 	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
 	{
 		u32 tmp = *romPtr;
@@ -403,14 +390,14 @@ static u16 getSaveType(u32 romSize, const char *const savePath)
 			ee_printf("\x1b[%u;H ", oldCursor + 6);
 			ee_printf("\x1b[%u;H>", cursor + 6);
 			oldCursor = cursor;
-	
+
 			u32 kDown;
 			do
 			{
 				GFX_waitForVBlank0();
-	
+
 				hidScanInput();
-				if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) return saveType;
+				if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
 				kDown = hidKeysDown();
 			} while(kDown == 0);
 
@@ -433,6 +420,7 @@ static u16 getSaveType(u32 romSize, const char *const savePath)
 		}
 	}
 
+end:
 	return saveType;
 }
 
@@ -535,9 +523,7 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	}
 	else if(strcmp(section, "video") == 0)
 	{
-		if(strcmp(name, "adjustGamma") == 0)
-			config->adjustGamma = (strcmp(value, "true") == 0 ? true : false);
-		else if(strcmp(name, "inGamma") == 0)
+		if(strcmp(name, "inGamma") == 0)
 			config->inGamma = str2float(value);
 		else if(strcmp(name, "outGamma") == 0)
 			config->outGamma = str2float(value);
@@ -575,9 +561,7 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	}
 	else if(strcmp(section, "video") == 0)
 	{
-		if(strcmp(name, "adjustGamma") == 0)
-			config->adjustGamma = (strcmp(value, "true") == 0 ? true : false);
-		else if(strcmp(name, "inGamma") == 0)
+		if(strcmp(name, "inGamma") == 0)
 			config->inGamma = str2float(value);
 		else if(strcmp(name, "outGamma") == 0)
 			config->outGamma = str2float(value);
@@ -724,7 +708,7 @@ Result oafInitAndRun(void)
 				g_frameReadyEvent = frameReadyEvent;
 
 				// Adjust gamma table and sync LgyFb start with LCD VBlank.
-				if(g_oafConfig.adjustGamma) adjustGammaTableForGba();
+				adjustGammaTableForGba();
 				GFX_waitForVBlank0();
 				LGY_switchMode();
 			}
