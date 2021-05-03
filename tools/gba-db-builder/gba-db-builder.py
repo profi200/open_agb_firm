@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
-# open_agb_firm gba_db.bin Builder v2.8
+# open_agb_firm gba_db.bin Builder v3.0
 # By HTV04
 # 
 # This script parses MAME's gba.xml (found here: https://github.com/mamedev/mame/blob/master/hash/gba.xml) and converts it to a gba_db.bin file for open_agb_firm.
 # No-Intro's GBA DAT (with scene numbers) is also used for filtering and naming (found here: https://datomatic.no-intro.org/). The DAT should be renamed to "gba.dat".
+# Unless otherwise specified, entries from an addentries.csv file are also added. This file usually includes entries that cannot be not found or are wrong in MAME's gba.xml.
 # 
 # This script should work with any updates to MAME's gba.xml and the No-Intro DAT, unless something this script expects is changed.
 
+import csv
 import math
 import re
 import sys
@@ -29,21 +31,19 @@ def gbadbentry(title, serial, sha, size, savetype):
     else:
         entry.append(serial.encode())
     entry.append(shabytes)
-    entry.append((int(math.log(size, 2)) << 27 | savetype).to_bytes(4, 'little')) # Save type is stored weirdly
+    entry.append((int(math.log(size, 2)) << 27 | savetype).to_bytes(4, 'little'))
     
     return entry
 
-# Prepare gba_db.bin binary string from gba_db list.
-def preparegbadbbin(gbadb):
-    gbadbbin = b''
-    
-    # Use sort key to sort the gba_db list and delete it from each entry
+# Prepare gba_db list for gba_db.bin
+def preparegbadb(gbadb):
+   # Use sort key to sort the gba_db list and delete it from each entry
     gbadb = sorted(gbadb, key=lambda l:l[0])
-    length = len(gbadb)
-    for i in range(length):
+    for i in range(len(gbadb)):
         gbadb[i].pop(0)
     
     # Compile gba_db binary
+    gbadbbin = b''
     for i in gbadb:
         for j in i:
             gbadbbin += j
@@ -52,17 +52,16 @@ def preparegbadbbin(gbadb):
 
 if __name__ == '__main__':
     # Arguments (could totally be done better but this will do for now)
-    puremode = False
-    if len(sys.argv) >= 2 and sys.argv[1] == 'pure': # Don't include anything that isn't in gba.xml and gba.dat
-        puremode = True
+    noaddentries = False
+    if len(sys.argv) >= 2 and sys.argv[1] == 'noaddentries': # Don't include anything that isn't in gba.xml and gba.dat
+        noaddentries = True
     
+    # Start adding entries
     gbadb = []
     skipcount = 0
     count = 0
-    addcount = 0
     gba = ET.parse('gba.xml').getroot() # MAME gba.xml
     nointro = ET.parse('gba.dat').getroot() # No-Intro GBA DAT
-    # Start adding entries
     for software in gba.findall('software'):
         for part in software.findall('part'):
             if part.get('name') == 'cart':
@@ -77,17 +76,19 @@ if __name__ == '__main__':
                 matchfound = False
                 for game in nointro.findall('game'):
                     for rom in game.findall('rom'):
-                        if rom.get('sha1') == sha.upper():
-                            matchfound = True
-                            
+                        if rom.get('sha1').lower() == sha:
                             title = game.get('name')
                             serial = rom.get('serial')
                             if serial == None:
                                 serial = ''
                             size = int(rom.get('size'))
+                            
+                            matchfound = True
+                            
+                            break
                 
                 # If not in No-Intro DAT, skip entry
-                if matchfound == False:
+                if not matchfound:
                     break
                 
                 # Obtain save type
@@ -95,11 +96,11 @@ if __name__ == '__main__':
                 for feature in part.findall('feature'):
                     if feature.get('name') == 'slot':
                         slottype = feature.get('value')
-                        if slottype in ('gba_eeprom_4k', 'gba_eeprom'):
+                        if slottype in ('gba_eeprom_4k', 'gba_yoshiug', 'gba_eeprom'):
                             savetype = 0 # SAVE_TYPE_EEPROM_8k
                             if size > 0x1000000:
                                 savetype += 1 # SAVE_TYPE_EEPROM_8k_2
-                        elif slottype == 'gba_eeprom_64k':
+                        elif slottype in ('gba_eeprom_64k', 'gba_boktai'):
                             savetype = 2 # SAVE_TYPE_EEPROM_64k
                             if size > 0x1000000:
                                 savetype += 1 # SAVE_TYPE_EEPROM_64k_2
@@ -111,46 +112,62 @@ if __name__ == '__main__':
                             savetype = 10 # SAVE_TYPE_FLASH_1m_MRX_RTC
                         elif slottype == 'gba_flash_1m':
                             savetype = 11 # SAVE_TYPE_FLASH_1m_MRX
-                        elif slottype == 'gba_sram':
+                        elif slottype in ('gba_sram', 'gba_drilldoz', 'gba_wariotws'):
                             savetype = 14 # SAVE_TYPE_SRAM_256k
                         
                         break
         
         # If not in No-Intro DAT, skip entry
-        if matchfound == False:
+        if not matchfound:
             print ('Skipped "' + software.find('description').text + '"')
             skipcount += 1
             
             continue
         
-        # Expand gba_db with entry
-        gbadb.append(gbadbentry(title, serial, sha, size, savetype))
+        # Add entry to gba_db
+        entry = gbadbentry(title, serial, sha, size, savetype)
+        for i in range(len(gbadb)):
+            if gbadb[i][3].hex() == sha:
+                print('Duplicate entry "' +  gbadb[i][1].decode() + '" replaced')
+                gbadb[i] = entry
+                skipcount += 1
+                break
+        else:
+            gbadb.append(entry)
+            count += 1
         
-        print('Added entry "' + software.find('description').text + '"')
-        count += 1
+        print('Added entry "' + title + '"')
     
-    # Add additional entries if "puremode" is false
-    if not puremode:
-        # Title, serial, SHA-1, size, save type
-        gbadbentries = ([['0246 - Kinniku Banzuke - Kimero! Kiseki no Kanzen Seiha (Japan)', 'AK5J', 'CF0A6C1C473BA6C85027B6071AA1CF6E21336974', 0x800000, 14]])
+    # Add additional entries from addentries.csv if "noaddentries" is false
+    if not noaddentries:
+        with open('addentries.csv') as f:
+            addentries = list(csv.reader(f))
+        
+        addentries.pop(0)
+        for i in addentries:
+            i[3] = int(i[3])
+            i[4] = int(i[4])
         
         print()
         
-        for title, serial, sha, size, savetype in gbadbentries:
-            gbadb.append(gbadbentry(title, serial, sha, size, savetype))
+        for title, serial, sha, size, savetype in addentries:
+            entry = gbadbentry(title, serial, sha, size, savetype)
+            for i in range(len(gbadb)):
+                if gbadb[i][3].hex().upper() == sha:
+                    print('Duplicate entry "' +  gbadb[i][1].decode() + '" replaced')
+                    gbadb[i] = entry
+                    skipcount += 1
+                    break
+            else:
+                gbadb.append(entry)
+                count += 1
             
             print('Added additional entry "' + title + '"')
-            addcount += 1
     
-    print('\nFinalizing...\n')
-    
-    gbadbbin = preparegbadbbin(gbadb)
+    gbadbbin = preparegbadb(gbadb)
     
     # Create and write to gba_db.bin
     with open('gba_db.bin', 'wb') as f:
         f.write(gbadbbin)
     
-    if puremode:
-        print(str(count) + ' entries added, ' + str(skipcount) + ' entries skipped')
-    else:
-        print(str(count) + ' entries added, ' + str(addcount) + ' additional entries added, ' + str(skipcount) + ' entries skipped')
+    print('\n' + str(count) + ' entries added, ' + str(skipcount) + ' entries skipped')
