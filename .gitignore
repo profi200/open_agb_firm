@@ -7,7 +7,6 @@ arm9/open_agb_firm9.bin
 arm11/open_agb_firm11.bin
 arm9/open_agb_firm9.elf
 arm11/open_agb_firm11.elf
-tools/eeprom-fixer/*.sav
 tools/gba-db-builder/gba_db.bin
 tools/gba-db-builder/gba.dat
 tools/gba-db-builder/gba.xml
