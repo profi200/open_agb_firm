@@ -22,12 +22,14 @@
 #include "mem_map.h"
 #include "hardware/pxi.h"
 #include "ipc_handler.h"
-//#include "fatfs/ff.h"
-//#include "fs.h"
+#include "fatfs/ff.h"
+#include "fs.h"
 #include "arm9/hardware/interrupt.h"
 #include "hardware/gfx.h"
 #include "arm9/hardware/ndma.h"
 
+
+u8 test_buf[0x2000];
 
 
 NOINLINE NOINLINE noreturn void panic(void)
@@ -74,7 +76,7 @@ NOINLINE noreturn void guruMeditation(UNUSED u8 type, UNUSED const u32 *excStack
 	}
 }
 
-/*void dumpMem(u8 *mem, u32 size, char *filepath)
+void dumpMem(u8 *mem, u32 size, char *filepath)
 {
 	FIL file;
 	UINT bytesWritten;
@@ -82,7 +84,13 @@ NOINLINE noreturn void guruMeditation(UNUSED u8 type, UNUSED const u32 *excStack
 	if(f_open(&file, filepath, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
 		return;
 
-	f_write(&file, mem, size, &bytesWritten);
+	//f_write(&file, mem, size, &bytesWritten);
+	for (int i = 0; i < size; i += 0x1000)
+	{
+		NDMA_copy((u32*)&test_buf[0], (u32*)&mem[i], 0x1000);
+		f_write(&file, test_buf, 0x1000, &bytesWritten);
+	}
+
 	f_sync(&file);
 	f_close(&file);
-}*/
+}

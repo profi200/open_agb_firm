@@ -24,6 +24,7 @@
 #include "mem_map.h"
 #include "mmio.h"
 #include "arm9/hardware/ndma.h"
+#include "arm9/hardware/timer.h"
 #include "arm9/arm7_stub.h"
 #include "fsutil.h"
 #include "arm9/debug.h"
@@ -63,17 +64,17 @@ static u32 g_saveSize = 0;
 static u32 g_saveHash[8] = {0};
 static char g_savePath[512] = {0};
 
+static const u32 biosVectors[8] = {0xEA000018, 0xEA000004, 0xEA00004C, 0xEA000002,
+	                               0xEA000001, 0xEA000000, 0xEA000042, 0xE59FD1A0};
 
+static bool bIsSleep = false;
 
 static void setupBiosOverlay(bool biosIntro)
 {
-	iomemcpy(getLgyRegs()->a7_vector, (u32*)_a7_overlay_stub, (u32)_a7_overlay_stub_size);
-	//static const u32 biosVectors[8] = {0xEA000018, 0xEA000004, 0xEA00004C, 0xEA000002,
-	//                                   0xEA000001, 0xEA000000, 0xEA000042, 0xE59FD1A0};
-	//iomemcpy(getLgyRegs()->a7_vector, biosVectors, 32);
+	iomemcpy(getLgyRegs()->a7_vector, biosVectors, 0x20);
 
 	NDMA_copy((u32*)ARM7_STUB_LOC9, (u32*)_a7_stub_start, (u32)_a7_stub_size);
-	if(biosIntro) *((vu8*)_a7_stub9_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
+	//if(biosIntro) *((vu8*)_a7_stub9_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
 }
 
 static u32 setupSaveType(u16 saveType)
@@ -202,4 +203,140 @@ Result LGY_backupGbaSave(void)
 	}
 
 	return res;
+}
+
+static inline void LGY_delay(u32 count)
+{
+	u32 i;
+	for (i = 0; i < count; i++)
+		__asm__ volatile ("");
+}
+
+static void LGY_runInstruction(u32 instruction)
+{
+	const u32 b_loop = 0xEAFFFFFE;
+	const u32 b_minus8 = 0xEAFFFFFC;
+	const u32 arm_nop = 0;
+
+	// Trap PC at 0008
+	getLgyRegs()->a7_vector[2] = b_loop;
+	getLgyRegs()->a7_vector[1] = arm_nop;
+	getLgyRegs()->a7_vector[0] = arm_nop;
+	LGY_delay(1000);
+
+	// Set a trap at 0000, with the instruction we want to run at 0004,
+	// then untrap SWI loop. It should branch back to 0000 and wait.
+	getLgyRegs()->a7_vector[0] = b_loop;
+	getLgyRegs()->a7_vector[1] = instruction;
+	getLgyRegs()->a7_vector[2] = b_minus8;
+	LGY_delay(1000);
+
+	// Set SWI trap at 0008, and allow instruction to be executed.
+	// PC should end at 0008
+	getLgyRegs()->a7_vector[2] = b_loop;
+	getLgyRegs()->a7_vector[0] = arm_nop;
+	LGY_delay(1000);
+
+	// Unset instruction
+	getLgyRegs()->a7_vector[1] = arm_nop;
+	LGY_delay(1000);
+}
+
+static void LGY_mov(u8 reg, u32 val)
+{
+	u16 val_lo = val & 0xFFFF;
+	u16 val_hi = val >> 16;
+
+	LGY_runInstruction(0xE3000000 | (val_lo & 0xFFF) | ((val_lo & 0xF000) << 4) | (reg << 12)); // movw rN, #hival
+	LGY_runInstruction(0xE3400000 | (val_hi & 0xFFF) | ((val_hi & 0xF000) << 4) | (reg << 12)); // movt rN, #loval
+}
+
+void LGY_sleepGba(void)
+{
+	if (bIsSleep)
+		return;
+
+    // Take over ARM7 by replacing all vectors with infinite loops.
+    // The hope is that the game will call an SWI or have an interrupt occur, where
+    // we can use the overlay to feed the ARM7 instructions bit-by-bit.
+    //
+    // Note: Sometimes this can fail, if called mid-interrupt.
+	// The fallback is just not sleeping or executing any instructions, for now.
+	//
+	iomemcpy(getLgyRegs()->a7_vector, (u32*)_a7_overlay_stub_capture, (u32)_a7_overlay_stub_capture_size);
+
+	// Wait for a frame to complete
+	TIMER_sleepMs(17);
+
+	// Stash r11 and r12 as our working registers
+	LGY_runInstruction(0); // nop
+	LGY_runInstruction(0xE92D5800); // stmfd sp!, {r11, r12, lr}
+
+#if 0
+	LGY_mov(11, 0x08000000);
+	LGY_mov(12, 0xFFFFFFFF);
+
+	for (int i = 0; i < 0x200 / 4; i++)
+	{
+		LGY_runInstruction(0xe28bb004); // add r11, r11, #0x4
+	}
+
+	for (int i = 0; i < 0x1000 / 4; i++)
+	{
+		LGY_runInstruction(0xe58bc000); // str r12, [r11, #0x0]
+		LGY_runInstruction(0xe28bb004); // add r11, r11, #0x4
+	}
+#endif
+
+	// swiStop equivalent
+	LGY_mov(11, 0x04000000);
+	LGY_mov(12, 0x80);
+	LGY_runInstruction(0xe5cbc301); // strb r12, [r11, #0x301]
+
+	LGY_runInstruction(0); // nop
+
+	// Wait for sleep entry
+	TIMER_sleepMs(17);
+
+	bIsSleep = true;
+}
+
+void LGY_wakeGba(void)
+{
+	if (!bIsSleep)
+		return;
+
+	// Wait for a frame to complete
+	TIMER_sleepMs(17);
+
+#if 0
+	// Enable savegame mem region.
+	Lgy *const lgy = getLgyRegs();
+	lgy->gba_save_map = LGY_SAVE_MAP_9;
+
+	dumpMem((void*)0x8080000u, 0x80000, "sdmc:/test-dump.bin");
+
+	// Disable savegame mem region.
+	lgy->gba_save_map = LGY_SAVE_MAP_7;
+#endif
+
+	// Remainder of forced sleep routine
+	LGY_runInstruction(0); // nop
+	LGY_runInstruction(0xE8BD5800); // ldmfd sp!, {r11, r12, lr}
+	LGY_runInstruction(0); // nop
+
+	// Clear out these two vectors just in case
+	getLgyRegs()->a7_vector[0] = 0;
+	getLgyRegs()->a7_vector[1] = 0;
+	TIMER_sleepMs(1);
+
+	// Restore original vectors, execution should begin flowing again.
+	iomemcpy(&getLgyRegs()->a7_vector[2], &biosVectors[2], 0x20-8);
+	TIMER_sleepMs(1);
+
+	// Restore reset vector in case a game uses it.
+	getLgyRegs()->a7_vector[0] = biosVectors[0];
+	getLgyRegs()->a7_vector[1] = biosVectors[1];
+
+	bIsSleep = false;
 }

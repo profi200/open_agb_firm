@@ -447,6 +447,22 @@ void CODEC_wakeup(void)
 	TIMER_sleepMs(18); // Fixed 18 ms delay when unsetting this GPIO.
 }
 
+void CODEC_muteI2S(void)
+{
+    codecMaskReg(0x00, 0x3F, 0x00, 0xC0);
+    codecWriteReg(0x00, 0x40, 0x0C);
+
+    codecMaskReg(0x64, 0x77, 0xC, 0xC);
+}
+
+void CODEC_unmuteI2S(void)
+{
+    codecMaskReg(0x00, 0x3F, 0xC0, 0xC0);
+    codecWriteReg(0x00, 0x40, 0x00);
+
+    codecMaskReg(0x64, 0x77, 0x0, 0xC);
+}
+
 bool CODEC_getRawAdcData(CdcAdcData *data)
 {
 	if((codecReadReg(0x67, 0x26) & 2u) == 0)

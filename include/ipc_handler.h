@@ -63,6 +63,8 @@ typedef enum
 	IPC_CMD9_SET_GBA_RTC       = MAKE_CMD9(0, 0, 2),
 	IPC_CMD9_GET_GBA_RTC       = MAKE_CMD9(0, 1, 0),
 	IPC_CMD9_BACKUP_GBA_SAVE   = MAKE_CMD9(0, 0, 0),
+	IPC_CMD9_SLEEPGBA          = MAKE_CMD9(0, 0, 0),
+	IPC_CMD9_WAKEGBA           = MAKE_CMD9(0, 0, 0),
 
 	// Miscellaneous API.
 	IPC_CMD9_PREPARE_POWER     = MAKE_CMD9(0, 0, 0)  // Also used for panic() and guruMeditation().
