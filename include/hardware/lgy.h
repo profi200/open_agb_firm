@@ -125,8 +125,11 @@ Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePa
 Result LGY_setGbaRtc(const GbaRtc rtc);
 Result LGY_getGbaRtc(GbaRtc *const out);
 Result LGY_backupGbaSave(void);
+void LGY_sleepGba(void);
+void LGY_wakeGba(void);
 #ifdef ARM11
 void LGY_switchMode(void);
 void LGY_handleOverrides(void);
 void LGY_deinit(void);
+int LGY_isSleeping(void);
 #endif

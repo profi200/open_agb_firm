@@ -147,5 +147,6 @@ typedef enum
 u8 LCDI2C_readReg(u8 lcd, LcdI2cReg reg);
 void LCDI2C_writeReg(u8 lcd, LcdI2cReg reg, u8 data);
 void LCDI2C_init(void);
+void LCDI2C_deinit(void);
 void LCDI2C_waitBacklightsOn(void);
 u16 LCDI2C_getRevisions(void);

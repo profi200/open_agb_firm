@@ -46,6 +46,10 @@ void CODEC_deinit(void);
  */
 void CODEC_wakeup(void);
 
+void CODEC_muteI2S(void);
+
+void CODEC_unmuteI2S(void);
+
 /**
  * @brief      Get raw ADC data for Circle-Pad/Touchscreen.
  *

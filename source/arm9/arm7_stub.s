@@ -22,6 +22,28 @@
 .cpu arm7tdmi
 .fpu softvfp
 
+BEGIN_ASM_FUNC _a7_overlay_stub_capture
+	nop
+	nop
+
+_swi_v:
+    b .-8
+    b .
+    b .
+	b .
+
+    @ I tried to have it so interrupts would finish before forced sleeps,
+    @ but it made some games crash so on the off chance we're mid-interrupt,
+    @ consume a bit more power.
+	b . @ .+0x110
+
+_fiq_v:
+b .
+
+.pool
+.global _a7_overlay_stub_capture_size
+_a7_overlay_stub_capture_size = . - _a7_overlay_stub_capture
+END_ASM_FUNC
 
 
 BEGIN_ASM_FUNC _a7_overlay_stub

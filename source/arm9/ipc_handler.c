@@ -108,6 +108,14 @@ u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, const u32 *const buf)
 		case IPC_CMD_ID_MASK(IPC_CMD9_BACKUP_GBA_SAVE):
 			result = LGY_backupGbaSave();
 			break;
+	    case IPC_CMD_ID_MASK(IPC_CMD9_SLEEPGBA):
+			LGY_sleepGba();
+			result = 0;
+			break;
+	    case IPC_CMD_ID_MASK(IPC_CMD9_WAKEGBA):
+			LGY_wakeGba();
+			result = 0;
+			break;
 
 		// Miscellaneous API.
 		case IPC_CMD_ID_MASK(IPC_CMD9_PREPARE_POWER):
