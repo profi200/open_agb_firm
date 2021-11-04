@@ -26,19 +26,17 @@ extern "C"
 {
 #endif
 
-typedef struct KTimer KTimer;
 
 
+/*KHandle createTimer(bool pulse);
 
-KTimer* createTimer(bool pulse);
+void deleteTimer(KHandle const ktimer);
 
-void deleteTimer(KTimer *const ktimer);
+void startTimer(KHandle const ktimer, uint32_t usec);
 
-void startTimer(KTimer *const ktimer, uint32_t usec);
+void stopTimer(KHandle const ktimer);
 
-void stopTimer(KTimer *const ktimer);
-
-KRes waitForTimer(KTimer *const ktimer);
+KRes waitForTimer(KHandle const ktimer);*/
 
 #ifdef __cplusplus
 } // extern "C"

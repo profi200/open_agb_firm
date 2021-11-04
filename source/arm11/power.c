@@ -19,10 +19,10 @@
 #include "types.h"
 #include "util.h"
 #include "ipc_handler.h"
-#include "arm11/hardware/mcu.h"
-#include "arm11/hardware/timer.h"
-#include "hardware/cache.h"
-#include "hardware/pxi.h"
+#include "arm11/drivers/mcu.h"
+#include "arm11/drivers/timer.h"
+#include "drivers/cache.h"
+#include "drivers/pxi.h"
 #include "arm.h"
 
 

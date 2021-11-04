@@ -93,9 +93,9 @@ void kernelInit(uint8_t priority)
 	g_numTasks = 2;
 }
 
-KTask* createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg)
+KHandle createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg)
 {
-	if(priority > MAX_PRIO_BITS - 1u) return NULL;
+	if(priority > MAX_PRIO_BITS - 1u) return 0;
 
 	// Make sure the stack is aligned to 8 bytes
 	stackSize = (stackSize + 7u) & ~7u;
@@ -107,7 +107,7 @@ KTask* createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *task
 	{
 		slabFree(taskSlabPtr, newT);
 		free(stack);
-		return NULL;
+		return 0;
 	}
 
 	cpuRegs *const regs = (cpuRegs*)(stack + stackSize - sizeof(cpuRegs));
@@ -127,7 +127,7 @@ KTask* createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *task
 	g_numTasks++;
 	kernelUnlock();
 
-	return newT;
+	return (uintptr_t)newT;
 }
 
 // TODO: setTaskPriority().

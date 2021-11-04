@@ -27,60 +27,58 @@ extern "C"
 {
 #endif
 
-typedef struct KEvent KEvent;
-
 
 
 /**
- * @brief      Creates a new KEvent.
+ * @brief      Creates a new kernel event.
  *
  * @param[in]  oneShot  Event fires only once and auto clears if true.
  *
- * @return     The KEvent pointer or NULL when out of memory.
+ * @return     The KHandle for the event or NULL on error.
  */
-KEvent* createEvent(bool oneShot);
+KHandle createEvent(bool oneShot);
 
 /**
- * @brief      Deletes a KEvent.
+ * @brief      Deletes an kernel event.
  *
- * @param[in]  kevent  The KEvent pointer.
+ * @param[in]  kevent  The KHandle of the event to delete.
  */
-void deleteEvent(KEvent *const kevent);
+void deleteEvent(KHandle const kevent);
 
 /**
- * @brief      Binds the given KEvent to an interrupt.
+ * @brief      Binds the given kernel event to an interrupt.
  *
- * @param[in]  kevent  The KEvent pointer.
+ * @param[in]  kevent  The KHandle of the event.
  * @param[in]  id      The interrupt id.
  * @param[in]  prio    The interrupt priority.
  */
-void bindInterruptToEvent(KEvent *const kevent, uint8_t id, uint8_t prio);
+void bindInterruptToEvent(KHandle const kevent, uint8_t id, uint8_t prio);
 
 void unbindInterruptEvent(uint8_t id);
 
 /**
- * @brief      Waits for the given KEvent to be signaled.
+ * @brief      Waits for a kernel event to be signaled.
  *
- * @param[in]  kevent  The KEvent pointer.
+ * @param[in]  kevent  The KHandle of the event.
  *
- * @return     Returns the result. See Kres above.
+ * @return     Returns the result. See Kres in kernel.h.
  */
-KRes waitForEvent(KEvent *const kevent);
+KRes waitForEvent(KHandle const kevent);
 
 /**
- * @brief      Signals a KEvent.
+ * @brief      Signals an kernel event.
  *
- * @param[in]  kevent      The KEvent pointer.
+ * @param[in]  kevent      The KHandle of the event.
  * @param[in]  reschedule  Set to true to immediately reschedule.
  */
-void signalEvent(KEvent *const kevent, bool reschedule);
+void signalEvent(KHandle const kevent, bool reschedule);
 
 /**
- * @brief      Clears a KEvent.
+ * @brief      Clears an kernel event.
  *
- * @param[in]  kevent  The KEvent pointer.
+ * @param[in]  kevent  The KHandle of the event.
  */
-void clearEvent(KEvent *const kevent);
+void clearEvent(KHandle const kevent);
 
 #ifdef __cplusplus
 } // extern "C"

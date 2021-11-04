@@ -16,27 +16,27 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdbool.h>
+/*#include <stdbool.h>
 #include <stdlib.h>
 #include "types.h"
 #include "ktimer.h"
 #include "internal/list.h"
-#include "arm11/hardware/interrupt.h"
-#include "arm11/hardware/timer.h"
+#include "arm11/drivers/interrupt.h"
+//#include "arm11/drivers/timer.h"
 #include "internal/kernel_private.h"
 #include "internal/slabheap.h"
 #include "internal/config.h"
  //#include "arm11/fmt.h"
 
 
-/*struct KTimer
+typedef struct
 {
 	ListNode node;
 	u32 delta;
 	u32 ticks;
 	const bool pulse;
 	ListNode waitQueue;
-};
+} KTimer;
 
 
 static SlabHeap g_timerSlab = {0};
@@ -54,22 +54,24 @@ void _timerInit(void)
 	IRQ_registerIsr(IRQ_TIMER, 12, 0, timerIsr);
 }
 
-KTimer* createTimer(bool pulse)
+KHandle createTimer(bool pulse)
 {
 	KTimer *const ktimer = (KTimer*)slabAlloc(&g_timerSlab);
 
 	*(bool*)&ktimer->pulse = pulse;
 	listInit(&ktimer->waitQueue);
 
-	return ktimer;
+	return (KHandle)ktimer;
 }
 
-void deleteTimer(KTimer *const ktimer)
+void deleteTimer(KHandle const ktimer)
 {
-	kernelLock();
-	waitQueueWakeN(&ktimer->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
+	KTimer *const timer = (KTimer*)ktimer;
 
-	slabFree(&g_timerSlab, ktimer);
+	kernelLock();
+	waitQueueWakeN(&timer->waitQueue, (u32)-1, KRES_HANDLE_DELETED, true);
+
+	slabFree(&g_timerSlab, timer);
 }
 
 static void timerIsr(UNUSED u32 intSource)
@@ -105,24 +107,28 @@ static void addToDeltaQueue(KTimer *const ktimer, u32 ticks)
 	listPush(&g_deltaQueue, &ktimer->node);
 }
 
-void startTimer(KTimer *const ktimer, uint32_t usec)
+void startTimer(KHandle const ktimer, uint32_t usec)
 {
+	KTimer *const timer = (KTimer*)ktimer;
+
 	const u32 ticks = TIMER_FREQ(1, 1000000) * usec;
-	ktimer->ticks = ticks;
+	timer->ticks = ticks;
 
 	kernelLock();
 	const bool firstTimer = listEmpty(&g_deltaQueue);
-	addToDeltaQueue(ktimer, ticks);
+	addToDeltaQueue(timer, ticks);
 	kernelUnlock();
 	if(firstTimer) TIMER_start(1, ticks, false, true);
 }
 
-void stopTimer(KTimer *const ktimer)
+void stopTimer(KHandle const ktimer)
 {
 }
 
-KRes waitForTimer(KTimer *const ktimer)
+KRes waitForTimer(KHandle const ktimer)
 {
+	KTimer *const timer = (KTimer*)ktimer;
+
 	kernelLock();
-	return waitQueueBlock(&ktimer->waitQueue);
+	return waitQueueBlock(&timer->waitQueue);
 }*/

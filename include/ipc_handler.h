@@ -21,18 +21,18 @@
 #include "types.h"
 
 
-#define IPC_MAX_PARAMS              (15)
-#define IPC_CMD_RESP_FLAG           (1u<<15)
-#define IPC_CMD_ID_MASK(cmd)        ((cmd)>>8)      // Max 127
-#define IPC_CMD_IN_BUFS_MASK(cmd)   ((cmd)>>6 & 3u) // Max 3
-#define IPC_CMD_OUT_BUFS_MASK(cmd)  ((cmd)>>4 & 3u) // Max 3
-#define IPC_CMD_PARAMS_MASK(cmd)    ((cmd) & 15u)   // Max 15
+#define IPC_MAX_PARAMS               (15)
+#define IPC_CMD_RESP_FLAG            (1u<<15)
+#define IPC_CMD_ID_MASK(cmd)         ((cmd)>>8)      // Max 127
+#define IPC_CMD_SEND_BUFS_MASK(cmd)  ((cmd)>>6 & 3u) // Max 3
+#define IPC_CMD_RECV_BUFS_MASK(cmd)  ((cmd)>>4 & 3u) // Max 3
+#define IPC_CMD_PARAMS_MASK(cmd)     ((cmd) & 15u)   // Max 15
 
 
 // https://stackoverflow.com/a/52770279
 // Note: __COUNTER__ is non standard.
-#define MAKE_CMD9(inBufs, outBufs, params) ((__COUNTER__ - _CMD9_C_BASE)<<8 | (inBufs)<<6 | (outBufs)<<4 | params)
-#define MAKE_CMD11(inBufs, outBufs, params) ((__COUNTER__ - _CMD11_C_BASE)<<8 | (inBufs)<<6 | (outBufs)<<4 | params)
+#define MAKE_CMD9(sendBufs, recvBufs, params) ((__COUNTER__ - _CMD9_C_BASE)<<8 | (sendBufs)<<6 | (recvBufs)<<4 | params)
+#define MAKE_CMD11(sendBufs, recvBufs, params) ((__COUNTER__ - _CMD11_C_BASE)<<8 | (sendBufs)<<6 | (recvBufs)<<4 | params)
 
 enum {_CMD9_C_BASE = __COUNTER__ + 1}; // Start at 0.
 typedef enum
@@ -89,4 +89,4 @@ typedef struct
 
 
 
-u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, const u32 *const buf);
+u32 IPC_handleCmd(u8 cmdId, u32 sendBufs, u32 recvBufs, const u32 *const buf);

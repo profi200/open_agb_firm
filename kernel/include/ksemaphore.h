@@ -28,52 +28,50 @@ extern "C"
 {
 #endif
 
-typedef struct KSema KSema;
-
 
 
 /**
- * @brief      Creates a new KSema.
+ * @brief      Creates a new kernel semaphore.
  *
  * @param[in]  count  The initial count of the semaphore.
  *
- * @return     The KSema pointer or NULL when out of memory.
+ * @return     The KHandle of the semaphore or NULL on error.
  */
-KSema* createSemaphore(int32_t count);
+KHandle createSemaphore(int32_t count);
 
 /**
- * @brief      Deletes a KSema.
+ * @brief      Deletes a kernel semaphore.
  *
- * @param[in]  ksema  The KSema handle.
+ * @param[in]  ksema  The KHandle of the semaphore.
  */
-void deleteSemaphore(KSema *const ksema);
+void deleteSemaphore(KHandle const ksema);
 
 /**
- * @brief      Polls a KSema.
+ * @brief      Polls a kernel semaphore.
  *
- * @param[in]  ksema  The KSema pointer.
+ * @param[in]  ksema  The KHandle of the semaphore.
  *
  * @return     Returns KRES_OK or KRES_WOULD_BLOCK.
  */
-KRes pollSemaphore(KSema *const ksema);
+KRes pollSemaphore(KHandle const ksema);
 
 /**
- * @brief      Decreases the semaphore and blocks if <=0.
+ * @brief      Decreases the kernel semaphore and blocks if <=0.
  *
- * @param[in]  ksema  The KSema pointer.
+ * @param[in]  ksema  The KHandle of the semaphore.
  *
- * @return     Returns the result. See Kres above.
+ * @return     Returns the result. See Kres in kernel.h.
  */
-KRes waitForSemaphore(KSema *const ksema);
+KRes waitForSemaphore(KHandle const ksema);
 
 /**
- * @brief      Increases the semaphore and wakes up signalCount waiting tasks if any.
+ * @brief      Increases the kernel semaphore and wakes up signalCount waiting tasks if any.
  *
- * @param[in]  ksema        The KSema pointer.
- * @param[in]  signalCount  The number to increase the semaphore by.
+ * @param[in]  ksema        The KHandle of the semaphore.
+ * @param[in]  signalCount  The number of tasks to wake up..
  * @param[in]  reschedule   Set to true to immediately reschedule.
  */
-void signalSemaphore(KSema *const ksema, uint32_t signalCount, bool reschedule);
+void signalSemaphore(KHandle const ksema, uint32_t signalCount, bool reschedule);
 
 #ifdef __cplusplus
 } // extern "C"

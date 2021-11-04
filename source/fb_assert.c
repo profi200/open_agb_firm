@@ -18,15 +18,15 @@
 
 #include "types.h"
 #include "ipc_handler.h"
-#include "hardware/pxi.h"
+#include "drivers/pxi.h"
 #ifdef ARM9
-	#include "arm9/hardware/interrupt.h"
-	#include "arm9/hardware/ndma.h"
+	#include "arm9/drivers/interrupt.h"
+	#include "arm9/drivers/ndma.h"
 #elif ARM11
 	#include "arm11/fmt.h"
-	#include "arm11/hardware/interrupt.h"
+	#include "arm11/drivers/interrupt.h"
 #endif
-#include "hardware/gfx.h"
+#include "drivers/gfx.h"
 #include "arm.h"
 
 

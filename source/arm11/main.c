@@ -17,22 +17,22 @@
  */
 
 #include "fs.h"
-#include "hardware/gfx.h"
+#include "drivers/gfx.h"
 #include "arm11/console.h"
 #include "arm11/open_agb_firm.h"
-#include "arm11/hardware/hid.h"
-#include "arm11/hardware/codec.h"
+#include "arm11/drivers/hid.h"
+#include "arm11/drivers/codec.h"
 #include "arm11/power.h"
 
 
 
 int main(void)
 {
-	Result res = fMount(FS_DRIVE_SDMC);
 	GFX_init(GFX_BGR8, GFX_RGB565);
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
 
+	Result res = fMount(FS_DRIVE_SDMC);
 	if(res == RES_OK && (res = oafInitAndRun()) == RES_OK)
 	{
 		do
