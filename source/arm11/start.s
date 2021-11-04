@@ -18,6 +18,7 @@
 
 #include "arm.h"
 #include "mem_map.h"
+#include "arm11/drivers/performance_monitor.h"
 
 .cpu mpcore
 .fpu vfpv2
@@ -127,7 +128,8 @@ BEGIN_ASM_FUNC _start
 	blx __libc_init_array       @ Initialize ctors and dtors
 	blx PDN_core123Init
 _start_skip_bss_init_array:
-	ldrh r2, =0x706             @ Disable + reset all counters. Cycle counter divider 1. IRQs disabled.
+	@ Disable + reset all performance monitor counters. Acknowledge IRQs.
+	ldrh r2, =PM_CCNT_IRQ | PM_PMN1_IRQ | PM_PMN0_IRQ | PM_CCNT_RST | PM_PMN01_RST
 	mcr p15, 0, r2, c15, c12, 0 @ Write Performance Monitor Control Register
 	blx setupMmu
 	bl setupVfp
