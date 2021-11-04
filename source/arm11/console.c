@@ -8,7 +8,7 @@
 #include <stdarg.h>
 #include "types.h"
 #include "arm11/fmt.h"
-#include "hardware/gfx.h"
+#include "drivers/gfx.h"
 #include "util.h"
 #include "arm11/console.h"
 

@@ -10,7 +10,11 @@
 #include "ff.h"			/* Obtains integer types */
 #include "diskio.h"		/* Declarations of disk functions */
 #include "types.h"
-#include "arm9/hardware/sdmmc.h"
+#include "drivers/toshsd.h"
+#include "drivers/mmc/sdmmc.h"
+#include "arm9/drivers/ndma.h"
+#include "arm.h"
+#include "drivers/cache.h"
 
 
 
@@ -26,7 +30,7 @@ DSTATUS disk_status (
 
 	DSTATUS stat = 0;
 
-	//if(!(sdmmc_read16(REG_SDSTATUS0) & TMIO_STAT0_SIGSTATE)) stat = STA_NODISK;
+	if(!TOSHSD_cardDetected()) stat = STA_NODISK;
 
 	return stat;
 }
@@ -45,8 +49,7 @@ DSTATUS disk_initialize (
 
 	DSTATUS stat = 0;
 
-	sdmmc_init();
-	if(SD_Init() != 0) stat = STA_NOINIT;
+	if(SDMMC_init(SDMMC_DEV_SLOT)) stat = STA_NOINIT;
 
 	return stat;
 }
@@ -66,11 +69,29 @@ DRESULT disk_read (
 {
 	(void)pdrv;
 
-	DRESULT res = RES_OK;
+	if((uintptr_t)buff & 3u) return RES_PARERR; // TODO: Find a solution for the alignment problem.
 
-	if(sdmmc_sdcard_readsectors(sector, count, buff) != 0) res = RES_ERROR;
+	// Warning! Flush before transfer only works on ARM9 (no speculative prefetching)!
+	flushDCacheRange(buff, 512u * count);
+	NdmaCh *const ndmaCh = getNdmaChRegs(5);
+	ndmaCh->sad  = (u32)getToshsdFifo(getToshsdRegs(1));
+	ndmaCh->dad  = (u32)buff;
+	ndmaCh->tcnt = count<<7;
+	ndmaCh->wcnt = 512 / 4;
+	ndmaCh->bcnt = NDMA_FASTEST;
+	ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE | // TODO: IRQ enable missing?
+	               NDMA_BURST(64 / 4) | NDMA_SAD_FIX | NDMA_DAD_INC;
+	if(SDMMC_readSectors(SDMMC_DEV_SLOT, sector, NULL /*(u32*)buff*/, count))
+	{
+		ndmaCh->cnt = 0; // Stop DMA on error.
+		return RES_ERROR;
+	}
+	do
+	{
+		__wfi();
+	} while(ndmaCh->cnt & NDMA_EN); // Wait needed (tested).
 
-	return res;
+	return RES_OK;
 }
 
 
@@ -90,11 +111,28 @@ DRESULT disk_write (
 {
 	(void)pdrv;
 
-	DRESULT res = RES_OK;
+	if((uintptr_t)buff & 3u) return RES_PARERR; // TODO: Find a solution for the alignment problem.
 
-	if(sdmmc_sdcard_writesectors(sector, count, buff) != 0) res = RES_ERROR;
+	flushDCacheRange(buff, 512u * count);
+	NdmaCh *const ndmaCh = getNdmaChRegs(5);
+	ndmaCh->sad  = (u32)buff;
+	ndmaCh->dad  = (u32)getToshsdFifo(getToshsdRegs(1));
+	ndmaCh->tcnt = count<<7;
+	ndmaCh->wcnt = 512 / 4;
+	ndmaCh->bcnt = NDMA_FASTEST;
+	ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE | // TODO: IRQ enable missing?
+	               NDMA_BURST(64 / 4) | NDMA_SAD_INC | NDMA_DAD_FIX;
+	if(SDMMC_writeSectors(SDMMC_DEV_SLOT, sector, NULL /*(u32*)buff*/, count))
+	{
+		ndmaCh->cnt = 0; // Stop DMA on error.
+		return RES_ERROR;
+	}
+	do
+	{
+		__wfi();
+	} while(ndmaCh->cnt & NDMA_EN); // Wait needed (tested).
 
-	return res;
+	return RES_OK;
 }
 
 #endif
@@ -116,18 +154,15 @@ DRESULT disk_ioctl (
 	switch(cmd)
 	{
 		case GET_SECTOR_COUNT:
-			{
-				*(DWORD*)buff = getMMCDevice(1)->total_size;
-				break;
-			}
-			res = RES_NOTRDY;
+			*(DWORD*)buff = SDMMC_getSectors(SDMMC_DEV_SLOT);
 			break;
 		case GET_SECTOR_SIZE:
 			*(WORD*)buff = 512;
 			break;
 		case GET_BLOCK_SIZE:
-			*(DWORD*)buff = 0x100; // Default to 128 KiB.
+			*(DWORD*)buff = 0x100; // Default to 128 KiB. TODO: Get this from the driver.
 		case CTRL_TRIM:
+			// TODO: Implement this.
 		case CTRL_SYNC:
 			break;
 		default:
@@ -136,4 +171,3 @@ DRESULT disk_ioctl (
 
 	return res;
 }
-

@@ -37,8 +37,8 @@ enum
 	KRES_NO_PERMISSIONS  = 4  // You have no permissions. Example unlocking a mutex on a different task.
 };
 
-typedef uintptr_t KRes; // See createTask()
-typedef struct TaskCb KTask;
+typedef uintptr_t KRes; // See createTask() implementation.
+typedef uintptr_t KHandle;
 typedef void (*TaskFunc)(void*);
 
 
@@ -59,9 +59,9 @@ void kernelInit(uint8_t priority);
  * @param[in]  entry      The entry function.
  * @param      taskArg    The task entry function argument.
  *
- * @return     Returns a KTask handle.
+ * @return     Returns a KHandle for the created task or NULL on error.
  */
-KTask* createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg);
+KHandle createTask(size_t stackSize, uint8_t priority, TaskFunc entry, void *taskArg);
 
 /**
  * @brief      Switches to the next task. Use with care.

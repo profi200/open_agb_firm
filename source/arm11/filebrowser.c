@@ -22,9 +22,9 @@
 #include "error_codes.h"
 #include "fs.h"
 #include "util.h"
-#include "arm11/hardware/hid.h"
+#include "arm11/drivers/hid.h"
 #include "arm11/fmt.h"
-#include "hardware/gfx.h"
+#include "drivers/gfx.h"
 
 
 #define MAX_DIR_ENTRIES  (510u)

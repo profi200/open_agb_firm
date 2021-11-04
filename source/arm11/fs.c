@@ -21,7 +21,7 @@
 #include "error_codes.h"
 #include "fs.h"
 #include "ipc_handler.h"
-#include "hardware/pxi.h"
+#include "drivers/pxi.h"
 
 
 

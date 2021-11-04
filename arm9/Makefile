@@ -18,7 +18,8 @@ include $(DEVKITARM)/base_rules
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	../source ../source/hardware ../source/arm9 ../source/arm9/hardware ../thirdparty/fatfs
+SOURCES		:=	../source ../source/drivers ../source/drivers/mmc ../source/arm9 \
+				../source/arm9/drivers ../thirdparty/fatfs
 DATA		:=
 INCLUDES	:=	../include ../thirdparty
 DEFINES		:=	-DARM9 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
@@ -43,6 +44,13 @@ CXXFLAGS	+=	$(INCLUDE) $(DEFINES)
 
 ASFLAGS	:=	$(ARCH) -g -flto $(INCLUDE) $(DEFINES)
 LDFLAGS	=	$(ARCH) -g -flto -specs=../arm9.specs -Wl,-Map,$(notdir $*.map) -nostartfiles
+
+ifeq ($(strip $(NO_DEBUG)),)
+	CFLAGS	:=	$(subst -flto,,$(CFLAGS)) -fstack-protector-strong -fno-inline
+	CXXFLAGS	:=	$(subst -flto,,$(CXXFLAGS)) -fstack-protector-strong -fno-inline
+	ASFLAGS	:=	$(subst -flto,,$(ASFLAGS))
+	LDFLAGS	:=	$(subst -flto,,$(LDFLAGS)) -fstack-protector-strong -fno-inline -Wl,-wrap=malloc,-wrap=calloc,-wrap=free
+endif
 
 LIBS	:=
 

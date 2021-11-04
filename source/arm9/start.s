@@ -109,7 +109,6 @@ BEGIN_ASM_FUNC _start
 	blx main
 	blx __systemDeinit
 	_start_lp:
-		mov r0, #0
 		mcr p15, 0, r0, c7, c0, 4 @ Wait for interrupt
 		b _start_lp
 

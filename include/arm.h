@@ -50,13 +50,13 @@
 
 #if !__ASSEMBLER__
 
-#define MAKE_INTR_NO_INOUT(isVolatile, name, ...)  \
-ALWAYS_INLINE void __##name(void)                  \
-{                                                  \
-	if(isVolatile == 1)                            \
-		__asm__ volatile(#name : : : __VA_ARGS__); \
-	else                                           \
-		__asm__(#name : : : __VA_ARGS__);          \
+#define MAKE_INTR_NO_INOUT(isVolatile, name, inst, ...)  \
+ALWAYS_INLINE void __##name(void)                        \
+{                                                        \
+	if(isVolatile == 1)                                  \
+		__asm__ volatile(inst : : : __VA_ARGS__);        \
+	else                                                 \
+		__asm__(inst : : : __VA_ARGS__);                 \
 }
 
 #define MAKE_INTR_GET_REG(isVolatile, name, inst) \
@@ -111,10 +111,10 @@ MAKE_INTR_SET_REG(1, setCr, "mcr p15, 0, %0, c1, c0, 0", "memory")
 #define __cpsie(flags) __asm__ volatile("cpsie " #flags : : : "memory")
 #define __setend(end) __asm__ volatile("setend " #end : : : "memory")
 
-MAKE_INTR_NO_INOUT(1, nop)
-MAKE_INTR_NO_INOUT(1, wfi, "memory")
-MAKE_INTR_NO_INOUT(1, wfe, "memory")
-MAKE_INTR_NO_INOUT(1, sev)
+MAKE_INTR_NO_INOUT(1, nop, "nop")
+MAKE_INTR_NO_INOUT(1, wfi, "wfi", "memory")
+MAKE_INTR_NO_INOUT(1, wfe, "wfe", "memory")
+MAKE_INTR_NO_INOUT(1, sev, "sev")
 
 #if !__thumb__
 ALWAYS_INLINE u8 __ldrexb(vu8 *addr)
@@ -195,7 +195,7 @@ ALWAYS_INLINE u32 __strex(vu32 *addr, u32 val)
 	return res;
 }*/
 
-MAKE_INTR_NO_INOUT(1, clrex, "memory")
+MAKE_INTR_NO_INOUT(1, clrex, "clrex", "memory")
 
 // Debug ID Register
 MAKE_INTR_GET_REG(0, getDidr, "mrc p14, 0, %0, c0, c0, 0")
@@ -312,7 +312,7 @@ MAKE_INTR_SET_REG(1, setCidr, "mcr p15, 0, %0, c13, c0, 1", "memory")
 #elif ARM9
 
 #if !__thumb__
-MAKE_INTR_SET_REG_ZERO(1, wfi, "mcr p15, 0, %0, c7, c0, 4", "memory")
+MAKE_INTR_NO_INOUT(1, wfi, "mcr p15, 0, r0, c7, c0, 4", "memory")
 #endif // if !__thumb__
 #endif // ifdef ARM11
 

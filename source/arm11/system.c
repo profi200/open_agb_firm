@@ -17,15 +17,15 @@
  */
 
 #include "types.h"
-#include "hardware/pxi.h"
+#include "drivers/pxi.h"
 #include "arm11/start.h"
-#include "arm11/hardware/interrupt.h"
-#include "arm11/hardware/timer.h"
+#include "arm11/drivers/interrupt.h"
+#include "arm11/drivers/timer.h"
 #include "kernel.h"
-#include "hardware/corelink_dma-330.h"
-#include "arm11/hardware/i2c.h"
-#include "arm11/hardware/mcu.h"
-#include "arm11/hardware/hid.h"
+#include "drivers/corelink_dma-330.h"
+#include "arm11/drivers/i2c.h"
+#include "arm11/drivers/mcu.h"
+#include "arm11/drivers/hid.h"
 #include "arm.h"
 
 

@@ -23,12 +23,12 @@
 #include "mem_map.h"
 #include "arm11/console.h"
 #include "arm11/fmt.h"
-#include "hardware/pxi.h"
+#include "drivers/pxi.h"
 #include "ipc_handler.h"
-#include "arm11/hardware/interrupt.h"
+#include "arm11/drivers/interrupt.h"
 #include "arm.h"
-#include "arm11/hardware/mcu.h"
-#include "arm11/hardware/hid.h"
+#include "arm11/drivers/mcu.h"
+#include "arm11/drivers/hid.h"
 
 
 
@@ -79,14 +79,14 @@ NOINLINE noreturn void guruMeditation(u8 type, const u32 *excStack)
 	else realPc = excStack[15] - instSize;                // Other
 
 	ee_printf("\x1b[41m\x1b[0J\x1b[15CGuru Meditation Error!\n\n%s:\n", typeStr[type]);
-	ee_printf("CPSR: 0x%08" PRIX32 "\n"
+	ee_printf("CPSR: 0x%" PRIX32 " DFSR: 0x%" PRIX32 " IFSR: 0x%" PRIX32 "\n"
 	       "r0 = 0x%08" PRIX32 " r6  = 0x%08" PRIX32 " r12 = 0x%08" PRIX32 "\n"
 	       "r1 = 0x%08" PRIX32 " r7  = 0x%08" PRIX32 " sp  = 0x%08" PRIX32 "\n"
 	       "r2 = 0x%08" PRIX32 " r8  = 0x%08" PRIX32 " lr  = 0x%08" PRIX32 "\n"
 	       "r3 = 0x%08" PRIX32 " r9  = 0x%08" PRIX32 " pc  = 0x%08" PRIX32 "\n"
 	       "r4 = 0x%08" PRIX32 " r10 = 0x%08" PRIX32 "\n"
 	       "r5 = 0x%08" PRIX32 " r11 = 0x%08" PRIX32 "\n\n",
-	       excStack[16],
+	       excStack[16], excStack[17], excStack[18],
 	       excStack[0], excStack[6],  excStack[12],
 	       excStack[1], excStack[7],  excStack[13],
 	       excStack[2], excStack[8],  excStack[14],

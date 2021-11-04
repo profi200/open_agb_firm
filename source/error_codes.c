@@ -18,10 +18,10 @@
 
 #include "types.h"
 #include "error_codes.h"
-#include "hardware/gfx.h"
+#include "drivers/gfx.h"
 #ifdef ARM11
 	#include "arm11/fmt.h"
-	#include "arm11/hardware/hid.h"
+	#include "arm11/drivers/hid.h"
 #endif
 
 
@@ -29,6 +29,8 @@
 #ifdef ARM11
 void printError(Result res)
 {
+	GFX_setBrightness(15, 15);
+
 	static const char *const common[] =
 	{
 		"OK",

@@ -22,20 +22,20 @@
 #include "types.h"
 #include "arm_intrinsic.h"
 #include "util.h"
-#include "arm11/hardware/sha.h"
-#include "arm11/hardware/hid.h"
-#include "hardware/lgy.h"
-#include "arm11/hardware/lgyfb.h"
+#include "drivers/sha.h"
+#include "arm11/drivers/hid.h"
+#include "drivers/lgy.h"
+#include "arm11/drivers/lgyfb.h"
 #include "arm11/console.h"
 #include "arm11/fmt.h"
-#include "hardware/gfx.h"
+#include "drivers/gfx.h"
 #include "fs.h"
 #include "fsutil.h"
 #include "inih/ini.h"
 #include "arm11/filebrowser.h"
-#include "arm11/hardware/lcd.h"
+#include "arm11/drivers/lcd.h"
 #include "arm11/gpu_cmd_lists.h"
-#include "arm11/hardware/mcu.h"
+#include "arm11/drivers/mcu.h"
 #include "kernel.h"
 #include "kevent.h"
 
@@ -93,7 +93,7 @@ static OafConfig g_oafConfig =
 	1.f,
 	0.f
 };
-static KEvent *g_frameReadyEvent = NULL;
+static KHandle g_frameReadyEvent = 0;
 
 
 
@@ -464,7 +464,7 @@ static Result dumpFrameTex(void)
 
 static void gbaGfxHandler(void *args)
 {
-	KEvent *const event = (KEvent*)args;
+	const KHandle event = (KHandle)args;
 
 	while(1)
 	{
@@ -672,9 +672,9 @@ Result oafInitAndRun(void)
 				if(MCU_getSystemModel() != 3) GFX_powerOffBacklights(GFX_BLIGHT_BOT);
 #endif
 
-				KEvent *const frameReadyEvent = createEvent(false);
+				const KHandle frameReadyEvent = createEvent(false);
 				LGYFB_init(frameReadyEvent); // Setup Legacy Framebuffer.
-				createTask(0x800, 3, gbaGfxHandler, frameReadyEvent);
+				createTask(0x800, 3, gbaGfxHandler, (void*)frameReadyEvent);
 				g_frameReadyEvent = frameReadyEvent;
 
 				// Adjust gamma table and sync LgyFb start with LCD VBlank.
@@ -700,10 +700,10 @@ void oafUpdate(void)
 void oafFinish(void)
 {
 	LGYFB_deinit();
-	if(g_frameReadyEvent != NULL)
+	if(g_frameReadyEvent != 0)
 	{
 		deleteEvent(g_frameReadyEvent); // gbaGfxHandler() will automatically terminate.
-		g_frameReadyEvent = NULL;
+		g_frameReadyEvent = 0;
 	}
 	LGY_deinit();
 }

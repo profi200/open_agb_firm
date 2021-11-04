@@ -19,17 +19,17 @@
 #include <stdlib.h>
 #include "types.h"
 #include "ipc_handler.h"
-#include "hardware/cache.h"
+#include "drivers/cache.h"
 #include "arm11/debug.h"
 
 
 
-u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, UNUSED const u32 *const buf)
+u32 IPC_handleCmd(u8 cmdId, u32 sendBufs, u32 recvBufs, UNUSED const u32 *const buf)
 {
-	for(u32 i = 0; i < inBufs; i++)
+	for(u32 i = 0; i < sendBufs; i++)
 	{
-		const IpcBuffer *const inBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];
-		if(inBuf->ptr && inBuf->size) invalidateDCacheRange(inBuf->ptr, inBuf->size);
+		const IpcBuffer *const sendBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];
+		if(sendBuf->ptr && sendBuf->size) invalidateDCacheRange(sendBuf->ptr, sendBuf->size);
 	}
 
 	u32 result = 0;
@@ -43,10 +43,10 @@ u32 IPC_handleCmd(u8 cmdId, u32 inBufs, u32 outBufs, UNUSED const u32 *const buf
 			panic();
 	}
 
-	for(u32 i = inBufs; i < inBufs + outBufs; i++)
+	for(u32 i = sendBufs; i < sendBufs + recvBufs; i++)
 	{
-		const IpcBuffer *const outBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];
-		if(outBuf->ptr && outBuf->size) flushDCacheRange(outBuf->ptr, outBuf->size);
+		const IpcBuffer *const recvBuf = (IpcBuffer*)&buf[i * sizeof(IpcBuffer) / 4];
+		if(recvBuf->ptr && recvBuf->size) flushDCacheRange(recvBuf->ptr, recvBuf->size);
 	}
 
 	return result;

@@ -18,8 +18,8 @@ include $(DEVKITARM)/base_rules
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	../kernel/source ../source ../source/hardware ../source/arm11 \
-				../source/arm11/allocator ../source/arm11/hardware \
+SOURCES		:=	../kernel/source ../source ../source/drivers ../source/drivers/mmc \
+				../source/arm11 ../source/arm11/allocator ../source/arm11/drivers \
 				../source/arm11/util/rbtree ../thirdparty/inih
 DATA		:=
 INCLUDES	:=	../kernel/include ../include ../thirdparty

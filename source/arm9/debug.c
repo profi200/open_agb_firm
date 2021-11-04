@@ -20,17 +20,15 @@
 #include <string.h>
 #include "types.h"
 #include "mem_map.h"
-#include "hardware/pxi.h"
+#include "drivers/pxi.h"
 #include "ipc_handler.h"
-//#include "fatfs/ff.h"
-//#include "fs.h"
-#include "arm9/hardware/interrupt.h"
-#include "hardware/gfx.h"
-#include "arm9/hardware/ndma.h"
+#include "arm9/drivers/interrupt.h"
+#include "drivers/gfx.h"
+#include "arm9/drivers/ndma.h"
 
 
 
-NOINLINE NOINLINE noreturn void panic(void)
+NOINLINE noreturn void panic(void)
 {
 	enterCriticalSection();
 	//fsDeinit();
@@ -74,15 +72,63 @@ NOINLINE noreturn void guruMeditation(UNUSED u8 type, UNUSED const u32 *excStack
 	}
 }
 
-/*void dumpMem(u8 *mem, u32 size, char *filepath)
+#ifndef NDEBUG
+// Needs to be marked as used to work with LTO.
+// The used attribute also overrides the newlib symbol.
+// This is for debugging purposes only. For security this value needs to be random!
+__attribute__((used)) uintptr_t __stack_chk_guard = 0xC724B66D;
+
+// Needs to be marked as noinline and used to work with LTO.
+// The used attribute also overrides the newlib symbol.
+// Combine -fstack-protector-all with -fno-inline to get the most effective detection.
+__attribute__((noinline, used)) noreturn void __stack_chk_fail(void)
 {
-	FIL file;
-	UINT bytesWritten;
+	panicMsg("Stack smash!");
+}
 
-	if(f_open(&file, filepath, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
-		return;
 
-	f_write(&file, mem, size, &bytesWritten);
-	f_sync(&file);
-	f_close(&file);
-}*/
+// Add "-Wl,-wrap=malloc,-wrap=calloc,-wrap=free" to LDFLAGS to enable the heap check.
+static const u32 __heap_chk_guard[4] = {0x9240A724, 0x6A6594A0, 0x976F0392, 0xB3A669AB};
+
+void* __real_malloc(size_t size);
+void __real_free(void *ptr);
+
+void* __wrap_malloc(size_t size)
+ {
+	void *const buf = __real_malloc(size + 32);
+	if(buf == NULL) return NULL;
+
+	memcpy(buf, &size, sizeof(size_t));
+	memcpy(buf + sizeof(size_t), (u8*)__heap_chk_guard + sizeof(size_t), 16 - sizeof(size_t));
+	memcpy(buf + 16 + size, __heap_chk_guard, 16);
+
+	return buf + 16;
+}
+
+void* __wrap_calloc(size_t num, size_t size)
+{
+	void *const buf = __wrap_malloc(num * size);
+	if(buf == NULL) return NULL;
+
+	memset(buf, 0, num * size);
+
+	return buf;
+}
+
+void __wrap_free(void *ptr)
+{
+	if(ptr == NULL) return;
+
+	if(memcmp(ptr - (16 - sizeof(size_t)), (u8*)__heap_chk_guard + sizeof(size_t), 16 - sizeof(size_t)) != 0)
+		panicMsg("Heap underflow!");
+	size_t size;
+	memcpy(&size, ptr - 16, sizeof(size_t));
+
+	// Important! Adjust the size check if needed.
+	// 1024u * 1024 is roughly ok for ARM9 mem.
+	if(size > (1024u * 1024) || memcmp(ptr + size, __heap_chk_guard, 16) != 0)
+		panicMsg("Heap overflow!");
+
+	__real_free(ptr - 16);
+}
+#endif

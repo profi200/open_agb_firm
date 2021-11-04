@@ -17,24 +17,23 @@
  */
 
 #include "types.h"
-#include "arm9/hardware/interrupt.h"
-#include "arm9/hardware/ndma.h"
-#include "hardware/corelink_dma-330.h"
-#include "arm9/hardware/timer.h"
-#include "hardware/pxi.h"
-#include "arm9/hardware/crypto.h"
+#include "arm9/drivers/interrupt.h"
+#include "arm9/drivers/timer.h"
+#include "arm9/drivers/ndma.h"
+#include "drivers/corelink_dma-330.h"
+#include "drivers/toshsd.h"
+#include "drivers/pxi.h"
 
 
 
 void WEAK __systemInit(void)
 {
 	IRQ_init();
-	leaveCriticalSection(0); // Enables interrupts
+	leaveCriticalSection(0); // Enables interrupts.
 	TIMER_init();
 	NDMA_init();
 	DMA330_init();
-	//AES_init();
-	//RSA_init();
+	TOSHSD_init();
 	PXI_init();
 }
 
