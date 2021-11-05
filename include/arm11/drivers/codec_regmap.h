@@ -232,7 +232,7 @@ enum
 	// 50-66 reserved?
 	CDC_REG_100_67       = 100u<<8 |  67u,
 	CDC_REG_100_68       = 100u<<8 |  68u,
-	CDC_REG_100_69       = 100u<<8 |  69u,
+	CDC_REG_HEADSET_SEL  = 100u<<8 |  69u,
 	// 70-116 reserved?
 	CDC_REG_100_117      = 100u<<8 | 117u,
 	CDC_REG_100_118      = 100u<<8 | 118u,
@@ -307,3 +307,15 @@ enum
 	// 4 reserved?
 	CDC_REG_TWL_MODE = 255<<8 | 5u
 };
+
+
+// ----------------------------------------------------------------------------------
+// CDC_REG_HEADSET_SEL (page 100 (0x64), reg 69 (0x45))
+#define HEADSET_SEL_HP_SHIFT   (4u)
+#define HEADSET_SEL_SP         (0u)                        // Force speaker output.
+#define HEADSET_SEL_HP         (1u<<HEADSET_SEL_HP_SHIFT)  // Force headphone output.
+#define HEADSET_SEL_HP_EN      (1u<<5)                     // Enable headphone override.
+#define HEADSET_SEL_MIC_SHIFT  (6u)
+#define HEADSET_SEL_INT_MIC    (0u)                        // Force internal microphone input.
+#define HEADSET_SEL_EXT_MIC    (1u<<HEADSET_SEL_MIC_SHIFT) // Force external microphone input.
+#define HEADSET_SEL_MIC_EN     (1u<<7)                     // Enable microphone override.

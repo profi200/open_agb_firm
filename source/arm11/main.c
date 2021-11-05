@@ -16,12 +16,12 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "fs.h"
 #include "drivers/gfx.h"
 #include "arm11/console.h"
+#include "arm11/drivers/codec.h"
+#include "fs.h"
 #include "arm11/open_agb_firm.h"
 #include "arm11/drivers/hid.h"
-#include "arm11/drivers/codec.h"
 #include "arm11/power.h"
 
 
