@@ -165,45 +165,31 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	return res;
 }
 
-// Deprecated due to gba_db.bin and defaultSave.
-/*static u16 checkSaveOverride(u32 serial)
+static u16 checkSaveOverride(u32 gameCode) // Save type overrides for modern homebrew.
 {
-	static const struct
+	switch (gameCode & 0xFFu)
 	{
-		alignas(4) char serial[4];
-		u16 saveType;
-	} overrideLut[] =
-	{
-		// Generalizations
-		{"\0\0\0\0", SAVE_TYPE_SRAM_256k},  // Homebrew (TODO: Set WAITCNT to 0x4014?)
-
-		// Homebrew
-		{"GMB\0",    SAVE_TYPE_SRAM_256k},  // Goomba Color
-	};
-
-	for(u32 i = 0; i < sizeof(overrideLut) / sizeof(*overrideLut); i++)
-	{
-		// Compare serial without region.
-		if((serial & 0xFFFFFFu) == *((u32*)overrideLut[i].serial))
-		{
-			return overrideLut[i].saveType;
-		}
+		case '1': return SAVE_TYPE_EEPROM_64k;         // Homebrew using EEPROM.
+		case '2': return SAVE_TYPE_SRAM_256k;          // Homebrew using SRAM.
+		case '3': return SAVE_TYPE_FLASH_512k_PSC_RTC; // Homebrew using FLASH-64.
+		case '4': return SAVE_TYPE_FLASH_1m_MRX_RTC;   // Homebrew using FLASH-128.
+		case 'F': return SAVE_TYPE_EEPROM_8k;          // Classic NES Series.
+		case 'S': return SAVE_TYPE_SRAM_256k;          // Homebrew using SRAM (Butano games).
 	}
 
 	return 0xFF;
-}*/
+}
 
 static u16 detectSaveType(u32 romSize)
 {
 	const u32 *romPtr = (u32*)ROM_LOC;
 	u16 saveType;
-	// Deprecated due to gba_db.bin and defaultSave.
-	/*if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
+	if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
 	{
 		debug_printf("Serial in override list.\n"
 		             "saveType: %u\n", saveType);
 		return saveType;
-	}*/
+	}
 
 	// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
 	romPtr += 0xE4 / 4; // Skip headers.
