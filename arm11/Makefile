@@ -18,11 +18,13 @@ include $(DEVKITARM)/base_rules
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	../kernel/source ../source ../source/drivers ../source/drivers/mmc \
-				../source/arm11 ../source/arm11/allocator ../source/arm11/drivers \
-				../source/arm11/util/rbtree ../thirdparty/inih
+SOURCES		:=	../libn3ds/kernel/source ../libn3ds/source ../libn3ds/source/drivers/mmc \
+				../libn3ds/source/drivers ../libn3ds/source/arm11 ../libn3ds/source/arm11/allocator \
+				../libn3ds/source/arm11/drivers ../libn3ds/source/arm11/util/rbtree ../source/arm11 \
+				../thirdparty/inih
 DATA		:=
-INCLUDES	:=	../kernel/include ../include ../thirdparty
+INCLUDES	:=	../libn3ds/include ../libn3ds/kernel/include ../libn3ds/thirdparty ../include \
+				../thirdparty
 DEFINES		:=	-DARM11 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
 				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR) -DOAF_SCALE_SELECT=2
 ASSETS		:=
