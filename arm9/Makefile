@@ -18,10 +18,10 @@ include $(DEVKITARM)/base_rules
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	../source ../source/drivers ../source/drivers/mmc ../source/arm9 \
-				../source/arm9/drivers ../thirdparty/fatfs
+SOURCES		:=	../libn3ds/source ../libn3ds/source/drivers/mmc ../libn3ds/source/drivers ../libn3ds/source/arm9 \
+				../libn3ds/source/arm9/drivers ../libn3ds/thirdparty/fatfs ../source/arm9
 DATA		:=
-INCLUDES	:=	../include ../thirdparty
+INCLUDES	:=	../libn3ds/include ../libn3ds/thirdparty ../include ../thirdparty
 DEFINES		:=	-DARM9 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
 				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
 
