@@ -34,16 +34,16 @@ endif
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv5te -mtune=arm946e-s -mfloat-abi=soft -mtp=soft -marm -mthumb-interwork
 
-CFLAGS	:=	$(ARCH) -std=c17 -O2 -g -flto -mword-relocations \
+CFLAGS	:=	$(ARCH) -std=c17 -O2 -gdwarf-4 -flto -mword-relocations \
 			-ffunction-sections -Wall -Wextra
 CFLAGS	+=	$(INCLUDE) $(DEFINES)
 
-CXXFLAGS	:=	$(ARCH) -std=c++17 -O2 -g -flto -fno-rtti -fno-exceptions \
+CXXFLAGS	:=	$(ARCH) -std=c++17 -O2 -gdwarf-4 -flto -fno-rtti -fno-exceptions \
 				-mword-relocations -ffunction-sections -Wall -Wextra
 CXXFLAGS	+=	$(INCLUDE) $(DEFINES)
 
-ASFLAGS	:=	$(ARCH) -g -flto $(INCLUDE) $(DEFINES)
-LDFLAGS	=	$(ARCH) -g -flto -specs=../arm9.specs -Wl,-Map,$(notdir $*.map) -nostartfiles
+ASFLAGS	:=	$(ARCH) -gdwarf-4 -flto $(INCLUDE) $(DEFINES)
+LDFLAGS	=	$(ARCH) -gdwarf-4 -flto -specs=../arm9.specs -Wl,-Map,$(notdir $*.map) -nostartfiles
 
 ifeq ($(strip $(NO_DEBUG)),)
 	CFLAGS	:=	$(subst -flto,,$(CFLAGS)) -fstack-protector-strong -fno-inline
