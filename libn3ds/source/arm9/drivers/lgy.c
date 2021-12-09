@@ -80,11 +80,9 @@ static u32 setupSaveType(u16 saveType)
 {
 	Lgy *const lgy = getLgyRegs();
 	lgy->gba_save_type = saveType;
-	// The last shift in the table is technically undefined behavior (C standard)
-	// but on ARM this will always result in 0.
-	// https://developer.arm.com/documentation/dui0489/h/arm-and-thumb-instructions/shift-operations
-	static const u8 saveSizeShiftLut[16] = {9, 9, 13, 13, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 15, 32};
-	const u32 saveSize = 1u<<saveSizeShiftLut[saveType & 0xFu];
+
+	static const u8 saveSizeShiftLut[16] = {9, 9, 13, 13, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 15, 0};
+	const u32 saveSize = (1u<<saveSizeShiftLut[saveType & 0xFu]) & ~1u;
 	g_saveSize = saveSize;
 
 	// Flash chip erase, flash sector erase, flash program, EEPROM write.
