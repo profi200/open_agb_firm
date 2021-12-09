@@ -209,14 +209,14 @@ BEGIN_ASM_FUNC setupMpu
 
 	@ Data cachable bits:
 	@ Region 0 = no
-	@ Region 1 = no
+	@ Region 1 = yes
 	@ Region 2 = no  <-- Never cache IO regs
 	@ Region 3 = yes
 	@ Region 4 = yes
 	@ Region 5 = no
 	@ Region 6 = no
 	@ Region 7 = yes
-	mov r0, #0b10011000
+	mov r0, #0b10011010
 	mcr p15, 0, r0, c2, c0, 0   @ Data cachable bits
 
 	@ Instruction cachable bits:
@@ -233,14 +233,14 @@ BEGIN_ASM_FUNC setupMpu
 
 	@ Write bufferable bits:
 	@ Region 0 = no
-	@ Region 1 = no
+	@ Region 1 = yes
 	@ Region 2 = no  <-- Never buffer IO regs
 	@ Region 3 = yes
 	@ Region 4 = yes
 	@ Region 5 = no
 	@ Region 6 = no
 	@ Region 7 = yes
-	@mov r2, #0b10011000        @ Same as data cachable bits
+	@mov r2, #0b10011010        @ Same as data cachable bits
 	mcr p15, 0, r0, c3, c0, 0   @ Write bufferable bits
 
 	ldrh r1, =0x1005            @ MPU, D-Cache and I-Cache bitmask

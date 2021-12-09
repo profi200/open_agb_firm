@@ -23,7 +23,7 @@
 #include "error_codes.h"
 #include "mem_map.h"
 #include "mmio.h"
-#include "arm9/drivers/ndma.h"
+#include "drivers/cache.h"
 #include "arm9/arm7_stub.h"
 #include "fsutil.h"
 #include "arm9/debug.h"
@@ -72,8 +72,9 @@ static void setupBiosOverlay(bool biosIntro)
 	//                                   0xEA000001, 0xEA000000, 0xEA000042, 0xE59FD1A0};
 	//iomemcpy(getLgyRegs()->a7_vector, biosVectors, 32);
 
-	NDMA_copy((u32*)ARM7_STUB_LOC9, (u32*)_a7_stub_start, (u32)_a7_stub_size);
+	iomemcpy((u32*)ARM7_STUB_LOC9, (u32*)_a7_stub_start, (u32)_a7_stub_size);
 	if(biosIntro) *((vu8*)_a7_stub9_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
+	flushDCacheRange((void*)ARM7_STUB_LOC9, (u32)_a7_stub_size);
 }
 
 static u32 setupSaveType(u16 saveType)
@@ -112,15 +113,18 @@ Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePa
 	Result res = RES_OK;
 	if(saveSize != 0)
 	{
-		res = fsQuickRead(savePath, (void*)SAVE_LOC, MAX_SAVE_SIZE);
+		res = fsQuickRead(savePath, (void*)SAVE_LOC, saveSize);
 		if(res == RES_FR_NO_FILE)
 		{
-			res = RES_OK; // Ignore a missing save file.
-			NDMA_fill((u32*)SAVE_LOC, 0xFFFFFFFFu, saveSize);
+			// Ignore a missing save file and fill the save with 0xFFs.
+			res = RES_OK;
+			iomemset((u32*)SAVE_LOC, 0xFFFFFFFFu, saveSize);
 		}
 
 		// Hash the savegame so it's only backed up when changed.
+		// Then flush the savegame region.
 		sha((u32*)SAVE_LOC, saveSize, g_saveHash, SHA_IN_BIG | SHA_256_MODE, SHA_OUT_BIG);
+		flushDCacheRange((void*)SAVE_LOC, saveSize);
 	}
 
 	return res;
@@ -184,6 +188,9 @@ Result LGY_backupGbaSave(void)
 		// Map savegame region to ARM9 side.
 		Lgy *const lgy = getLgyRegs();
 		lgy->gba_save_map = LGY_SAVE_MAP_9;
+
+		// Make sure there is no stale data in the cache.
+		invalidateDCacheRange((void*)SAVE_LOC, saveSize);
 
 		u32 newHash[8];
 		sha((u32*)SAVE_LOC, saveSize, newHash, SHA_IN_BIG | SHA_256_MODE, SHA_OUT_BIG);
