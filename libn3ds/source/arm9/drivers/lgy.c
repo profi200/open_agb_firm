@@ -83,20 +83,19 @@ static u32 setupSaveType(u16 saveType)
 	lgy->gba_save_type = saveType;
 
 	static const u8 saveSizeShiftLut[16] = {9, 9, 13, 13, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 15, 0};
-	const u32 saveSize = (1u<<saveSizeShiftLut[saveType & 0xFu]) & ~1u;
+	const u32 saveSize = (1u<<saveSizeShiftLut[saveType & SAVE_TYPE_MASK]) & ~1u;
 	g_saveSize = saveSize;
 
 	// Flash chip erase, flash sector erase, flash program, EEPROM write.
 	static const u32 saveTm512k4k[4] = {0x27C886, 0x8CE35, 0x184, 0x31170}; // Timing 512k/4k.
 	static const u32 saveTm1m64k[4] = {0x17D43E, 0x26206, 0x86, 0x2DD13};   // Timing 1m/64k.
-	const u32 *saveTm;
-	if(saveType < SAVE_TYPE_EEPROM_64k ||
-	   (saveType > SAVE_TYPE_EEPROM_64k_2 && saveType < SAVE_TYPE_FLASH_1m_MRX_RTC) ||
-	   saveType == SAVE_TYPE_SRAM_256k)
+	const u32 *saveTm = saveTm512k4k;
+	if(saveType == SAVE_TYPE_EEPROM_64k ||
+	   saveType == SAVE_TYPE_EEPROM_64k_2 ||
+	   (saveType >= SAVE_TYPE_FLASH_1m_MRX_RTC && saveType <= SAVE_TYPE_FLASH_1m_SNO))
 	{
-		saveTm = saveTm512k4k;
+		saveTm = saveTm1m64k;
 	}
-	else saveTm = saveTm1m64k; // Don't care about save type none.
 	iomemcpy(lgy->gba_save_timing, saveTm, 16);
 
 	return saveSize;
