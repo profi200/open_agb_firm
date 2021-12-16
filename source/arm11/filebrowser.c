@@ -27,36 +27,38 @@
 #include "drivers/gfx.h"
 
 
-#define MAX_DIR_ENTRIES  (510u)
-#define DIR_READ_BLOCKS  (10u)
-#define SCREEN_COLS      (53u - 1) // - 1 because the console inserts a newline after the last line otherwise.
-#define SCREEN_ROWS      (24u)
+// Notes on these settings:
+// MAX_ENT_BUF_SIZE should be big enough to hold the average file/dir name length * MAX_DIR_ENTRIES.
+// MAX_DIR_ENTRIES should be a multiple of DIR_READ_BLOCKS.
+#define MAX_ENT_BUF_SIZE  (1024u * 196) // 196 KiB.
+#define MAX_DIR_ENTRIES   (1000u)
+#define DIR_READ_BLOCKS   (10u)
+#define SCREEN_COLS       (53u - 1) // - 1 because the console inserts a newline after the last line otherwise.
+#define SCREEN_ROWS       (24u)
+
+#define ENT_TYPE_FILE  (0)
+#define ENT_TYPE_DIR   (1)
 
 
 typedef struct
 {
-	u8 type;       // 0 = file, 1 = dir
-	char str[256];
-} DirListEnt;
-
-typedef struct
-{
-	u32 num;
-	DirListEnt entries[MAX_DIR_ENTRIES];
-	DirListEnt *ptrs[MAX_DIR_ENTRIES];
+	u32 num;                       // Total number of entries.
+	char entBuf[MAX_ENT_BUF_SIZE]; // Format: char entryType; char name[X]; // null terminated.
+	char *ptrs[MAX_DIR_ENTRIES];   // For fast sorting.
 } DirList;
 
 
 
 int dlistCompare(const void *a, const void *b)
 {
-	const DirListEnt *const entA = *(DirListEnt**)a;
-	const DirListEnt *const entB = *(DirListEnt**)b;
+	const char *const entA = *(char**)a;
+	const char *const entB = *(char**)b;
 
-	if(entA->type != entB->type) return (int)entB->type - entA->type;
+	// Compare the entry type. Dirs have priority over files.
+	if(*entA != *entB) return (int)*entB - *entA;
 
-	const char *strA = entA->str;
-	const char *strB = entB->str;
+	const char *strA = &entA[1];
+	const char *strB = &entB[1];
 	int res = *strA - *strB;
 	while(*strA != '\0' && *strB != '\0' && res == 0) res = *++strA - *++strB;
 
@@ -74,38 +76,44 @@ static Result scanDir(const char *const path, DirList *const dList, const char *
 	DHandle dh;
 	if((res = fOpenDir(&dh, path)) == RES_OK)
 	{
-		u32 read;
-		u32 dListPos = 0;
+		u32 read;           // Number of entries read by fReadDir().
+		u32 numEntries = 0; // Total number of processed entries.
+		u32 entBufPos = 0;  // Entry buffer position/number of bytes used.
 		const u32 filterLen = strlen(filter);
 		do
 		{
 			if((res = fReadDir(dh, fi, DIR_READ_BLOCKS, &read)) != RES_OK) break;
-			if(dListPos + read > MAX_DIR_ENTRIES) break;
+			if(numEntries + read > MAX_DIR_ENTRIES) break;
 
 			for(u32 i = 0; i < read; i++)
 			{
-				const u8 isDir = (fi[i].fattrib & AM_DIR ? 1u : 0u);
-				if(isDir == 0) // File
+				const char entType = (fi[i].fattrib & AM_DIR ? ENT_TYPE_DIR : ENT_TYPE_FILE);
+				const u32 nameLen = strlen(fi[i].fname);
+				if(entType == ENT_TYPE_FILE)
 				{
-					const u32 entLen = strlen(fi[i].fname);
-					if(entLen <= filterLen || strcmp(filter, fi[i].fname + entLen - filterLen) != 0)
+					if(nameLen <= filterLen || strcmp(filter, fi[i].fname + nameLen - filterLen) != 0)
 						continue;
 				}
 
-				dList->entries[dListPos].type = isDir;
-				safeStrcpy(dList->entries[dListPos].str, fi[i].fname, 256);
-				dList->ptrs[dListPos] = &dList->entries[dListPos];
-				dListPos++;
+				// nameLen does not include the entry type and NULL termination.
+				if(entBufPos + nameLen + 2 > MAX_ENT_BUF_SIZE) goto scanEnd;
+
+				dList->entBuf[entBufPos] = entType;
+				safeStrcpy(&dList->entBuf[entBufPos + 1], fi[i].fname, 256);
+				dList->ptrs[numEntries++] = &dList->entBuf[entBufPos];
+				entBufPos += nameLen + 2;
 			}
 		} while(read == DIR_READ_BLOCKS);
-		dList->num = dListPos;
+
+scanEnd:
+		dList->num = numEntries;
 
 		fCloseDir(dh);
 	}
 
 	free(fi);
 
-	qsort(dList->ptrs, dList->num, sizeof(DirListEnt*), dlistCompare);
+	qsort(dList->ptrs, dList->num, sizeof(char*), dlistCompare);
 
 	return res;
 }
@@ -119,9 +127,9 @@ static void showDirList(const DirList *const dList, u32 start)
 	for(u32 i = start; i < listLength; i++)
 	{
 		const char *const printStr =
-			(dList->ptrs[i]->type == 0 ? "\x1b[%lu;H\x1b[37m %.51s" : "\x1b[%lu;H\x1b[33m %.51s");
+			(*dList->ptrs[i] == ENT_TYPE_FILE ? "\x1b[%lu;H\x1b[37m %.51s" : "\x1b[%lu;H\x1b[33m %.51s");
 
-		ee_printf(printStr, i - start, dList->ptrs[i]->str);
+		ee_printf(printStr, i - start, &dList->ptrs[i][1]);
 	}
 }
 
@@ -199,9 +207,9 @@ Result browseFiles(const char *const basePath, char selected[512])
 			{
 				// TODO: !!! Insecure !!!
 				if(curDir[pathLen - 1] != '/') curDir[pathLen++] = '/';
-				safeStrcpy(curDir + pathLen, dList->ptrs[cursorPos]->str, 256);
+				safeStrcpy(curDir + pathLen, &dList->ptrs[cursorPos][1], 256);
 
-				if(dList->ptrs[cursorPos]->type == 0)
+				if(*dList->ptrs[cursorPos] == ENT_TYPE_FILE)
 				{
 					safeStrcpy(selected, curDir, 512);
 					break;
