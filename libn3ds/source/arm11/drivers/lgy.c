@@ -94,12 +94,12 @@ static void powerDownFcramForLegacy(u8 mode)
 	while(pdn->fcram_cnt & PDN_FCRAM_CNT_CLK_EN_ACK); // Wait until clock is disabled.
 }
 
-Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePath)
+Result LGY_prepareGbaMode(bool directBoot, u16 saveType, const char *const savePath)
 {
 	u32 cmdBuf[4];
 	cmdBuf[0] = (u32)savePath;
 	cmdBuf[1] = strlen(savePath) + 1;
-	cmdBuf[2] = biosIntro;
+	cmdBuf[2] = directBoot;
 	cmdBuf[3] = saveType;
 	Result res = PXI_sendCmd(IPC_CMD9_PREPARE_GBA, cmdBuf, 4);
 	if(res != RES_OK) return res;

@@ -22,6 +22,8 @@
 
 
 
+Result oafParseConfigEarly(void);
+u8 oafGetBacklightConfig(void);
 Result oafInitAndRun(void);
 void oafUpdate(void);
 void oafFinish(void);

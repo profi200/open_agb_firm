@@ -72,8 +72,8 @@ u32 swap32(u32 val);
 
 static inline u32 intLog2(u32 val)
 {
-	// The result is undefined if __builtin_clz() is called with 0.
-	return (val ? 31u - __builtin_clz(val) : 0u);
+	// The result is undefined if __builtin_clzl() is called with 0.
+	return (val ? 31u - __builtin_clzl(val) : val);
 }
 
 // Round up to the next power of 2.
@@ -93,5 +93,5 @@ static inline u32 nextPow2(u32 val)
 
 	// Warning: Allowed range is 2 - 2147483648.
 	// Everything else is undefined behavior.
-	return 1u<<(32u - __builtin_clz(val - 1));
+	return 1u<<(32u - __builtin_clzl(val - 1));
 }

@@ -16,23 +16,47 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "drivers/gfx.h"
-#include "arm11/console.h"
-#include "arm11/drivers/codec.h"
 #include "fs.h"
 #include "arm11/open_agb_firm.h"
+#include "drivers/gfx.h"
+#include "arm11/drivers/mcu.h"
+#include "arm11/console.h"
+#include "arm11/drivers/codec.h"
 #include "arm11/drivers/hid.h"
 #include "arm11/power.h"
 
 
 
+static void setBacklight(void)
+{
+	u8 backlightMax;
+	u8 backlightMin;
+	if(MCU_getSystemModel() >= 4)
+	{
+		backlightMax=142;
+		backlightMin=16;
+	}
+	else
+	{
+		backlightMax=117;
+		backlightMin=20;
+	}
+
+	const u8 backlight = oafGetBacklightConfig();
+	if (backlight > backlightMax) GFX_setBrightness(backlightMax, backlightMax);
+	else if (backlight < backlightMin) GFX_setBrightness(backlightMin, backlightMin);
+	else GFX_setBrightness(backlight, backlight);
+}
+
 int main(void)
 {
+	Result res = fMount(FS_DRIVE_SDMC);
+	if(res == RES_OK) res = oafParseConfigEarly();
 	GFX_init(GFX_BGR8, GFX_RGB565);
+	setBacklight();
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
 
-	Result res = fMount(FS_DRIVE_SDMC);
 	if(res == RES_OK && (res = oafInitAndRun()) == RES_OK)
 	{
 		do

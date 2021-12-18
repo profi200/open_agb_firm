@@ -40,33 +40,34 @@
 #include "kevent.h"
 
 
-#define OAF_WORK_DIR       "sdmc:/3ds/open_agb_firm"
-#define INI_BUF_SIZE       (1024u)
-#define DEFAULT_CONFIG     "[general]\n"          \
-                           "backlight=64\n"       \
-                           "biosIntro=true\n"     \
-                           "useGbaDb=true\n\n"    \
-                           "[video]\n"            \
-                           "inGamma=2.2\n"        \
-                           "outGamma=1.54\n"      \
-                           "contrast=1.0\n"       \
-                           "brightness=0.0\n\n"   \
-                           "[advanced]\n"         \
-                           "saveOverride=false\n" \
-                           "defaultSave=14\n"     \
+#define OAF_WORK_DIR    "sdmc:/3ds/open_agb_firm"
+#define INI_BUF_SIZE    (1024u)
+#define DEFAULT_CONFIG  "[general]\n"             \
+                        "backlight=64\n"          \
+                        "directBoot=false\n"      \
+                        "useGbaDb=true\n"         \
+                        "useSaveFolder=false\n\n" \
+                        "[video]\n"               \
+                        "gbaGamma=2.2\n"          \
+                        "lcdGamma=1.54\n"         \
+                        "contrast=1.0\n"          \
+                        "brightness=0.0\n\n"      \
+                        "[advanced]\n"            \
+                        "saveOverride=false\n"    \
+                        "defaultSave=14"
 
 
 typedef struct
 {
 	// [general]
 	u8 backlight; // Both LCDs.
-	bool biosIntro;
+	bool directBoot;
 	bool useGbaDb;
-	// Setting to separate save and config files from the ROMs?
+	bool useSaveFolder;
 
 	// [video]
-	float inGamma;
-	float outGamma;
+	float gbaGamma;
+	float lcdGamma;
 	float contrast;
 	float brightness;
 
@@ -74,13 +75,6 @@ typedef struct
 	bool saveOverride;
 	u16 defaultSave;
 } OafConfig;
-
-typedef struct
-{
-	// [game]
-	u16 saveType;
-	u8 saveSlot;
-} OafGameConfig;
 
 typedef struct
 {
@@ -94,15 +88,21 @@ typedef struct
 // Default config.
 static OafConfig g_oafConfig =
 {
-	40,
-	true,
-	true,
-	2.2f,
-	1.54f,
-	1.f,
-	0.f,
-	false,
-	14
+	// [general]
+	64,    // backlight
+	false, // directBoot
+	true,  // useGbaDb
+	false, // useSaveFolder
+
+	// [video]
+	2.2f,  // gbaGamma
+	1.54f, // lcdGamma
+	1.f,   // contrast
+	0.f,   // brightness
+
+	// [advanced]
+	false, // saveOverride
+	14     // defaultSave
 };
 static KHandle g_frameReadyEvent = 0;
 
@@ -116,7 +116,7 @@ static u32 fixRomPadding(u32 romFileSize)
 	if(romSize < 0x100000u) romSize = 0x100000u;
 	memset((void*)(ROM_LOC + romFileSize), 0xFFFFFFFFu, romSize - romFileSize);
 
-	if(romSize > 0x100000u)
+	if(romSize > 0x100000u) // >1 MiB.
 	{
 		// Fake "open bus" padding.
 		u32 padding = (ROM_LOC + romSize) / 2;
@@ -412,16 +412,16 @@ end:
 
 static void adjustGammaTableForGba(void)
 {
-	const float inGamma = g_oafConfig.inGamma;
-	const float outGamma = g_oafConfig.outGamma;
+	const float gbaGamma = g_oafConfig.gbaGamma;
+	const float lcdGamma = g_oafConfig.lcdGamma;
 	const float contrast = g_oafConfig.contrast;
 	const float brightness = g_oafConfig.brightness;
 	for(u32 i = 0; i < 256; i++)
 	{
 		// Credits for this algo go to Extrems.
 		// Originally from Game Boy Interface Standard Edition for the GameCube.
-		u32 res = powf(powf(contrast, inGamma) * powf((float)i / 255.0f + brightness / contrast, inGamma),
-		               1.0f / outGamma) * 255.0f;
+		u32 res = powf(powf(contrast, gbaGamma) * powf((float)i / 255.0f + brightness / contrast, gbaGamma),
+		               1.0f / lcdGamma) * 255.0f;
 
 		// Same adjustment for red/green/blue.
 		REG_LCD_PDC0_GTBL_FIFO = res<<16 | res<<8 | res;
@@ -502,32 +502,28 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	{
 		if(strcmp(name, "backlight") == 0)
 			config->backlight = (u8)strtoul(value, NULL, 10);
-		else if(strcmp(name, "biosIntro") == 0)
-			config->biosIntro = (strcmp(value, "true") == 0 ? true : false);
+		else if(strcmp(name, "directBoot") == 0)
+			config->directBoot = (strcmp(value, "false") == 0 ? false : true);
 		else if(strcmp(name, "useGbaDb") == 0)
 			config->useGbaDb = (strcmp(value, "true") == 0 ? true : false);
+		else if(strcmp(name, "useSaveFolder") == 0)
+			config->useSaveFolder = (strcmp(value, "false") == 0 ? false : true);
 	}
 	else if(strcmp(section, "video") == 0)
 	{
-		if(strcmp(name, "inGamma") == 0)
-			config->inGamma = str2float(value);
-		else if(strcmp(name, "outGamma") == 0)
-			config->outGamma = str2float(value);
+		if(strcmp(name, "gbaGamma") == 0)
+			config->gbaGamma = str2float(value);
+		else if(strcmp(name, "lcdGamma") == 0)
+			config->lcdGamma = str2float(value);
 		else if(strcmp(name, "contrast") == 0)
 			config->contrast = str2float(value);
 		else if(strcmp(name, "brightness") == 0)
 			config->brightness = str2float(value);
 	}
-	/*else if(strcmp(section, "audio") == 0)
-	{
-	}
-	else if(strcmp(section, "input") == 0)
-	{
-	}*/
 	else if(strcmp(section, "advanced") == 0)
 	{
 		if(strcmp(name, "saveOverride") == 0)
-			config->saveOverride = (strcmp(value, "true") == 0 ? true : false);
+			config->saveOverride = (strcmp(value, "false") == 0 ? false : true);
 		if(strcmp(name, "defaultSave") == 0)
 			config->defaultSave = (u16)strtoul(value, NULL, 10);
 	}
@@ -536,44 +532,13 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	return 1; // 1 is no error? Really?
 }
 
-/*static int gameConfIniHandler(void* user, const char* section, const char* name, const char* value)
-{
-	OafGameConfig *const config = (OafGameConfig*)user;
-
-	if(strcmp(section, "game") == 0)
-	{
-		// Save type.
-		// Save slot.
-	}
-	else if(strcmp(section, "video") == 0)
-	{
-		if(strcmp(name, "inGamma") == 0)
-			config->inGamma = str2float(value);
-		else if(strcmp(name, "outGamma") == 0)
-			config->outGamma = str2float(value);
-		else if(strcmp(name, "contrast") == 0)
-			config->contrast = str2float(value);
-		else if(strcmp(name, "brightness") == 0)
-			config->brightness = str2float(value);
-	}
-	else if(strcmp(section, "audio") == 0)
-	{
-	}
-	else if(strcmp(section, "input") == 0)
-	{
-	}
-	else return 0; // Error.
-
-	return 1; // 1 is no error? Really?
-}*/
-
-static Result parseConfig(const char *const path, /* u8 confType, */ void *config)
+static Result parseConfig(const char *const path, void *config)
 {
 	char *iniBuf = (char*)calloc(INI_BUF_SIZE, 1);
 	if(iniBuf == NULL) return RES_OUT_OF_MEM;
 
 	Result res = fsQuickRead(path, iniBuf, INI_BUF_SIZE - 1);
-	if(res == RES_OK) ini_parse_string(iniBuf, /* (confType == 0 ? */ confIniHandler /* : gameConfIniHandler) */, config);
+	if(res == RES_OK) ini_parse_string(iniBuf, confIniHandler, config);
 	else
 	{
 		const char *const defaultConfig = DEFAULT_CONFIG;
@@ -585,7 +550,7 @@ static Result parseConfig(const char *const path, /* u8 confType, */ void *confi
 	return res;
 }
 
-static Result handleFsStuff(char romAndSavePath[512])
+static Result showFileBrowser(char romAndSavePath[512])
 {
 	Result res;
 	char *lastDir = (char*)calloc(512, 1);
@@ -593,33 +558,6 @@ static Result handleFsStuff(char romAndSavePath[512])
 	{
 		do
 		{
-			// Create the work dir and switch to it.
-			if((res = fsMakePath(OAF_WORK_DIR)) != RES_OK && res != RES_FR_EXIST) break;
-			if((res = fChdir(OAF_WORK_DIR)) != RES_OK) break;
-
-			// Parse config.
-			parseConfig("config.ini", /* 0, */ &g_oafConfig);
-			{
-				// TODO: Move this elsewhere?
-				u8 backlightMax;
-				u8 backlightMin;
-				if(MCU_getSystemModel() >= 4)
-				{
-					backlightMax=142;
-					backlightMin=16;
-				}
-				else
-				{
-					backlightMax=117;
-					backlightMin=20;
-				}
-
-				const u8 backlight = g_oafConfig.backlight;
-				if (backlight > backlightMax) GFX_setBrightness(backlightMax, backlightMax);
-				else if (backlight < backlightMin) GFX_setBrightness(backlightMin, backlightMin);
-				else GFX_setBrightness(backlight, backlight);
-			}
-
 			// Get last ROM launch path.
 			if((res = fsQuickRead("lastdir.bin", lastDir, 511)) != RES_OK)
 			{
@@ -657,6 +595,26 @@ static Result handleFsStuff(char romAndSavePath[512])
 	return res;
 }
 
+Result oafParseConfigEarly(void)
+{
+	// Create the work dir and switch to it before parsing the config.
+	Result res = fsMakePath(OAF_WORK_DIR);
+	if(res == RES_OK || res == RES_FR_EXIST)
+	{
+		if((res = fChdir(OAF_WORK_DIR)) == RES_OK)
+		{
+			res = parseConfig("config.ini", &g_oafConfig);
+		}
+	}
+
+	return res;
+}
+
+u8 oafGetBacklightConfig(void)
+{
+	return g_oafConfig.backlight;
+}
+
 Result oafInitAndRun(void)
 {
 	Result res;
@@ -665,7 +623,7 @@ Result oafInitAndRun(void)
 	{
 		do
 		{
-			if((res = handleFsStuff(romAndSavePath)) != RES_OK || *romAndSavePath == '\0') break;
+			if((res = showFileBrowser(romAndSavePath)) != RES_OK || *romAndSavePath == '\0') break;
 
 			ee_puts("Loading...");
 			u32 romSize;
@@ -680,7 +638,7 @@ Result oafInitAndRun(void)
 				saveType = detectSaveType(romSize);
 
 			// Prepare ARM9 for GBA mode + settings and save loading.
-			if((res = LGY_prepareGbaMode(g_oafConfig.biosIntro, saveType, romAndSavePath)) == RES_OK)
+			if((res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, romAndSavePath)) == RES_OK)
 			{
 #ifdef NDEBUG
 				GFX_setForceBlack(false, true);

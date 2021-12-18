@@ -65,7 +65,7 @@ static char g_savePath[512] = {0};
 
 
 
-static void setupBiosOverlay(bool biosIntro)
+static void setupBiosOverlay(bool directBoot)
 {
 	iomemcpy(getLgyRegs()->a7_vector, (u32*)_a7_overlay_stub, (u32)_a7_overlay_stub_size);
 	//static const u32 biosVectors[8] = {0xEA000018, 0xEA000004, 0xEA00004C, 0xEA000002,
@@ -73,7 +73,7 @@ static void setupBiosOverlay(bool biosIntro)
 	//iomemcpy(getLgyRegs()->a7_vector, biosVectors, 32);
 
 	iomemcpy((u32*)ARM7_STUB_LOC9, (u32*)_a7_stub_start, (u32)_a7_stub_size);
-	if(biosIntro) *((vu8*)_a7_stub9_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
+	if(!directBoot) *((vu8*)_a7_stub9_swi) = 0x26; // Patch swi 0x01 (RegisterRamReset) to swi 0x26 (HardReset).
 	flushDCacheRange((void*)ARM7_STUB_LOC9, (u32)_a7_stub_size);
 }
 
@@ -101,11 +101,11 @@ static u32 setupSaveType(u16 saveType)
 	return saveSize;
 }
 
-Result LGY_prepareGbaMode(bool biosIntro, u16 saveType, const char *const savePath)
+Result LGY_prepareGbaMode(bool directBoot, u16 saveType, const char *const savePath)
 {
 	getLgyRegs()->mode = LGY_MODE_AGB;
 
-	setupBiosOverlay(biosIntro);
+	setupBiosOverlay(directBoot);
 	const u32 saveSize = setupSaveType(saveType);
 	strncpy_s(g_savePath, savePath, 511, 512);
 
