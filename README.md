@@ -18,7 +18,7 @@ Additionally, we are not responsible for any damage that may occur to your syste
 * Copy the `open_agb_firm.firm` file to your 3DS's SD card at `/luma/payloads` if you're using Luma3DS or elsewhere if you're using fastboot3DS.
 * Copy the `3ds` folder to the root of your 3DS's SD card. Merge folders if asked.
 * Launch open_agb_firm using Luma3DS by holding START while booting your 3DS or assign it to a slot if you're using fastboot3DS.
-* After open_agb_firm launches, use the file browser to navigate to a `.GBA` ROM to run.
+* After open_agb_firm launches, use the file browser to navigate to a `.gba` ROM to run.
 
 ## Controls
 A/B/L/R/START/SELECT - GBA buttons, respectively
@@ -41,19 +41,22 @@ General settings.
   * New 3DS: `16`-`142`
 * Values ≤`64` are recommended.
 
-`bool biosIntro` - Show GBA BIOS intro at game startup
-* Default: `true`
+`bool directBoot` - Skip GBA BIOS intro at game startup
+* Default: `false`
 
 `bool useGbaDb` - Use `gba_db.bin` to get save types
 * Default: `true`
 
+`bool useSaveFolder` - Store savegames and config files in `/3ds/open_agb_firm/saves`
+* Default: `false`
+
 ### Video
 Video-related settings.
 
-`float inGamma` - Screen input gamma
+`float gbaGamma` - GBA input gamma
 * Default: `2.2`
 
-`float outGamma` - Screen output gamma
+`float lcdGamma` - Output LCD gamma
 * Default : `1.54`
 
 `float contrast` - Screen gain
@@ -99,6 +102,7 @@ open_agb_firm using the 3DS's built-in GBA hardware. Unfortunately, this comes w
 * \>32 KiB (>256 Kbit) SRAM (homebrew games/emulators).
 * Reboots are required for switching between games.
 * No save states. Very difficult to implement because no direct hardware access.
+* Sound has lots of aliasing issues. No known workaround (hardware bug).
 
 ## EEPROM Fixer
 Most emulators output EEPROM saves differently than what open_agb_firm expects, making them incompatible. Fortunately, they are very easy to fix, using [this tool](https://exelotl.github.io/gba-eeprom-save-fix/) by exelotl.
