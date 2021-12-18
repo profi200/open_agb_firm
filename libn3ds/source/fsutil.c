@@ -87,3 +87,15 @@ Result fsMakePath(const char *const path)
 
 	return res;
 }
+
+Result fsLoadPathFromFile(const char *const path, char outPath[512])
+{
+	Result res = fsQuickRead(path, outPath, 511);
+	if(res == RES_OK)
+	{
+		char *const invalidChar = strpbrk(outPath, "\n\r\t");
+		if(invalidChar != NULL) *invalidChar = '\0';
+	}
+
+	return res;
+}

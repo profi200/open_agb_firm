@@ -559,7 +559,7 @@ static Result showFileBrowser(char romAndSavePath[512])
 		do
 		{
 			// Get last ROM launch path.
-			if((res = fsQuickRead("lastdir.bin", lastDir, 511)) != RES_OK)
+			if((res = fsLoadPathFromFile("lastdir.txt", lastDir)) != FR_OK)
 			{
 				if(res == RES_FR_NO_FILE) strcpy(lastDir, "sdmc:/");
 				else                      break;
@@ -583,7 +583,7 @@ static Result showFileBrowser(char romAndSavePath[512])
 				{
 					strncpy(lastDir, romAndSavePath, cmpLen);
 					lastDir[cmpLen] = '\0';
-					res = fsQuickWrite("lastdir.bin", lastDir, cmpLen + 1);
+					res = fsQuickWrite("lastdir.txt", lastDir, cmpLen + 1);
 				}
 			}
 		} while(0);
@@ -618,14 +618,18 @@ u8 oafGetBacklightConfig(void)
 Result oafInitAndRun(void)
 {
 	Result res;
-	char *const romAndSavePath = (char*)malloc(512);
+	char *const romAndSavePath = (char*)calloc(512, 1);
 	if(romAndSavePath != NULL)
 	{
 		do
 		{
-			if((res = showFileBrowser(romAndSavePath)) != RES_OK || *romAndSavePath == '\0') break;
+			if((res = fsLoadPathFromFile("autoboot.txt", romAndSavePath)) == RES_FR_NO_FILE)
+			{
+				if((res = showFileBrowser(romAndSavePath)) != RES_OK || *romAndSavePath == '\0') break;
+				ee_puts("Loading...");
+			}
+			else if(res != RES_OK) break;
 
-			ee_puts("Loading...");
 			u32 romSize;
 			if((res = loadGbaRom(romAndSavePath, &romSize)) != RES_OK) break;
 
