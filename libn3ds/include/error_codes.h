@@ -37,28 +37,29 @@ enum
 	RES_OUT_OF_MEM             =  4u,
 	RES_OUT_OF_RANGE           =  5u,
 	RES_NOT_FOUND              =  6u,
+	RES_PATH_TOO_LONG          =  7u,
 
 	// fatfs errors.
 	// Caution: Update fres2Res() in fs.c on ARM9 if this changes!
-	RES_FR_DISK_ERR            =  7u, /* (1) A hard error occurred in the low level disk I/O layer */
-	RES_FR_INT_ERR             =  8u, /* (2) Assertion failed */
-	RES_FR_NOT_READY           =  9u, /* (3) The physical drive cannot work */
-	RES_FR_NO_FILE             = 10u, /* (4) Could not find the file */
-	RES_FR_NO_PATH             = 11u, /* (5) Could not find the path */
-	RES_FR_INVALID_NAME        = 12u, /* (6) The path name format is invalid */
-	RES_FR_DENIED              = 13u, /* (7) Access denied due to prohibited access or directory full */
-	RES_FR_EXIST               = 14u, /* (8) Access denied due to prohibited access */
-	RES_FR_INVALID_OBJECT      = 15u, /* (9) The file/directory object is invalid */
-	RES_FR_WRITE_PROTECTED     = 16u, /* (10) The physical drive is write protected */
-	RES_FR_INVALID_DRIVE       = 17u, /* (11) The logical drive number is invalid */
-	RES_FR_NOT_ENABLED         = 18u, /* (12) The volume has no work area */
-	RES_FR_NO_FILESYSTEM       = 19u, /* (13) There is no valid FAT volume */
-	RES_FR_MKFS_ABORTED        = 20u, /* (14) The f_mkfs() aborted due to any problem */
-	RES_FR_TIMEOUT             = 21u, /* (15) Could not get a grant to access the volume within defined period */
-	RES_FR_LOCKED              = 22u, /* (16) The operation is rejected according to the file sharing policy */
-	RES_FR_NOT_ENOUGH_CORE     = 23u, /* (17) LFN working buffer could not be allocated */
-	RES_FR_TOO_MANY_OPEN_FILES = 24u, /* (18) Number of open files > FF_FS_LOCK */
-	RES_FR_INVALID_PARAMETER   = 25u, /* (19) Given parameter is invalid */
+	RES_FR_DISK_ERR            =  8u, /* (1) A hard error occurred in the low level disk I/O layer */
+	RES_FR_INT_ERR             =  9u, /* (2) Assertion failed */
+	RES_FR_NOT_READY           = 10u, /* (3) The physical drive cannot work */
+	RES_FR_NO_FILE             = 11u, /* (4) Could not find the file */
+	RES_FR_NO_PATH             = 12u, /* (5) Could not find the path */
+	RES_FR_INVALID_NAME        = 13u, /* (6) The path name format is invalid */
+	RES_FR_DENIED              = 14u, /* (7) Access denied due to prohibited access or directory full */
+	RES_FR_EXIST               = 15u, /* (8) Access denied due to prohibited access */
+	RES_FR_INVALID_OBJECT      = 16u, /* (9) The file/directory object is invalid */
+	RES_FR_WRITE_PROTECTED     = 17u, /* (10) The physical drive is write protected */
+	RES_FR_INVALID_DRIVE       = 18u, /* (11) The logical drive number is invalid */
+	RES_FR_NOT_ENABLED         = 19u, /* (12) The volume has no work area */
+	RES_FR_NO_FILESYSTEM       = 20u, /* (13) There is no valid FAT volume */
+	RES_FR_MKFS_ABORTED        = 21u, /* (14) The f_mkfs() aborted due to any problem */
+	RES_FR_TIMEOUT             = 22u, /* (15) Could not get a grant to access the volume within defined period */
+	RES_FR_LOCKED              = 23u, /* (16) The operation is rejected according to the file sharing policy */
+	RES_FR_NOT_ENOUGH_CORE     = 24u, /* (17) LFN working buffer could not be allocated */
+	RES_FR_TOO_MANY_OPEN_FILES = 25u, /* (18) Number of open files > FF_FS_LOCK */
+	RES_FR_INVALID_PARAMETER   = 26u, /* (19) Given parameter is invalid */
 
 	// Custom errors.
 	RES_ROM_TOO_BIG            = MAKE_CUSTOM_ERR(0),

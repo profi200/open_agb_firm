@@ -47,9 +47,6 @@ General settings.
 `bool useGbaDb` - Use `gba_db.bin` to get save types
 * Default: `true`
 
-`bool useSaveFolder` - Store savegames and config files in `/3ds/open_agb_firm/saves`
-* Default: `false`
-
 ### Video
 Video-related settings.
 

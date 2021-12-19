@@ -29,8 +29,6 @@
 #ifdef ARM11
 void printError(Result res)
 {
-	GFX_setBrightness(15, 15);
-
 	static const char *const common[] =
 	{
 		"OK",
@@ -40,6 +38,7 @@ void printError(Result res)
 		"Out of memory",
 		"Out of range",
 		"Not found",
+		"Path too long",
 
 		// fatfs errors.
 		"fatfs disk error",

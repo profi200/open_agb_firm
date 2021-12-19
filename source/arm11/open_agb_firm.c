@@ -41,19 +41,19 @@
 
 
 #define OAF_WORK_DIR    "sdmc:/3ds/open_agb_firm"
+#define OAF_SAVE_DIR    "saves"                   // Relative to work dir.
 #define INI_BUF_SIZE    (1024u)
-#define DEFAULT_CONFIG  "[general]\n"             \
-                        "backlight=64\n"          \
-                        "directBoot=false\n"      \
-                        "useGbaDb=true\n"         \
-                        "useSaveFolder=false\n\n" \
-                        "[video]\n"               \
-                        "gbaGamma=2.2\n"          \
-                        "lcdGamma=1.54\n"         \
-                        "contrast=1.0\n"          \
-                        "brightness=0.0\n\n"      \
-                        "[advanced]\n"            \
-                        "saveOverride=false\n"    \
+#define DEFAULT_CONFIG  "[general]\n"           \
+                        "backlight=64\n"        \
+                        "directBoot=false\n"    \
+                        "useGbaDb=true\n\n"     \
+                        "[video]\n"             \
+                        "gbaGamma=2.2\n"        \
+                        "lcdGamma=1.54\n"       \
+                        "contrast=1.0\n"        \
+                        "brightness=0.0\n\n"    \
+                        "[advanced]\n"          \
+                        "saveOverride=false\n"  \
                         "defaultSave=14"
 
 
@@ -63,7 +63,6 @@ typedef struct
 	u8 backlight; // Both LCDs.
 	bool directBoot;
 	bool useGbaDb;
-	bool useSaveFolder;
 
 	// [video]
 	float gbaGamma;
@@ -92,7 +91,6 @@ static OafConfig g_oafConfig =
 	64,    // backlight
 	false, // directBoot
 	true,  // useGbaDb
-	false, // useSaveFolder
 
 	// [video]
 	2.2f,  // gbaGamma
@@ -506,8 +504,6 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 			config->directBoot = (strcmp(value, "false") == 0 ? false : true);
 		else if(strcmp(name, "useGbaDb") == 0)
 			config->useGbaDb = (strcmp(value, "true") == 0 ? true : false);
-		else if(strcmp(name, "useSaveFolder") == 0)
-			config->useSaveFolder = (strcmp(value, "false") == 0 ? false : true);
 	}
 	else if(strcmp(section, "video") == 0)
 	{
@@ -595,17 +591,44 @@ static Result showFileBrowser(char romAndSavePath[512])
 	return res;
 }
 
+static void rom2SavePath(char romPath[512], const u8 saveSlot)
+{
+	if(saveSlot > 9)
+	{
+		*romPath = '\0'; // Prevent using the ROM as save file.
+		return;
+	}
+
+	char tmpSaveFileName[256];
+	static char numberedExt[7] = {'.', 'X', '.', 's', 'a', 'v', '\0'};
+
+	numberedExt[1] = '0' + saveSlot;
+
+	// Extract the file name and change the extension.
+	// The numbered extension is 2 chars longer than unnumbered.
+	safeStrcpy(tmpSaveFileName, strrchr(romPath, '/') + 1, 256 - 2);
+	strcpy(tmpSaveFileName + strlen(tmpSaveFileName) - 4, (saveSlot == 0 ? ".sav" : numberedExt));
+
+	// Construct the new path.
+	strcpy(romPath, OAF_SAVE_DIR "/");
+	strcat(romPath, tmpSaveFileName);
+}
+
 Result oafParseConfigEarly(void)
 {
-	// Create the work dir and switch to it before parsing the config.
-	Result res = fsMakePath(OAF_WORK_DIR);
-	if(res == RES_OK || res == RES_FR_EXIST)
+	Result res;
+	do
 	{
-		if((res = fChdir(OAF_WORK_DIR)) == RES_OK)
-		{
-			res = parseConfig("config.ini", &g_oafConfig);
-		}
-	}
+		// Create the work dir and switch to it.
+		if((res = fsMakePath(OAF_WORK_DIR)) != RES_OK && res != RES_FR_EXIST) break;
+		if((res = fChdir(OAF_WORK_DIR)) != RES_OK) break;
+
+		// Create the saves folder.
+		if((res = fMkdir(OAF_SAVE_DIR)) != RES_OK && res != RES_FR_EXIST) break;
+
+		// Parse the config.
+		res = parseConfig("config.ini", &g_oafConfig);
+	} while(0);
 
 	return res;
 }
@@ -634,7 +657,7 @@ Result oafInitAndRun(void)
 			if((res = loadGbaRom(romAndSavePath, &romSize)) != RES_OK) break;
 
 			// Adjust path for the save file and get save type.
-			strcpy(romAndSavePath + strlen(romAndSavePath) - 4, ".sav");
+			rom2SavePath(romAndSavePath, 0); // TODO: Save slot config.
 			u16 saveType;
 			if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
 				saveType = getSaveType(romSize, romAndSavePath);
