@@ -70,6 +70,9 @@ typedef struct
 	float contrast;
 	float brightness;
 
+	// [game]
+	u8 saveSlot;
+
 	// [advanced]
 	bool saveOverride;
 	u16 defaultSave;
@@ -97,6 +100,9 @@ static OafConfig g_oafConfig =
 	1.54f, // lcdGamma
 	1.f,   // contrast
 	0.f,   // brightness
+
+	// [game]
+	0,     // saveSlot
 
 	// [advanced]
 	false, // saveOverride
@@ -492,7 +498,7 @@ static void gbaGfxHandler(void *args)
 	taskExit();
 }
 
-static int confIniHandler(void* user, const char* section, const char* name, const char* value)
+static int cfgIniCallback(void* user, const char* section, const char* name, const char* value)
 {
 	OafConfig *const config = (OafConfig*)user;
 
@@ -516,6 +522,11 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 		else if(strcmp(name, "brightness") == 0)
 			config->brightness = str2float(value);
 	}
+	else if(strcmp(section, "game") == 0)
+	{
+		if(strcmp(name, "saveSlot") == 0)
+			config->saveSlot = (u8)strtoul(value, NULL, 10);
+	}
 	else if(strcmp(section, "advanced") == 0)
 	{
 		if(strcmp(name, "saveOverride") == 0)
@@ -528,14 +539,14 @@ static int confIniHandler(void* user, const char* section, const char* name, con
 	return 1; // 1 is no error? Really?
 }
 
-static Result parseConfig(const char *const path, void *config)
+static Result parseOafConfig(const char *const path, const bool writeDefaultCfg)
 {
 	char *iniBuf = (char*)calloc(INI_BUF_SIZE, 1);
 	if(iniBuf == NULL) return RES_OUT_OF_MEM;
 
 	Result res = fsQuickRead(path, iniBuf, INI_BUF_SIZE - 1);
-	if(res == RES_OK) ini_parse_string(iniBuf, confIniHandler, config);
-	else
+	if(res == RES_OK) ini_parse_string(iniBuf, cfgIniCallback, &g_oafConfig);
+	else if(writeDefaultCfg)
 	{
 		const char *const defaultConfig = DEFAULT_CONFIG;
 		res = fsQuickWrite(path, defaultConfig, strlen(defaultConfig));
@@ -591,27 +602,33 @@ static Result showFileBrowser(char romAndSavePath[512])
 	return res;
 }
 
-static void rom2SavePath(char romPath[512], const u8 saveSlot)
+static void rom2GameCfgPath(char romPath[512])
 {
-	if(saveSlot > 9)
-	{
-		*romPath = '\0'; // Prevent using the ROM as save file.
-		return;
-	}
-
-	char tmpSaveFileName[256];
-	static char numberedExt[7] = {'.', 'X', '.', 's', 'a', 'v', '\0'};
-
-	numberedExt[1] = '0' + saveSlot;
-
 	// Extract the file name and change the extension.
-	// The numbered extension is 2 chars longer than unnumbered.
+	// For cfg2SavePath() we need to reserve 2 extra bytes/chars.
+	char tmpSaveFileName[256];
 	safeStrcpy(tmpSaveFileName, strrchr(romPath, '/') + 1, 256 - 2);
-	strcpy(tmpSaveFileName + strlen(tmpSaveFileName) - 4, (saveSlot == 0 ? ".sav" : numberedExt));
+	strcpy(tmpSaveFileName + strlen(tmpSaveFileName) - 4, ".ini");
 
 	// Construct the new path.
 	strcpy(romPath, OAF_SAVE_DIR "/");
 	strcat(romPath, tmpSaveFileName);
+}
+
+static void gameCfg2SavePath(char cfgPath[512], const u8 saveSlot)
+{
+	if(saveSlot > 9)
+	{
+		*cfgPath = '\0'; // Prevent using the ROM as save file.
+		return;
+	}
+
+	static char numberedExt[7] = {'.', 'X', '.', 's', 'a', 'v', '\0'};
+
+	// Change the extension.
+	// This relies on rom2GameCfgPath() to reserve 2 extra bytes/chars.
+	numberedExt[1] = '0' + saveSlot;
+	strcpy(cfgPath + strlen(cfgPath) - 4, (saveSlot == 0 ? ".sav" : numberedExt));
 }
 
 Result oafParseConfigEarly(void)
@@ -627,7 +644,7 @@ Result oafParseConfigEarly(void)
 		if((res = fMkdir(OAF_SAVE_DIR)) != RES_OK && res != RES_FR_EXIST) break;
 
 		// Parse the config.
-		res = parseConfig("config.ini", &g_oafConfig);
+		res = parseOafConfig("config.ini", true);
 	} while(0);
 
 	return res;
@@ -641,38 +658,47 @@ u8 oafGetBacklightConfig(void)
 Result oafInitAndRun(void)
 {
 	Result res;
-	char *const romAndSavePath = (char*)calloc(512, 1);
-	if(romAndSavePath != NULL)
+	char *const filePath = (char*)calloc(512, 1);
+	if(filePath != NULL)
 	{
 		do
 		{
-			if((res = fsLoadPathFromFile("autoboot.txt", romAndSavePath)) == RES_FR_NO_FILE)
+			// Try to load the ROM path from autoboot.txt.
+			// If this file doesn't exist show the file browser.
+			if((res = fsLoadPathFromFile("autoboot.txt", filePath)) == RES_FR_NO_FILE)
 			{
-				if((res = showFileBrowser(romAndSavePath)) != RES_OK || *romAndSavePath == '\0') break;
+				if((res = showFileBrowser(filePath)) != RES_OK || *filePath == '\0') break;
 				ee_puts("Loading...");
 			}
 			else if(res != RES_OK) break;
 
+			// Load the ROM file.
 			u32 romSize;
-			if((res = loadGbaRom(romAndSavePath, &romSize)) != RES_OK) break;
+			if((res = loadGbaRom(filePath, &romSize)) != RES_OK) break;
 
-			// Adjust path for the save file and get save type.
-			rom2SavePath(romAndSavePath, 0); // TODO: Save slot config.
+			// Load the per-game config.
+			rom2GameCfgPath(filePath);
+			if((res = parseOafConfig(filePath, false)) != RES_OK && res != RES_FR_NO_FILE) break;
+
+			// Adjust the path for the save file and get save type.
+			gameCfg2SavePath(filePath, g_oafConfig.saveSlot);
 			u16 saveType;
 			if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
-				saveType = getSaveType(romSize, romAndSavePath);
+				saveType = getSaveType(romSize, filePath);
 			else
 				saveType = detectSaveType(romSize);
 
-			// Prepare ARM9 for GBA mode + settings and save loading.
-			if((res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, romAndSavePath)) == RES_OK)
+			// Prepare ARM9 for GBA mode + save loading.
+			if((res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath)) == RES_OK)
 			{
 #ifdef NDEBUG
+				// Force black and turn the backlight off on the bottom screen.
+				// Don't turn the backlight off on 2DS (1 panel).
 				GFX_setForceBlack(false, true);
-				// Don't turn the backlight off on 2DS.
 				if(MCU_getSystemModel() != 3) GFX_powerOffBacklights(GFX_BLIGHT_BOT);
 #endif
 
+				// Initialize the legacy frame buffer and frame handler.
 				const KHandle frameReadyEvent = createEvent(false);
 				LGYFB_init(frameReadyEvent); // Setup Legacy Framebuffer.
 				createTask(0x800, 3, gbaGfxHandler, (void*)frameReadyEvent);
@@ -687,7 +713,7 @@ Result oafInitAndRun(void)
 	}
 	else res = RES_OUT_OF_MEM;
 
-	free(romAndSavePath);
+	free(filePath);
 
 	return res;
 }

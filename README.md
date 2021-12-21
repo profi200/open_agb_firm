@@ -62,6 +62,12 @@ Video-related settings.
 `float brightness` - Screen lift
 * Default: `0.0`
 
+### Game
+Game-specific settings. Only intended to be used in the per-game settings (romName.ini in `/3ds/open_agb_firm/saves`).
+
+`u8 saveSlot` - Savegame slot (0-9)
+* Default: `0`
+
 ### Advanced
 Options for advanced users. No pun intended.
 
