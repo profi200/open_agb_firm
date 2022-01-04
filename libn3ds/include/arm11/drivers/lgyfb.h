@@ -94,7 +94,7 @@ ALWAYS_INLINE LgyFb* getLgyFbRegs(bool top)
 
 
 
-void LGYFB_init(KHandle frameReadyEvent);
+void LGYFB_init(KHandle frameReadyEvent, u8 scaler);
 void LGYFB_deinit(void);
 
 #ifndef NDEBUG

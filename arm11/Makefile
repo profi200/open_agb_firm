@@ -26,7 +26,7 @@ DATA		:=
 INCLUDES	:=	../libn3ds/include ../libn3ds/kernel/include ../libn3ds/thirdparty ../include \
 				../thirdparty
 DEFINES		:=	-DARM11 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
-				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR) -DOAF_SCALE_SELECT=2
+				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
 ASSETS		:=
 
 ifneq ($(strip $(NO_DEBUG)),)

@@ -50,6 +50,9 @@ General settings.
 ### Video
 Video-related settings.
 
+`u8 scaler` - Video scaler. 0 = none, 1 = bilinear, 2 = hardware.
+* Default: `2`
+
 `float gbaGamma` - GBA input gamma
 * Default: `2.2`
 

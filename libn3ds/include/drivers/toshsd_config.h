@@ -23,19 +23,21 @@
 // To make things easier 2 ports are assigned to each controller.
 // There are a maximum of 2 controllers mapped at the same time
 // and 3 (on DSi 2) controllers in total.
-// Also see /regs/toshsd.h.
+// Also see toshsd.h.
 //
 // Examples:
 // Port 0 is port 0 on controller 1, port 3 is port 1 on controller 2.
 #ifdef _3DS
-#define TOSHSD_C3_MAP     (0u) // Controller 3 memory mapping. 0=ARM9 0x10007000 or 1=ARM11 0x10100000.
+// This define determines whenever the SD slot is accessible on
+// ARM9 or ARM11 when TOSHSD_SLOT_PORT for ARM9 is set to 2.
+#define TOSHSD_C2_MAP     (0u) // Controller 2 (physical 3) memory mapping. 0=ARM9 0x10007000 or 1=ARM11 0x10100000.
 
 #ifdef ARM9
-#define TOSHSD_SLOT_PORT  (2u) // Can be on port 0 or 2.
-#define TOSHSD_eMMC_PORT  (1u) // Port 1 only.
+#define TOSHSD_SLOT_PORT  (2u) // Can be on port 0 or 2. 0 always on ARM9.
+#define TOSHSD_eMMC_PORT  (1u) // Port 1 only. Do not change.
 #elif ARM11
-#define TOSHSD_SLOT_PORT  (2u) // Port 2 only.
-#define TOSHSD_eMMC_PORT  (3u) // Not connected/accessible.
+#define TOSHSD_SLOT_PORT  (2u) // Port 2 only. Do not change.
+#define TOSHSD_eMMC_PORT  (3u) // Placeholder. Do not change. Not connected/accessible.
 #endif // #ifdef ARM9
 
 #elif TWL

@@ -48,6 +48,7 @@
                         "directBoot=false\n"    \
                         "useGbaDb=true\n\n"     \
                         "[video]\n"             \
+                        "scaler=2"              \
                         "gbaGamma=2.2\n"        \
                         "lcdGamma=1.54\n"       \
                         "contrast=1.0\n"        \
@@ -65,6 +66,7 @@ typedef struct
 	bool useGbaDb;
 
 	// [video]
+	u8 scaler;      // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
 	float gbaGamma;
 	float lcdGamma;
 	float contrast;
@@ -72,6 +74,7 @@ typedef struct
 
 	// [game]
 	u8 saveSlot;
+	// TODO: Per-game save type override.
 
 	// [advanced]
 	bool saveOverride;
@@ -96,6 +99,7 @@ static OafConfig g_oafConfig =
 	true,  // useGbaDb
 
 	// [video]
+	2,     // scaler
 	2.2f,  // gbaGamma
 	1.54f, // lcdGamma
 	1.f,   // contrast
@@ -513,7 +517,9 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 	}
 	else if(strcmp(section, "video") == 0)
 	{
-		if(strcmp(name, "gbaGamma") == 0)
+		if(strcmp(name, "scaler") == 0)
+			config->scaler = (u8)strtoul(value, NULL, 10);
+		else if(strcmp(name, "gbaGamma") == 0)
 			config->gbaGamma = str2float(value);
 		else if(strcmp(name, "lcdGamma") == 0)
 			config->lcdGamma = str2float(value);
@@ -700,7 +706,8 @@ Result oafInitAndRun(void)
 
 				// Initialize the legacy frame buffer and frame handler.
 				const KHandle frameReadyEvent = createEvent(false);
-				LGYFB_init(frameReadyEvent); // Setup Legacy Framebuffer.
+				LGYFB_init(frameReadyEvent, g_oafConfig.scaler); // Setup Legacy Framebuffer.
+				patchGbaGpuCmdList(g_oafConfig.scaler);
 				createTask(0x800, 3, gbaGfxHandler, (void*)frameReadyEvent);
 				g_frameReadyEvent = frameReadyEvent;
 
