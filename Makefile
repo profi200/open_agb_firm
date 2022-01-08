@@ -9,10 +9,18 @@ export TARGET := open_agb_firm
 ENTRY9        := 0x08000040
 ENTRY11       := 0x1FF89034
 SECTION0_ADR  := 0x08000040
+ifeq ($(strip $(USE_FIRMTOOL)),1)
+SECTION0_TYPE := NDMA
+else
 SECTION0_TYPE := 0
+endif
 SECTION0_FILE := arm9/$(TARGET)9.bin
 SECTION1_ADR  := 0x1FF89000
+ifeq ($(strip $(USE_FIRMTOOL)),1)
+SECTION1_TYPE := XDMA
+else
 SECTION1_TYPE := 1
+endif
 SECTION1_FILE := arm11/$(TARGET)11.bin
 
 
@@ -38,8 +46,13 @@ checkarm11:
 
 #---------------------------------------------------------------------------------
 $(TARGET).firm: arm9/$(TARGET)9.bin arm11/$(TARGET)11.bin
+ifeq ($(strip $(USE_FIRMTOOL)),1)
+	firmtool build $(TARGET).firm -n $(ENTRY9) -e $(ENTRY11) -A $(SECTION0_ADR) $(SECTION1_ADR) \
+		-D $(SECTION0_FILE) $(SECTION1_FILE) -C $(SECTION0_TYPE) $(SECTION1_TYPE)
+else
 	firm_builder $(TARGET).firm $(ENTRY9) $(ENTRY11) $(SECTION0_ADR) $(SECTION0_TYPE) \
 		$(SECTION0_FILE) $(SECTION1_ADR) $(SECTION1_TYPE) $(SECTION1_FILE)
+endif
 
 #---------------------------------------------------------------------------------
 arm9/$(TARGET)9.bin:
@@ -58,8 +71,13 @@ clean:
 release: clean
 	@$(MAKE) -j4 --no-print-directory -C arm9 NO_DEBUG=1
 	@$(MAKE) -j4 --no-print-directory -C arm11 NO_DEBUG=1
+ifeq ($(strip $(USE_FIRMTOOL)),1)
+	firmtool build $(TARGET).firm -n $(ENTRY9) -e $(ENTRY11) -A $(SECTION0_ADR) $(SECTION1_ADR) \
+		-D $(SECTION0_FILE) $(SECTION1_FILE) -C $(SECTION0_TYPE) $(SECTION1_TYPE)
+else
 	firm_builder $(TARGET).firm $(ENTRY9) $(ENTRY11) $(SECTION0_ADR) $(SECTION0_TYPE) \
 		$(SECTION0_FILE) $(SECTION1_ADR) $(SECTION1_TYPE) $(SECTION1_FILE)
+endif
 	@7z a -mx -m0=ARM -m1=LZMA $(TARGET)$(VERS_STRING).7z $(TARGET).firm
 	@7z u -mx -m0=LZMA $(TARGET)$(VERS_STRING).7z resources/gba_db.bin
 	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z libn3ds/thirdparty/fatfs/LICENSE.txt thirdparty/inih/LICENSE.txt LICENSE.txt README.md
