@@ -3079,4 +3079,4 @@ static const unsigned char default_font[] = {
     0x00, /* 00000000 */
     0x00, /* 00000000 */
 };
-const int default_font_size = sizeof(default_font);
+static const int default_font_size = sizeof(default_font);

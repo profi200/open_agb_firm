@@ -29,7 +29,6 @@
 
 // Notes on these settings:
 // MAX_ENT_BUF_SIZE should be big enough to hold the average file/dir name length * MAX_DIR_ENTRIES.
-// MAX_DIR_ENTRIES should be a multiple of DIR_READ_BLOCKS.
 #define MAX_ENT_BUF_SIZE  (1024u * 196) // 196 KiB.
 #define MAX_DIR_ENTRIES   (1000u)
 #define DIR_READ_BLOCKS   (10u)
@@ -51,24 +50,26 @@ typedef struct
 
 int dlistCompare(const void *a, const void *b)
 {
-	const char *const entA = *(char**)a;
-	const char *const entB = *(char**)b;
+	const char *entA = *(char**)a;
+	const char *entB = *(char**)b;
 
 	// Compare the entry type. Dirs have priority over files.
 	if(*entA != *entB) return (int)*entB - *entA;
 
-	const char *strA = &entA[1];
-	const char *strB = &entB[1];
-	int res = *strA - *strB;
-	while(*strA != '\0' && *strB != '\0' && res == 0) res = *++strA - *++strB;
+	// Compare the string.
+	int res;
+	do
+	{
+		res = *++entA - *++entB;
+	} while(res == 0 && *entA != '\0' && *entB != '\0');
 
 	return res;
 }
 
 static Result scanDir(const char *const path, DirList *const dList, const char *const filter)
 {
-	FILINFO *const fi = (FILINFO*)malloc(sizeof(FILINFO) * DIR_READ_BLOCKS);
-	if(fi == NULL) return RES_OUT_OF_MEM;
+	FILINFO *const fis = (FILINFO*)malloc(sizeof(FILINFO) * DIR_READ_BLOCKS);
+	if(fis == NULL) return RES_OUT_OF_MEM;
 
 	dList->num = 0;
 
@@ -82,25 +83,26 @@ static Result scanDir(const char *const path, DirList *const dList, const char *
 		const u32 filterLen = strlen(filter);
 		do
 		{
-			if((res = fReadDir(dh, fi, DIR_READ_BLOCKS, &read)) != RES_OK) break;
-			if(numEntries + read > MAX_DIR_ENTRIES) break;
+			if((res = fReadDir(dh, fis, DIR_READ_BLOCKS, &read)) != RES_OK) break;
+			read = (read <= MAX_DIR_ENTRIES - numEntries ? read : MAX_DIR_ENTRIES - numEntries);
 
 			for(u32 i = 0; i < read; i++)
 			{
-				const char entType = (fi[i].fattrib & AM_DIR ? ENT_TYPE_DIR : ENT_TYPE_FILE);
-				const u32 nameLen = strlen(fi[i].fname);
+				const char entType = (fis[i].fattrib & AM_DIR ? ENT_TYPE_DIR : ENT_TYPE_FILE);
+				const u32 nameLen = strlen(fis[i].fname);
 				if(entType == ENT_TYPE_FILE)
 				{
-					if(nameLen <= filterLen || strcmp(filter, fi[i].fname + nameLen - filterLen) != 0)
+					if(nameLen <= filterLen || strcmp(filter, fis[i].fname + nameLen - filterLen) != 0)
 						continue;
 				}
 
 				// nameLen does not include the entry type and NULL termination.
 				if(entBufPos + nameLen + 2 > MAX_ENT_BUF_SIZE) goto scanEnd;
 
-				dList->entBuf[entBufPos] = entType;
-				safeStrcpy(&dList->entBuf[entBufPos + 1], fi[i].fname, 256);
-				dList->ptrs[numEntries++] = &dList->entBuf[entBufPos];
+				char *const entry = &dList->entBuf[entBufPos];
+				*entry = entType;
+				safeStrcpy(&entry[1], fis[i].fname, 256);
+				dList->ptrs[numEntries++] = entry;
 				entBufPos += nameLen + 2;
 			}
 		} while(read == DIR_READ_BLOCKS);
@@ -111,7 +113,7 @@ scanEnd:
 		fCloseDir(dh);
 	}
 
-	free(fi);
+	free(fis);
 
 	qsort(dList->ptrs, dList->num, sizeof(char*), dlistCompare);
 

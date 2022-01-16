@@ -42,7 +42,7 @@
 #define DEFAULT_BRIGHTNESS  (0x30)
 
 /// Converts packed RGB8 to packed RGB565.
-#define RGB8_to_565(r,g,b)  (((b)>>3)&0x1f)|((((g)>>2)&0x3f)<<5)|((((r)>>3)&0x1f)<<11)
+#define RGB8_to_565(r,g,b)  (((((r)>>3) & 0x1f)<<11) | ((((g)>>2) & 0x3f)<<5) | (((b)>>3) & 0x1f))
 
 
 /// Framebuffer format.
