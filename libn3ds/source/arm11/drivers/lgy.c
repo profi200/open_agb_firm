@@ -94,6 +94,24 @@ static void powerDownFcramForLegacy(u8 mode)
 	while(pdn->fcram_cnt & PDN_FCRAM_CNT_CLK_EN_ACK); // Wait until clock is disabled.
 }
 
+// https://stackoverflow.com/a/42340213
+static inline u8 bcd2dec(u8 bcd)
+{
+	return bcd - 6 * (bcd>>4);
+}
+
+// https://en.wikipedia.org/wiki/Determination_of_the_day_of_the_week#Sakamoto's_methods
+static void calcDayOfWeek(GbaRtc *const rtc)
+{
+	u32 y = bcd2dec(rtc->y) + 2000u;
+	u8 m = bcd2dec(rtc->mon);
+	u8 d = bcd2dec(rtc->d);
+
+	static const u8 t[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+	if(m < 3) y--;
+	rtc->dow = (y + (y / 4u) - (y / 100u) + (y / 400u) + t[m - 1] + d) % 7u;
+}
+
 Result LGY_prepareGbaMode(bool directBoot, u16 saveType, const char *const savePath)
 {
 	u32 cmdBuf[4];
@@ -108,7 +126,8 @@ Result LGY_prepareGbaMode(bool directBoot, u16 saveType, const char *const saveP
 	GbaRtc rtc;
 	MCU_getRTCTime((u8*)&rtc);
 	rtc.time = __builtin_bswap32(rtc.time)>>8;
-	rtc.date = __builtin_bswap32(rtc.date)>>8; // TODO: Do we need to set day of week?
+	rtc.date = __builtin_bswap32(rtc.date)>>8;
+	calcDayOfWeek(&rtc);
 	LGY_setGbaRtc(rtc);
 
 	// Setup FCRAM for GBA mode.
