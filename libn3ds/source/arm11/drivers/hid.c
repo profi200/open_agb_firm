@@ -29,6 +29,12 @@
 #include "arm11/drivers/codec.h"
 
 
+#define MCU_HID_IRQ_MASK  (MCU_IRQ_VOL_SLIDER_CHANGE | MCU_IRQ_BATT_CHARGE_START | \
+                           MCU_IRQ_BATT_CHARGE_STOP | MCU_IRQ_SHELL_OPEN | \
+                           MCU_IRQ_SHELL_CLOSE | MCU_IRQ_WIFI_PRESS | \
+                           MCU_IRQ_HOME_RELEASE | MCU_IRQ_HOME_PRESS | \
+                           MCU_IRQ_POWER_HELD | MCU_IRQ_POWER_PRESS)
+
 #define CPAD_THRESHOLD  (400)
 
 
@@ -46,10 +52,10 @@ void hidInit(void)
 	inited = true;
 
 	MCU_init();
-	u8 state = MCU_getExternalHwState();
+	u16 state = MCU_getExternalHardwareStatus();
 	u32 tmp = ~state<<3 & KEY_SHELL;      // Current shell state. Bit is inverted.
 	tmp |= state<<1 & KEY_BAT_CHARGING;   // Current battery charging state
-	state = MCU_getHidHeld();
+	state = MCU_getEarlyButtonsHeld();
 	tmp |= ~state<<1 & KEY_HOME;          // Current HOME button state
 	g_extraKeys = tmp;
 
@@ -58,7 +64,7 @@ void hidInit(void)
 
 static void updateMcuHidState(void)
 {
-	const u32 state = MCU_getEvents(0x40C07F);
+	const u32 state = MCU_getIrqs(MCU_HID_IRQ_MASK);
 	if(state == 0) return;
 
 	u32 tmp = g_extraKeys;

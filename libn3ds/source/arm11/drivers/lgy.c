@@ -124,7 +124,7 @@ Result LGY_prepareGbaMode(bool directBoot, u16 saveType, const char *const saveP
 
 	// Setup GBA Real-Time Clock.
 	GbaRtc rtc;
-	MCU_getRTCTime((u8*)&rtc);
+	MCU_getRtcTimeDate((u8*)&rtc);
 	rtc.time = __builtin_bswap32(rtc.time)>>8;
 	rtc.date = __builtin_bswap32(rtc.date)>>8;
 	calcDayOfWeek(&rtc);

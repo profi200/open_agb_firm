@@ -39,6 +39,11 @@
 #include "kevent.h"
 
 
+#define MCU_LCD_IRQ_MASK  (MCU_IRQ_TOP_BL_ON | MCU_IRQ_TOP_BL_OFF | \
+                           MCU_IRQ_BOT_BL_ON | MCU_IRQ_BOT_BL_OFF | \
+                           MCU_IRQ_LCD_POWER_ON | MCU_IRQ_LCD_POWER_OFF)
+
+
 static struct
 {
 	u32 swap;              // Currently active framebuffer.
@@ -67,7 +72,7 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 
 	// FIXME: Temporary workaround for screen init compatibility (Luma/fb3DS 1.2).
 	TIMER_sleepMs(50);
-	(void)MCU_getEvents(0x3Fu<<24); // Discard any screen init events.
+	(void)MCU_getIrqs(MCU_LCD_IRQ_MASK); // Discard any screen init events.
 
 	getCfg11Regs()->gpuprot = GPUPROT_NO_PROT;
 
@@ -131,10 +136,10 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_UNK00C = 0;      // Starts H-/V-sync control signals?
 	TIMER_sleepMs(10);       // Wait for power supply (which?) to stabilize and LCD drivers to finish resetting.
 	LCDI2C_init();           // Initialize LCD drivers.
-	MCU_controlLCDPower(2u); // Power on LCDs (MCU --> PMIC).
+	MCU_setLcdPower(2u);     // Power on LCDs (MCU --> PMIC).
 	// Timing critical part end.
 	// Wait 50 us for LCD sync. The MCU event wait will cover this.
-	if(MCU_waitEvents(0x3Fu<<24) != 2u<<24) panic();
+	if(MCU_waitIrqs(MCU_LCD_IRQ_MASK) != MCU_IRQ_LCD_POWER_ON) panic();
 
 	// The transfer engine is (sometimes) borked on screen init.
 	// Doing a dummy texture copy fixes it.
@@ -146,8 +151,8 @@ void GFX_init(GfxFbFmt fmtTop, GfxFbFmt fmtBot)
 	REG_LCD_ABL0_LIGHT = 1;
 	REG_LCD_ABL1_LIGHT_PWM = 0x1023E; // TODO: Figure out how this works.
 	REG_LCD_ABL1_LIGHT = 1;
-	MCU_controlLCDPower(0x28u); // Power on backlights.
-	if(MCU_waitEvents(0x3Fu<<24) != 0x28u<<24) panic();
+	MCU_setLcdPower(0x28u); // Power on backlights.
+	if(MCU_waitIrqs(MCU_LCD_IRQ_MASK) != (MCU_IRQ_TOP_BL_ON | MCU_IRQ_BOT_BL_ON)) panic();
 
 	// Make sure the fills finished.
 	GFX_waitForPSC0();
@@ -176,8 +181,8 @@ void GFX_deinit(void)
 	const u8 power = g_gfxState.lcdPower;
 	if(power & ~1u)
 	{
-		MCU_controlLCDPower(power & ~1u);
-		if(MCU_waitEvents(0x3Fu<<24) != (u32)(power & ~1u)<<24) panic();
+		MCU_setLcdPower(power & ~1u);
+		if(MCU_waitIrqs(MCU_LCD_IRQ_MASK) != (u32)(power & ~1u)<<24) panic();
 	}
 	GFX_setBrightness(0, 0);
 	REG_LCD_ABL0_LIGHT_PWM = 0;
@@ -197,8 +202,8 @@ void GFX_deinit(void)
 	// Power off LCDs if on.
 	if(power & 1u)
 	{
-		MCU_controlLCDPower(1u);
-		if(MCU_waitEvents(0x3Fu<<24) != 1u<<24) panic();
+		MCU_setLcdPower(1u);
+		if(MCU_waitIrqs(MCU_LCD_IRQ_MASK) != MCU_IRQ_LCD_POWER_OFF) panic();
 	}
 
 	// TODO: Wait until PDC is not reading any data from mem.
@@ -365,8 +370,8 @@ void GFX_powerOnBacklights(GfxBlight mask)
 	g_gfxState.lcdPower |= mask;
 
 	mask <<= 1;
-	MCU_controlLCDPower(mask); // Power on backlights.
-	if(MCU_waitEvents(0x3Fu<<24) != (u32)mask<<24) panic();
+	MCU_setLcdPower(mask); // Power on backlights.
+	if(MCU_waitIrqs(MCU_LCD_IRQ_MASK) != (u32)mask<<24) panic();
 }
 
 void GFX_powerOffBacklights(GfxBlight mask)
@@ -374,8 +379,8 @@ void GFX_powerOffBacklights(GfxBlight mask)
 	fb_assert((mask & ~GFX_BLIGHT_BOTH) == 0u);
 	g_gfxState.lcdPower &= ~mask;
 
-	MCU_controlLCDPower(mask); // Power off backlights.
-	if(MCU_waitEvents(0x3Fu<<24) != (u32)mask<<24) panic();
+	MCU_setLcdPower(mask); // Power off backlights.
+	if(MCU_waitIrqs(MCU_LCD_IRQ_MASK) != (u32)mask<<24) panic();
 }
 
 void GFX_setBrightness(u8 top, u8 bot)

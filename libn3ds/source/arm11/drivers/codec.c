@@ -431,7 +431,7 @@ static void legacyTouchscreenMode(bool enabled)
 static void headsetInit(void)
 {
 	// Headset detection stuff.
-	GPIO_config(GPIO_2_HEADPH_JACK, GPIO_IRQ_ENABLE | GPIO_EDGE_RISING | GPIO_INPUT); // Headphone jack IRQ.
+	GPIO_config(GPIO_2_HEADPH_JACK, GPIO_IRQ_RISING | GPIO_INPUT); // Headphone jack IRQ.
 	//maskReg(CDC_REG_HEADSET_SEL, GPIO_read(GPIO_2_HEADPH_JACK)<<HEADSET_SEL_HP_SHIFT | HEADSET_SEL_HP_EN, 0x30); // GPIO bitmask 8.
 	maskReg(CDC_REG_HEADSET_SEL, 0, 0x30); // With automatic output switching.
 	maskReg(CDC_REG_100_67, 0, 0x80); // TODO: Can we remove this?

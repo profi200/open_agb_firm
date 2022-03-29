@@ -47,8 +47,8 @@ typedef struct
 	u8 _0x10a[6];
 	vu32 gba_rtc_bcd_date;
 	vu32 gba_rtc_bcd_time;
-	vu32 gba_rtc_hex_time; // Writing bit 7 completely hangs all(?) GBA hardware.
-	vu32 gba_rtc_hex_date;
+	vu32 gba_rtc_toffset;  // Writing bit 7 completely hangs all(?) GBA hardware.
+	vu32 gba_rtc_doffset;
 	vu32 gba_save_timing[4];
 } Lgy;
 static_assert(offsetof(Lgy, gba_save_timing) == 0x120, "Error: Member gba_save_timing of Lgy is not at offset 0x120!");
@@ -138,8 +138,8 @@ Result LGY_setGbaRtc(const GbaRtc rtc)
 
 	//while(lgy->gba_rtc_cnt & LGY_RTC_CNT_BUSY);
 	//lgy->gba_rtc_cnt = 0; // Legacy P9 does this. Useless?
-	lgy->gba_rtc_hex_time = 1u<<15; // Time offset 0 and 24h format.
-	lgy->gba_rtc_hex_date = 0;      // Date offset 0.
+	lgy->gba_rtc_toffset = 1u<<15; // Time offset 0 and 24h format.
+	lgy->gba_rtc_doffset = 0;      // Date offset 0.
 	lgy->gba_rtc_cnt = LGY_RTC_CNT_WR;
 	while(lgy->gba_rtc_cnt & LGY_RTC_CNT_BUSY);
 

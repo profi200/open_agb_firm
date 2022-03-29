@@ -20,6 +20,11 @@
 #include "arm11/drivers/gpio.h"
 
 
+#define GPIO_EDGE_FALLING  (0u)
+#define GPIO_EDGE_RISING   (1u<<1)
+#define GPIO_IRQ_ENABLE    (1u<<2)
+
+
 static vu16 *const g_datRegs[5] = {(vu16*)&REG_GPIO1_DAT, (vu16*)&REG_GPIO2_DAT,
                                    &REG_GPIO2_DAT2, &REG_GPIO3_DAT, &REG_GPIO3_DAT2};
 

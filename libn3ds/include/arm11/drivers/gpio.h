@@ -46,15 +46,15 @@
 #define REG_GPIO3_DAT2  *((     vu16*)(GPIO_REGS_BASE + 0x28)) // WiFi.
 
 
-#define GPIO_INPUT         (0u)
-#define GPIO_OUTPUT        (1u)
-#define GPIO_EDGE_FALLING  (0u)
-#define GPIO_EDGE_RISING   (1u<<1)
-#define GPIO_IRQ_ENABLE    (1u<<2)
+#define GPIO_INPUT           (0u)
+#define GPIO_OUTPUT          (1u)
+#define GPIO_NO_IRQ          (0u)
+#define GPIO_IRQ_FALLING     (1u<<2 | 0u)
+#define GPIO_IRQ_RISING      (1u<<2 | 1u<<1)
 
 
 // bits 3-7 pin number, bits 0-3 reg index.
-#define MAKE_GPIO(pin, reg) ((pin)<<3 | (reg))
+#define MAKE_GPIO(pin, reg)  ((pin)<<3 | (reg))
 
 typedef enum
 {
