@@ -59,19 +59,3 @@ typedef volatile int8_t  vs8;
 typedef volatile int16_t vs16;
 typedef volatile int32_t vs32;
 typedef volatile int64_t vs64;
-
-
-typedef struct
-{
-	u32 data[3];
-} _u96;
-
-typedef struct
-{
-	u32 data[4];
-} _u128;
-
-typedef struct
-{
-	u32 data[16];
-} _u512;

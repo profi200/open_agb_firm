@@ -29,14 +29,17 @@
 #define SHA_REGS_BASE  (IO_MEM_ARM9_ONLY + 0xA000)
 #endif // #ifdef ARM11
 
+// Vectorizing the FIFO improves code generation at the cost of being slightly slower for small data.
+typedef u32 ShaFifo __attribute__((vector_size(64)));
+
 typedef struct
 {
-	vu32 cnt;            // 0x00
-	vu32 blkcnt;         // 0x04
+	vu32 cnt;              // 0x00
+	vu32 blkcnt;           // 0x04
 	u8 _0x8[0x38];
-	vu32 hash[8];        // 0x40
+	vu32 hash[8];          // 0x40
 	u8 _0x60[0x20];
-	volatile _u512 fifo; // 0x80 The FIFO is in the DMA region instead on ARM11.
+	volatile ShaFifo fifo; // 0x80 The FIFO is in the DMA region instead on ARM11.
 } Sha;
 static_assert(offsetof(Sha, fifo) == 0x80, "Error: Member fifo of Sha is not at offset 0x80!");
 
@@ -45,10 +48,10 @@ ALWAYS_INLINE Sha* getShaRegs(void)
 	return (Sha*)SHA_REGS_BASE;
 }
 
-ALWAYS_INLINE volatile _u512* getShaFifo(Sha *const regs)
+ALWAYS_INLINE volatile ShaFifo* getShaFifo(Sha *const regs)
 {
 #if (_3DS && ARM11)
-	return (volatile _u512*)((uintptr_t)regs + 0x200000);
+	return (volatile ShaFifo*)((uintptr_t)regs + 0x200000u);
 #else
 	return &regs->fifo;
 #endif // #if (_3DS && ARM11)
@@ -57,7 +60,7 @@ ALWAYS_INLINE volatile _u512* getShaFifo(Sha *const regs)
 
 // REG_SHA_CNT
 #define SHA_EN           (1u)     // Also used as busy flag.
-#define SHA_FINAL_ROUND  (1u<<1)
+#define SHA_FINAL_ROUND  (1u<<1)  // Final round/add input padding.
 #define SHA_I_DMA_EN     (1u<<2)  // Input DMA enable.
 #define SHA_IN_BIG       (1u<<3)
 #define SHA_IN_LITTLE    (0u)

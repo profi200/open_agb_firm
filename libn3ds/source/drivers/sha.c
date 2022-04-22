@@ -23,34 +23,42 @@
 
 void SHA_getState(u32 *const out);
 
+static inline void waitBusy(const Sha *const sha)
+{
+	while(sha->cnt & SHA_EN);
+}
+
 void SHA_start(u16 params)
 {
 	getShaRegs()->cnt = params | SHA_EN;
 }
 
-// TODO: Possible edge case:
-//       What if we call this with less than 64 bytes size first
-//       and then again with at least 64 bytes?
+// TODO: If we call this with less than 64 bytes first and then with
+//       64 bytes the FIFO triggers a data abort (busy).
 void SHA_update(const u32 *data, u32 size)
 {
 	Sha *const sha = getShaRegs();
-	volatile _u512 *const fifo = getShaFifo(sha);
-	while(size >= 64)
+	volatile ShaFifo *const fifo = getShaFifo(sha);
+	while(size & ~(sizeof(ShaFifo) - 1)) // Optimizes better than while(size > (sizeof(ShaFifo) - 1)).
 	{
-		*fifo = *((const _u512*)data);
-		data += 64 / 4;
-		size -= 64;
-		while(sha->cnt & SHA_EN);
+		waitBusy(sha);
+		*fifo = *((const ShaFifo*)data);
+		data += sizeof(ShaFifo) / sizeof(*data);
+		size -= sizeof(ShaFifo);
 	}
 
-	if(size) iomemcpy((vu32*)fifo, data, size);
+	if(size != 0u)
+	{
+		waitBusy(sha);
+		iomemcpy((vu32*)fifo, data, size);
+	}
 }
 
 void SHA_finish(u32 *const hash, u16 endianess)
 {
 	Sha *const sha = getShaRegs();
 	sha->cnt = (sha->cnt & SHA_MODE_MASK) | endianess | SHA_FINAL_ROUND;
-	while(sha->cnt & SHA_EN);
+	waitBusy(sha); // We don't need to wait on the SHA_FINAL_ROUND bit (tested).
 
 	SHA_getState(hash);
 }
@@ -68,7 +76,7 @@ void SHA_getState(u32 *const out)
 			size = 28;
 			break;
 		case SHA_1_MODE:
-		default:           // 2 and 3 are both SHA1.
+		default:           // 2 and 3 SHA1.
 			size = 20;
 	}
 
