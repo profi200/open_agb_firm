@@ -185,19 +185,16 @@ u8 MCU_getVolumeSliderPosition(void)
 	return MCU_readReg(MCU_REG_VOL_SLIDER);
 }
 
-u8 MCU_getBatteryTemperature(void)
+s8 MCU_getBatteryTemperature(void)
 {
-	return MCU_readReg(MCU_REG_BATT_TEMP);
+	return (s8)MCU_readReg(MCU_REG_BATT_TEMP);
 }
 
-float MCU_getBatteryLevel(void)
+u8 MCU_getBatteryLevel(void)
 {
-	u8 buf[2];
-
-	// Read integer and fractional bytes at once.
-	if(!MCU_readRegBuf(MCU_REG_BATT_LEVEL, buf, sizeof(buf))) return NAN;
-
-	return buf[0] + (float)buf[1] / 256u; // TODO: Verify this.
+	// The fractional part of the percentage is borderline useless.
+	// It has varying accuracy and is stuck at 0 near 1%.
+	return MCU_readReg(MCU_REG_BATT_LEVEL);
 }
 
 float MCU_getBatteryVoltage(void)

@@ -183,14 +183,14 @@ u8 MCU_getVolumeSliderPosition(void);
  *
  * @return     { description_of_the_return_value }
  */
-u8 MCU_getBatteryTemperature(void);
+s8 MCU_getBatteryTemperature(void);
 
 /**
  * @brief      { function_description }
  *
  * @return     { description_of_the_return_value }
  */
-float MCU_getBatteryLevel(void);
+u8 MCU_getBatteryLevel(void);
 
 /**
  * @brief      { function_description }
