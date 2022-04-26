@@ -22,6 +22,7 @@
 #include "drivers/lgy.h"
 #include "drivers/pxi.h"
 #include "ipc_handler.h"
+#include "util.h"
 #include "arm11/drivers/hid.h"
 #include "arm11/drivers/interrupt.h"
 #include "drivers/cache.h"
@@ -94,12 +95,6 @@ static void powerDownFcramForLegacy(u8 mode)
 	while(pdn->fcram_cnt & PDN_FCRAM_CNT_CLK_EN_ACK); // Wait until clock is disabled.
 }
 
-// https://stackoverflow.com/a/42340213
-static inline u8 bcd2dec(u8 bcd)
-{
-	return bcd - 6 * (bcd>>4);
-}
-
 // https://en.wikipedia.org/wiki/Determination_of_the_day_of_the_week#Sakamoto's_methods
 static void calcDayOfWeek(GbaRtc *const rtc)
 {
@@ -110,6 +105,17 @@ static void calcDayOfWeek(GbaRtc *const rtc)
 	static const u8 t[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
 	if(m < 3) y--;
 	rtc->dow = (y + (y / 4u) - (y / 100u) + (y / 400u) + t[m - 1] + d) % 7u;
+}
+
+// Extra safety check just in case.
+static_assert(sizeof(GbaRtc) >= sizeof(RtcTimeDate), "GbaRtc is not bigger or same size as RtcTimeDate!");
+static void mcuTimeDateToGbaRtc(GbaRtc *const rtc)
+{
+	// Lazy conversion.
+	MCU_getRtcTimeDate((RtcTimeDate*)rtc);
+	rtc->time = __builtin_bswap32(rtc->time)>>8;
+	rtc->date = __builtin_bswap32(rtc->date)>>8;
+	calcDayOfWeek(rtc);
 }
 
 Result LGY_prepareGbaMode(bool directBoot, u16 saveType, const char *const savePath)
@@ -124,10 +130,7 @@ Result LGY_prepareGbaMode(bool directBoot, u16 saveType, const char *const saveP
 
 	// Setup GBA Real-Time Clock.
 	GbaRtc rtc;
-	MCU_getRtcTimeDate((u8*)&rtc);
-	rtc.time = __builtin_bswap32(rtc.time)>>8;
-	rtc.date = __builtin_bswap32(rtc.date)>>8;
-	calcDayOfWeek(&rtc);
+	mcuTimeDateToGbaRtc(&rtc);
 	LGY_setGbaRtc(rtc);
 
 	// Setup FCRAM for GBA mode.

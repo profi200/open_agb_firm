@@ -95,3 +95,9 @@ static inline u32 nextPow2(u32 val)
 	// Everything else is undefined behavior.
 	return 1u<<(32u - __builtin_clzl(val - 1));
 }
+
+// https://stackoverflow.com/a/42340213
+static inline u8 bcd2dec(const u8 bcd)
+{
+    return bcd - 6u * (bcd>>4);
+}
