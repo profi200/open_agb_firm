@@ -40,23 +40,23 @@
 // We lose about 5 ms of time on init by using 261 kHz.
 #ifdef _3DS
 #ifdef ARM9
-#define DELAY_MULT   (1u) // Assumes ARM9 timer. Same speed as controller.
+// TODO: Use a timer instead? The delay is only a few hundred us though.
+#define INIT_DELAY_FUNC()  wait_cycles(2 * 256 * 74)       // ARM9 timer clock = controller clock. CPU is x2 timer freqency.
 #elif ARM11
-#define DELAY_MULT   (2u) // Assumes ARM11 timer. 2x controller speed.
+#define INIT_DELAY_FUNC()  TIMER_sleepTicks(2 * 256 * 74); // ARM11 timer is x2 controller clock.
 #endif // #ifdef ARM9
 
-#define INIT_CLOCK   (1u<<6) // 261 kHz
-#define INIT_DELAY   (DELAY_MULT * 256 * 74)
-
-#define SDR12_CLOCK  (1u) // 16.756991 MHz
-#define SDR25_CLOCK  (0u) // 33.513982 MHz
+#define INIT_CLOCK     (1u<<6) // 261 kHz (maximum 400 kHz).
+#define DEFAULT_CLOCK  (1u)    // 16.756991 MHz (maximum 20 MHz).
+#define HS_CLOCK       (0u)    // 33.513982 MHz (maximum 50 MHz).
 
 #elif TWL
 
-#define INIT_CLOCK   (1u<<5)         // 261 kHz
-#define INIT_DELAY   (1u * 128 * 74) // Assumes ARM9 timers. Same speed as controller.
+//#define INIT_DELAY     (1u * 128 * 74) // Assumes ARM9 timers. Same clock as controller.
+#error "SD/MMC necessary delay unimplemented."
 
-#define SDR12_CLOCK  (0u) // 16.756991 MHz
+#define INIT_CLOCK     (1u<<5) // 261 kHz (maximum 400 kHz).
+#define DEFAULT_CLOCK  (0u)    // 16.756991 MHz (maximum 20 MHz).
 #endif // #ifdef _3DS
 
 
@@ -181,10 +181,10 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const cardTypeOut)
 		// TODO: From sd.c in Linux:
 		// "Some SD cards claims an out of spec VDD voltage range.
 		//  Let's treat these bits as being in-valid and especially also bit7."
-		if(!(ocr & SD_OCR_VOLT_MASK)) return SDMMC_ERR_VOLT_SUPPORT;
+		if(!(ocr & SD_OCR_VOLT_MASK)) return SDMMC_ERR_VOLT_SUPPORT; // Voltage not supported.
 		if(ocr & SD_OCR_CCS) cardType = CTYPE_SDHC;
 	}
-	else // (e)MMC
+	else // (e)MMC.
 	{
 		// Loop until a timeout of 1 second or the card is ready.
 		u32 tries = 200;
@@ -289,8 +289,6 @@ static void parseCsd(SdmmcDev *const dev, const u8 cardType)
 	if(structure == 0 || cardType == CTYPE_MMC)
 	{
 		// Same calculation for SDSC and (e)MMC <=2 GB.
-		// TODO: https://github.com/torvalds/linux/blob/master/drivers/mmc/core/sd.c#L129
-		//       This doesn't work? Always calculates half of the expected sectors.
 		const u32 read_bl_len = UNSTUFF_BITS(csd, 80, 4);  // [83:80]
 		const u32 c_size      = UNSTUFF_BITS(csd, 62, 12); // [73:62]
 		const u32 c_size_mult = UNSTUFF_BITS(csd, 47, 3);  // [49:47]
@@ -363,14 +361,16 @@ static u32 initTranState(SdmmcDev *const dev, const u8 cardType, const u32 rca)
 			const u32 arg = SD_SWITCH_FUNC_ARG(1, 0xF, 0xF, 0xF, 1);
 			res = TOSHSD_sendCommand(port, SD_SWITCH_FUNC, arg);
 			if(res != 0) return SDMMC_ERR_SWITCH_HS;
+
+			// Restore default 512 bytes block length.
 			TOSHSD_setBlockLen(port, 512);
 
 			// [415:400] Support Bits of Functions in Function Group 1.
-			if(switchStat[63 - 400 / 8] & 1u<<1) // Is group 1, function 1 "SDR25" supported?
+			if(switchStat[63 - 400 / 8] & 1u<<1) // Is group 1, function 1 "High-Speed" supported?
 			{
-				// SDR25 (50 MHz) supported. Switch to highest supported clock.
-				// Stop clock at idle. 33 MHz.
-				TOSHSD_setClock(port, (1u<<9) | (1u<<8) | SDR25_CLOCK);
+				// High-Speed (max. 50 MHz at 3.3V) supported. Switch to highest supported clock.
+				// Stop clock at idle, High-speed clock.
+				TOSHSD_setClock(port, (1u<<9) | (1u<<8) | HS_CLOCK);
 			}
 		}
 #endif
@@ -388,12 +388,13 @@ static u32 initTranState(SdmmcDev *const dev, const u8 cardType, const u32 rca)
 			TOSHSD_setBusWidth(port, 4);
 
 #ifndef TWL
-			// Switch to high speed timing (52 MHz).
+			// Switch to high speed timing (max. 52 MHz).
 			arg = MMC_SWITCH_ARG(MMC_SWITCH_ACC_WR_BYTE, 185, 1, 0);
 			res = TOSHSD_sendCommand(port, MMC_SWITCH, arg);
 			if(res != 0) return SDMMC_ERR_SWITCH_HS;
-			// Stop clock at idle. 33 MHz.
-			TOSHSD_setClock(port, (1u<<9) | (1u<<8) | SDR25_CLOCK);
+
+			// Stop clock at idle, High-speed clock.
+			TOSHSD_setClock(port, (1u<<9) | (1u<<8) | HS_CLOCK);
 #endif
 
 			// We also should check in the ext CSD the power budget for the card.
@@ -427,18 +428,8 @@ u32 SDMMC_init(u8 devNum)
 
 	// TODO: When does the card detection timer start? Does not restart on controller reset.
 	TOSHSD_initPort(port, dev2portNum(devNum));
-	TOSHSD_setClock(port, (1u<<8) | INIT_CLOCK); // Continuous clock, 261/523 kHz.
-#ifdef _3DS
-#ifdef ARM9
-	// TODO: Use a timer instead? The delay is only a few hundred us though.
-	wait_cycles(2 * INIT_DELAY); // CPU is 2x timer freqency.
-#elif ARM11
-	// TODO: Is it worth using a timer? The delay is only a few hundred us.
-	TIMER_sleepTicks(INIT_DELAY);
-#endif // #ifdef ARM9
-#elif TWL
-#error "SD/MMC necessary delay unimplemented."
-#endif // #ifdef _3DS
+	TOSHSD_setClock(port, (1u<<8) | INIT_CLOCK); // Continuous clock, init clock.
+	INIT_DELAY_FUNC();
 
 	u32 res = goIdleState(port);
 	if(res != 0) return res;
@@ -448,7 +439,7 @@ u32 SDMMC_init(u8 devNum)
 	res = initIdleState(port, &cardType);
 	if(res != 0) return res;
 
-	// Stop clock at idle. 261/523 kHz.
+	// Stop clock at idle, init clock.
 	TOSHSD_setClock(port, (1u<<9) | (1u<<8) | INIT_CLOCK);
 
 	// SD/(e)MMC now in ready state (ready).
@@ -460,16 +451,16 @@ u32 SDMMC_init(u8 devNum)
 	res = initIdentState(dev, cardType, &rca);
 	if(res != 0) return res;
 
-	// Maximum at this point would be 25 MHz for SD and 20 for (e)MMC.
+	// Maximum at this point would be 20 MHz for (e)MMC and 25 for SD.
 	// SD: We can increase the clock after end of identification state.
 	// TODO: eMMC spec section 7.6
 	// "Until the contents of the CSD register is known by the host,
 	// the fPP clock rate must remain at fOD. (See Section 12.7 on page 176.)"
 	// Since the absolute minimum clock rate is 20 MHz and we are in push-pull
-	// mode already can we cheat and switch to 16 MHz before getting the CSD?
+	// mode already can we cheat and switch to <=20 MHz before getting the CSD?
 	// Note: This seems to be working just fine in all tests.
-	// Stop clock at idle. 16 MHz.
-	TOSHSD_setClock(port, (1u<<9) | (1u<<8) | SDR12_CLOCK);
+	// Stop clock at idle, default clock.
+	TOSHSD_setClock(port, (1u<<9) | (1u<<8) | DEFAULT_CLOCK);
 
 	// SD/(e)MMC now in stand-by state (stby).
 	res = initStandbyState(dev, cardType, rca);
@@ -496,6 +487,7 @@ u32 SDMMC_deinit(u8 devNum)
 	return SDMMC_ERR_NONE;
 }
 
+// TODO: Less controller dependent code.
 void SDMMC_getCardInfo(u8 devNum, SdmmcInfo *const infoOut)
 {
 	if(devNum > SDMMC_DEV_eMMC) return;
