@@ -18,6 +18,7 @@
 
  @ Based on https://github.com/AuroraWright/Luma3DS/blob/master/arm9/source/alignedseqmemcpy.s
 
+.syntax unified
 .arm
 .cpu arm946e-s
 .fpu softvfp
@@ -53,11 +54,11 @@ kmemcpy_test_words:
 		bne    kmemcpy_words_lp
 kmemcpy_halfword_byte:
 	tst     r2, #2
-	ldrneh  r3, [r1], #2
-	strneh  r3, [r0], #2
+	ldrhne  r3, [r1], #2
+	strhne  r3, [r0], #2
 	tst     r2, #1
-	ldrneb  r3, [r1]
-	strneb  r3, [r0]
+	ldrbne  r3, [r1]
+	strbne  r3, [r0]
 	bx      lr
 
 
@@ -95,7 +96,7 @@ kmemset_test_words:
 		bne    kmemset_words_lp
 kmemset_halfword_byte:
 	tst     r2, #2
-	strneh  r1, [r0], #2
+	strhne  r1, [r0], #2
 	tst     r2, #1
-	strneb  r1, [r0]
+	strbne  r1, [r0]
 	bx      lr

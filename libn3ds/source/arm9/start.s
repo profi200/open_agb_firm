@@ -19,6 +19,7 @@
 #include "arm.h"
 #include "mem_map.h"
 
+.syntax unified
 .cpu arm946e-s
 .fpu softvfp
 

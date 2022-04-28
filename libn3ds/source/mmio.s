@@ -20,6 +20,7 @@
 
 #include "asm_macros.h"
 
+.syntax unified
 .cpu arm946e-s
 .fpu softvfp
 
@@ -46,11 +47,11 @@ iomemcpy_test_words:
 		bne    iomemcpy_words_lp
 iomemcpy_halfword_byte:
 	tst     r2, #2
-	ldrneh  r3, [r1], #2
-	strneh  r3, [r0], #2
+	ldrhne  r3, [r1], #2
+	strhne  r3, [r0], #2
 	tst     r2, #1
-	ldrneb  r3, [r1]
-	strneb  r3, [r0]
+	ldrbne  r3, [r1]
+	strbne  r3, [r0]
 	bx      lr
 END_ASM_FUNC
 
@@ -81,8 +82,8 @@ iomemset_test_words:
 		bne    iomemset_words_lp
 iomemset_halfword_byte:
 	tst     r2, #2
-	strneh  r1, [r0], #2
+	strhne  r1, [r0], #2
 	tst     r2, #1
-	strneb  r1, [r0]
+	strbne  r1, [r0]
 	bx      lr
 END_ASM_FUNC

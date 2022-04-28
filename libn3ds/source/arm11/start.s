@@ -20,6 +20,7 @@
 #include "mem_map.h"
 #include "arm11/drivers/performance_monitor.h"
 
+.syntax unified
 .cpu mpcore
 .fpu vfpv2
 

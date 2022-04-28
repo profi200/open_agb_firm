@@ -18,6 +18,7 @@
 
 #include "asm_macros.h"
 
+.syntax unified
 .arm
 .cpu mpcore
 .fpu vfpv2

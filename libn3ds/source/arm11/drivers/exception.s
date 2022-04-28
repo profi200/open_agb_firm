@@ -20,6 +20,7 @@
 #include "arm.h"
 #include "mem_map.h"
 
+.syntax unified
 .cpu mpcore
 .fpu vfpv2
 
