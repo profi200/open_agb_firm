@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "asm_macros.h"
 #include "arm.h"
 #include "mem_map.h"
 
@@ -23,32 +24,11 @@
 .cpu arm946e-s
 .fpu softvfp
 
-.macro BEGIN_ASM_FUNC name, type=arm, linkage=global
-.if \type == thumb
-	.align          1
-	.thumb
-.else
-	.align          2
-	.arm
-.endif
-	.\linkage       \name
-	.type           \name, %function
-	.func           \name
-	.cfi_sections   .debug_frame
-	.cfi_startproc
-\name:
-.endm
-
-.macro END_ASM_FUNC
-	.cfi_endproc
-	.endfunc
-.endm
-
 .section .crt0, "ax", %progbits
 
 
 
-BEGIN_ASM_FUNC _start
+BEGIN_ASM_FUNC _start no_section
 	msr cpsr_cxsf, #PSR_INT_OFF | PSR_SVC_MODE
 
 	@ Control register:
@@ -121,7 +101,7 @@ END_ASM_FUNC
 
 #define MAKE_BRANCH(src, dst) (0xEA000000 | (((((dst) - (src)) >> 2) - 2) & 0xFFFFFF))
 
-BEGIN_ASM_FUNC setupExceptionVectors
+BEGIN_ASM_FUNC setupExceptionVectors no_section
 	adr r0, _vectorStubs
 	ldr r1, =A9_VECTORS_START
 	ldmia r0!, {r2-r9}
@@ -147,7 +127,7 @@ _vectorStubs:
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC setupTcms
+BEGIN_ASM_FUNC setupTcms no_section
 	ldr r1, =(ITCM_BASE | 0x24) @ Base = 0x00000000, size = 128 MiB (32 KiB mirrored)
 	ldr r0, =(DTCM_BASE | 0x0A) @ Base = 0xFFF00000, size = 16 KiB
 	mcr p15, 0, r0, c9, c1, 0   @ Write DTCM region reg
@@ -193,7 +173,7 @@ END_ASM_FUNC
 #define MAKE_PERMISSIONS(r0, r1, r2, r3, r4, r5, r6, r7) \
         ((r0) | (r1<<4) | (r2<<8) | (r3<<12) | (r4<<16) | (r5<<20) | (r6<<24) | (r7<<28))
 
-BEGIN_ASM_FUNC setupMpu
+BEGIN_ASM_FUNC setupMpu no_section
 	adr r0, _mpu_regions        @ Table at end of file
 	ldm r0, {r1-r10}
 	mcr p15, 0, r1, c6, c0, 0   @ Write MPU region reg 0-7
@@ -299,12 +279,12 @@ END_ASM_FUNC
 
 
 @ Needed by libc
-BEGIN_ASM_FUNC _init, thumb
+BEGIN_ASM_FUNC _init no_section thumb
 	bx lr
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC deinitCpu
+BEGIN_ASM_FUNC deinitCpu no_section
 	mov r3, lr
 
 	msr cpsr_cxsf, #PSR_INT_OFF | PSR_SYS_MODE

@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "asm_macros.h"
 #include "arm.h"
 #include "mem_map.h"
 #include "arm11/drivers/performance_monitor.h"
@@ -24,32 +25,11 @@
 .cpu mpcore
 .fpu vfpv2
 
-.macro BEGIN_ASM_FUNC name, type=arm, linkage=global
-.if \type == thumb
-	.align          1
-	.thumb
-.else
-	.align          2
-	.arm
-.endif
-	.\linkage       \name
-	.type           \name, %function
-	.func           \name
-	.cfi_sections   .debug_frame
-	.cfi_startproc
-\name:
-.endm
-
-.macro END_ASM_FUNC
-	.cfi_endproc
-	.endfunc
-.endm
-
 .section .crt0, "ax", %progbits
 
 
 
-BEGIN_ASM_FUNC vectors
+BEGIN_ASM_FUNC vectors no_section
 	ldr pc, resetHandlerPtr         @ Reset vector
 	ldr pc, undefInstrHandlerPtr    @ Undefined instruction vector
 	udf #3                          @ Software interrupt (SVC) vector
@@ -68,7 +48,7 @@ BEGIN_ASM_FUNC vectors
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC _start
+BEGIN_ASM_FUNC _start no_section
 	cpsid aif, #PSR_SVC_MODE
 
 	@ Control register:
@@ -158,7 +138,7 @@ END_ASM_FUNC
 
 #define MAKE_BRANCH(src, dst) (0xEA000000 | (((((dst) - (src)) >> 2) - 2) & 0xFFFFFF))
 
-BEGIN_ASM_FUNC stubExceptionVectors
+BEGIN_ASM_FUNC stubExceptionVectors no_section
 	ldr r0, =A11_VECTORS_START
 	ldr r2, =MAKE_BRANCH(0, 0)  @ Endless loop
 	mov r1, #6
@@ -172,7 +152,7 @@ BEGIN_ASM_FUNC stubExceptionVectors
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC setupVfp
+BEGIN_ASM_FUNC setupVfp no_section
 	mov r0, #0xF00000           @ Give full access to cp10/11 in user and privileged mode
 	mov r1, #0
 	mcr p15, 0, r0, c1, c0, 2   @ Write Coprocessor Access Control Register
@@ -185,12 +165,12 @@ BEGIN_ASM_FUNC setupVfp
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC _init, thumb
+BEGIN_ASM_FUNC _init no_section thumb
 	bx lr
 END_ASM_FUNC
 
 
-BEGIN_ASM_FUNC deinitCpu
+BEGIN_ASM_FUNC deinitCpu no_section
 	mov r3, lr
 
 	cpsid aif, #PSR_SYS_MODE

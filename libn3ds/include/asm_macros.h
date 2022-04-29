@@ -23,14 +23,20 @@
 #endif
 
 
-.macro BEGIN_ASM_FUNC name, type=arm, linkage=global, section=text
+.macro BEGIN_ASM_FUNC name, section=text, type=arm, linkage=global
+.if \section == no_section
+	@ Section specified elsewhere.
+.else
 	.section        .\section\().\name, "ax", %progbits
+.endif
 .if \type == thumb
 	.align          1
 	.thumb
-.else
+.elseif \type == arm
 	.align          2
 	.arm
+.else
+	.error "Invalid code type!"
 .endif
 	.\linkage       \name
 	.type           \name, %function
