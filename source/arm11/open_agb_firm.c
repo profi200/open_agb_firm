@@ -155,17 +155,16 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	FHandle f;
 	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
 	{
-		u32 fileSize;
-		if((fileSize = fSize(f)) <= MAX_ROM_SIZE)
+		u32 fileSize = fSize(f);
+		if(fileSize > MAX_ROM_SIZE)
 		{
-			u8 *ptr = (u8*)ROM_LOC;
-			u32 read;
-			while((res = fRead(f, ptr, 0x100000u, &read)) == RES_OK && read == 0x100000u)
-				ptr += 0x100000u;
-
-			*romSizeOut = fixRomPadding(fileSize);
+			fileSize = MAX_ROM_SIZE;
+			ee_puts("Warning: ROM file is too big. Expect crashes.");
 		}
-		else res = RES_ROM_TOO_BIG;
+
+		u32 read;
+		res = fRead(f, (u8*)ROM_LOC, fileSize, &read);
+		if(read == fileSize) *romSizeOut = fixRomPadding(fileSize);
 
 		fClose(f);
 	}
