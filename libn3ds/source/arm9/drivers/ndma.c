@@ -23,7 +23,7 @@
 #include "arm.h"
 
 
-#define MAX_BURST_WORDS  (5u) // In log2. 5 is 32 words (128 bytes).
+#define MAX_BURST_WORDS  (4u) // In log2. 4 is 16 words (64 bytes).
 
 
 
@@ -43,17 +43,17 @@ void NDMA_init(void)
 	REG_NDMA_GCNT = NDMA_ROUND_ROBIN(32) | NDMA_REG_READBACK;
 }
 
-void NDMA_copy(u32 *dest, const u32 *source, u32 size)
+void NDMA_copy(u32 *const dst, const u32 *const src, u32 size)
 {
-	fb_assert(((u32)dest >= ITCM_BOOT9_MIRROR + ITCM_SIZE) && (((u32)dest < DTCM_BASE) || ((u32)dest >= DTCM_BASE + DTCM_SIZE)));
-	fb_assert(((u32)source >= ITCM_BOOT9_MIRROR + ITCM_SIZE) && (((u32)source < DTCM_BASE) || ((u32)source >= DTCM_BASE + DTCM_SIZE)));
+	fb_assert(((u32)dst >= ITCM_BOOT9_MIRROR + ITCM_SIZE) && (((u32)dst < DTCM_BASE) || ((u32)dst >= DTCM_BASE + DTCM_SIZE)));
+	fb_assert(((u32)src >= ITCM_BOOT9_MIRROR + ITCM_SIZE) && (((u32)src < DTCM_BASE) || ((u32)src >= DTCM_BASE + DTCM_SIZE)));
 
 	size /= 4; // Sizes need to be in words.
 
 	// TODO: Test iomemcpy() with struct vs. setting the regs manually.
 	NdmaCh *const ndmaCh = getNdmaChRegs(7);
-	ndmaCh->sad  = (u32)source;
-	ndmaCh->dad  = (u32)dest;
+	ndmaCh->sad  = (const u32)src;
+	ndmaCh->dad  = (const u32)dst;
 	ndmaCh->wcnt = size;
 	ndmaCh->bcnt = NDMA_FASTEST;
 
@@ -68,14 +68,14 @@ void NDMA_copy(u32 *dest, const u32 *source, u32 size)
 	} while(ndmaCh->cnt & NDMA_EN);
 }
 
-void NDMA_fill(u32 *dest, u32 value, u32 size)
+void NDMA_fill(u32 *const dst, const u32 value, u32 size)
 {
-	fb_assert(((u32)dest >= ITCM_BOOT9_MIRROR + ITCM_SIZE) && (((u32)dest < DTCM_BASE) || ((u32)dest >= DTCM_BASE + DTCM_SIZE)));
+	fb_assert(((u32)dst >= ITCM_BOOT9_MIRROR + ITCM_SIZE) && (((u32)dst < DTCM_BASE) || ((u32)dst >= DTCM_BASE + DTCM_SIZE)));
 
 	size /= 4; // Sizes need to be in words.
 
 	NdmaCh *const ndmaCh = getNdmaChRegs(7);
-	ndmaCh->dad   = (u32)dest;
+	ndmaCh->dad   = (const u32)dst;
 	ndmaCh->wcnt  = size;
 	ndmaCh->bcnt  = NDMA_FASTEST;
 	ndmaCh->fdata = value;

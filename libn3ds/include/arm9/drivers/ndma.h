@@ -132,17 +132,17 @@ void NDMA_init(void);
 /**
  * @brief      Copies data using the NDMA engine.
  *
- * @param      dest    Pointer to destination memory. Must be 4 bytes aligned.
- * @param      source  Pointer to source data. Must be 4 bytes aligned.
- * @param[in]  size    The size of the data. Must be multiple of 4.
+ * @param      dst   Pointer to destination memory. Must be 4 bytes aligned.
+ * @param      src   Pointer to source data. Must be 4 bytes aligned.
+ * @param[in]  size  The size of the data. Must be multiple of 4.
  */
-void NDMA_copy(u32 *dest, const u32 *source, u32 size);
+void NDMA_copy(u32 *const dst, const u32 *const src, u32 size);
 
 /**
  * @brief      Fills memory with the given value using the NDMA engine.
  *
- * @param      dest   Pointer to destination memory. Must be 4 bytes aligned.
+ * @param      dst    Pointer to destination memory. Must be 4 bytes aligned.
  * @param[in]  value  The value each 32-bit word will be set to.
  * @param[in]  size   The size of the memory to fill. Must be multiple of 4.
  */
-void NDMA_fill(u32 *dest, u32 value, u32 size);
+void NDMA_fill(u32 *const dst, const u32 value, u32 size);
