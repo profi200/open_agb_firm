@@ -43,7 +43,7 @@ DSTATUS disk_initialize (
 {
 	(void)pdrv;
 
-	return (SDMMC_init(SDMMC_DEV_SLOT) == RES_OK ? 0u : STA_NOINIT);
+	return (SDMMC_init(SDMMC_DEV_CARD) == RES_OK ? 0u : STA_NOINIT);
 }
 
 
@@ -79,7 +79,7 @@ DRESULT disk_read (
 		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE | // TODO: IRQ enable missing?
 		               NDMA_BURST(64u / 4) | NDMA_SAD_FIX | NDMA_DAD_INC;
 
-		if(SDMMC_readSectors(SDMMC_DEV_SLOT, sector, NULL, blockCount))
+		if(SDMMC_readSectors(SDMMC_DEV_CARD, sector, NULL, blockCount))
 		{
 			ndmaCh->cnt = 0; // Stop DMA on error.
 			return RES_ERROR;
@@ -132,7 +132,7 @@ DRESULT disk_write (
 		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE | // TODO: IRQ enable missing?
 		               NDMA_BURST(64u / 4) | NDMA_SAD_INC | NDMA_DAD_FIX;
 
-		if(SDMMC_writeSectors(SDMMC_DEV_SLOT, sector, NULL, blockCount))
+		if(SDMMC_writeSectors(SDMMC_DEV_CARD, sector, NULL, blockCount))
 		{
 			ndmaCh->cnt = 0; // Stop DMA on error.
 			return RES_ERROR;
@@ -170,7 +170,7 @@ DRESULT disk_ioctl (
 	switch(cmd)
 	{
 		case GET_SECTOR_COUNT:
-			*(DWORD*)buff = SDMMC_getSectors(SDMMC_DEV_SLOT);
+			*(DWORD*)buff = SDMMC_getSectors(SDMMC_DEV_CARD);
 			break;
 		case GET_SECTOR_SIZE:
 			*(WORD*)buff = 512u;

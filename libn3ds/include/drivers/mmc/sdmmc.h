@@ -51,7 +51,7 @@ enum
 // SD/MMC device numbers.
 enum
 {
-	SDMMC_DEV_SLOT = 0, // SD card/MMC slot.
+	SDMMC_DEV_CARD = 0, // SD card/MMC.
 	SDMMC_DEV_eMMC = 1  // Builtin eMMC.
 };
 

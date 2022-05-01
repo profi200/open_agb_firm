@@ -34,7 +34,7 @@
 
 static void toshsdIsr(UNUSED u32 id)
 {
-	Toshsd *const regs = getToshsdRegs(TOSHSD_SLOT_PORT / 2u);
+	Toshsd *const regs = getToshsdRegs(TOSHSD_CARD_PORT / 2u);
 	regs->sd_status = ~(STATUS_INSERT | STATUS_REMOVE);
 	// TODO: Some kind of event to notify the main loop.
 }
@@ -44,7 +44,7 @@ void TOSHSD_init(void)
 #if (_3DS && ARM9)
 	// Note: The power bits don't affect regular card detect. Port remapping does.
 	// TODO: Can we switch controllers/ports glitch-free?
-	const u32 slotPort = (TOSHSD_SLOT_PORT == 2u ? SDMMCCTL_SLOT_TOSHSD3_SEL : SDMMCCTL_SLOT_TOSHSD1_SEL);
+	const u32 slotPort = (TOSHSD_CARD_PORT == 2u ? SDMMCCTL_SLOT_TOSHSD3_SEL : SDMMCCTL_SLOT_TOSHSD1_SEL);
 	const u32 c2Map = (TOSHSD_C2_MAP == 1u ? SDMMCCTL_TOSHSD3_MAP11 : SDMMCCTL_TOSHSD3_MAP9);
 	getCfg9Regs()->sdmmcctl = slotPort | c2Map | SDMMCCTL_UNK_BIT6;
 #endif // #if (_3DS && ARM9)
@@ -134,12 +134,12 @@ static void setPort(Toshsd *const regs, const ToshsdPort *const port)
 
 bool TOSHSD_cardDetected(void)
 {
-	return getToshsdRegs(TOSHSD_SLOT_PORT / 2u)->sd_status & STATUS_DETECT;
+	return getToshsdRegs(TOSHSD_CARD_PORT / 2u)->sd_status & STATUS_DETECT;
 }
 
 bool TOSHSD_cardSliderUnlocked(void)
 {
-	return getToshsdRegs(TOSHSD_SLOT_PORT / 2u)->sd_status & STATUS_NO_WRPROT;
+	return getToshsdRegs(TOSHSD_CARD_PORT / 2u)->sd_status & STATUS_NO_WRPROT;
 }
 
 // TODO: Clock in Hz?

@@ -413,7 +413,7 @@ static u32 initTranState(SdmmcDev *const dev, const u8 cardType, const u32 rca)
 
 static inline u8 dev2portNum(u8 devNum)
 {
-	return (devNum == SDMMC_DEV_eMMC ? TOSHSD_eMMC_PORT : TOSHSD_SLOT_PORT);
+	return (devNum == SDMMC_DEV_eMMC ? TOSHSD_eMMC_PORT : TOSHSD_CARD_PORT);
 }
 
 // TODO: In many places we also want to check the card's response.
