@@ -41,26 +41,26 @@
 #ifdef _3DS
 #ifdef ARM9
 // TODO: Use a timer instead? The delay is only a few hundred us though.
-#define INIT_DELAY_FUNC()  wait_cycles(2 * 256 * 74)       // ARM9 timer clock = controller clock. CPU is x2 timer freqency.
+#define INIT_DELAY_FUNC()  wait_cycles(2 * 256 * 74)      // ARM9 timer clock = controller clock. CPU is x2 timer clock.
 #elif ARM11
-#define INIT_DELAY_FUNC()  TIMER_sleepTicks(2 * 256 * 74); // ARM11 timer is x2 controller clock.
+#define INIT_DELAY_FUNC()  TIMER_sleepTicks(2 * 256 * 74) // ARM11 timer is x2 controller clock.
 #endif // #ifdef ARM9
 
-#define INIT_CLOCK     (1u<<6) // 261 kHz (maximum 400 kHz).
-#define DEFAULT_CLOCK  (1u)    // 16.756991 MHz (maximum 20 MHz).
-#define HS_CLOCK       (0u)    // 33.513982 MHz (maximum 50 MHz).
+#define INIT_CLOCK     (SD_CLK_DIV_256)                 // 261 kHz (maximum 400 kHz).
+#define DEFAULT_CLOCK  (SD_CLK_AUTO_OFF | SD_CLK_DIV_4) // 16.756991 MHz (maximum 20 MHz).
+#define HS_CLOCK       (SD_CLK_AUTO_OFF | SD_CLK_DIV_2) // 33.513982 MHz (maximum 50 MHz).
 
 #elif TWL
 
 //#define INIT_DELAY     (1u * 128 * 74) // Assumes ARM9 timers. Same clock as controller.
 #error "SD/MMC necessary delay unimplemented."
 
-#define INIT_CLOCK     (1u<<5) // 261 kHz (maximum 400 kHz).
-#define DEFAULT_CLOCK  (0u)    // 16.756991 MHz (maximum 20 MHz).
+#define INIT_CLOCK     (SD_CLK_DIV_128) // 261 kHz (maximum 400 kHz).
+#define DEFAULT_CLOCK  (SD_CLK_DIV_2)   // 16.756991 MHz (maximum 20 MHz).
 #endif // #ifdef _3DS
 
 
-#define IF_COND_ARG        (SD_CMD8_VHS_2_7_3_6V | SD_CMD8_CHK_PATT)
+#define SD_IF_COND_ARG     (SD_CMD8_VHS_2_7_3_6V | SD_CMD8_CHK_PATT)
 #define SD_OP_COND_ARG     (SD_ACMD41_XPC | SD_OCR_3_2_3_3V)          // We support 150 mA and 3.3V. Without HCS bit.
 #define MMC_OP_COND_ARG    (/*MMC_OCR_SECT_MODE |*/ MMC_OCR_3_2_3_3V) // We support s̶e̶c̶t̶o̶r̶ a̶d̶r̶e̶s̶s̶i̶n̶g̶ a̶n̶d̶ 3.3V.
 #define SD_OCR_VOLT_MASK   (SD_OCR_3_2_3_3V)                          // We support 3.3V only.
@@ -70,11 +70,11 @@ enum
 {
 	// Card types.
 	CTYPE_NONE  = 0u, // Unitialized/no card.
-	CTYPE_SDSC  = 1u, // SDSC.
-	CTYPE_SDHC  = 2u, // SDHC, SDXC.
-	CTYPE_SDUC  = 3u, // SDUC.
-	CTYPE_MMC   = 4u, // (e)MMC.
-	CTYPE_MMCHC = 5u  // High capacity (e)MMC (>2 GB).
+	CTYPE_MMC   = 1u, // (e)MMC.
+	CTYPE_MMCHC = 2u, // High capacity (e)MMC (>2 GB).
+	CTYPE_SDSC  = 3u, // SDSC.
+	CTYPE_SDHC  = 4u, // SDHC, SDXC.
+	CTYPE_SDUC  = 5u  // SDUC.
 };
 
 
@@ -88,10 +88,10 @@ typedef struct
 	u32 sectors;    // Size in 512 byte units.
 
 	// Cached card infos.
-	u32 cid[4];     // Raw CID with the CRC zeroed out.
+	u32 cid[4];     // Raw CID without the CRC.
 } SdmmcDev;
 
-SdmmcDev g_devs[2] = {0};
+static SdmmcDev g_devs[2] = {0};
 
 
 
@@ -104,9 +104,9 @@ SdmmcDev g_devs[2] = {0};
 	return res;
 }*/
 
-static u32 sdSendAppCmd(ToshsdPort *const port, u16 cmd, u32 arg, u32 rca)
+static u32 sdSendAppCmd(ToshsdPort *const port, const u16 cmd, const u32 arg, const u32 rca)
 {
-	u32 res = TOSHSD_sendCommand(port, SD_APP_CMD, rca); // TODO: How do we handle the R1 response?
+	u32 res = TOSHSD_sendCommand(port, SD_APP_CMD, rca);
 	if(res == 0)
 	{
 		res = TOSHSD_sendCommand(port, cmd, arg);
@@ -133,7 +133,7 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const cardTypeOut)
 {
 	// Tell the card what interfaces and voltages we support.
 	// Only SD v2 and up will respond. (e)MMC won't respond.
-	u32 res = TOSHSD_sendCommand(port, SD_SEND_IF_COND, IF_COND_ARG);
+	u32 res = TOSHSD_sendCommand(port, SD_SEND_IF_COND, SD_IF_COND_ARG);
 	if(res == 0)
 	{
 		// If the card supports the interfaces and voltages
@@ -142,9 +142,9 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const cardTypeOut)
 		// Since we don't support anything but the
 		// standard SD interface at 3.3V we can check
 		// the whole response at once.
-		if(port->resp[0] != IF_COND_ARG) return SDMMC_ERR_IF_COND_RESP;
+		if(port->resp[0] != SD_IF_COND_ARG) return SDMMC_ERR_IF_COND_RESP;
 	}
-	else if(res != TSD_ERR_CMD_TMOUT) return SDMMC_ERR_SEND_IF_COND; // Card responded but an error occured.
+	else if(res != STATUS_ERR_CMD_TIMEOUT) return SDMMC_ERR_SEND_IF_COND; // Card responded but an error occured.
 
 	// Send the first app CMD. If this times out it's (e)MMC.
 	// If SEND_IF_COND timed out tell the SD card we are a v1 host.
@@ -153,43 +153,16 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const cardTypeOut)
 	res = sdSendAppCmd(port, SD_APP_SD_SEND_OP_COND, opCondArg, 0);
 	if(res != 0)
 	{
-		if(res == TSD_ERR_CMD_TMOUT) cardType = CTYPE_MMC;          // Continue with (e)MMC init.
-		else                         return SDMMC_ERR_SEND_OP_COND; // Unknown error.
+		if(res == STATUS_ERR_CMD_TIMEOUT) cardType = CTYPE_MMC;          // Continue with (e)MMC init.
+		else                              return SDMMC_ERR_SEND_OP_COND; // Unknown error.
 	}
 
-	if(cardType == CTYPE_SDSC) // SD card.
-	{
-		// Loop until a timeout of 1 second or the card is ready.
-		u32 tries = 199; // 200 tries minus the first one.
-		u32 ocr;
-		do
-		{
-			// Linux uses 10 ms but the card doesn't become ready faster
-			// when polling with delay. Use 5 ms as compromise so not much
-			// time is wasted when the card becomes ready in the middle of the delay.
-			TIMER_sleepMs(5);
-
-			res = sdSendAppCmd(port, SD_APP_SD_SEND_OP_COND, opCondArg, 0);
-			if(res != 0) return SDMMC_ERR_SEND_OP_COND;
-
-			ocr = port->resp[0];
-		} while(--tries && !(ocr & SD_OCR_NOT_BUSY));
-
-		// SD card didn't finish init within 1 second.
-		if(tries == 0) return SDMMC_ERR_OP_COND_TMOUT;
-
-		// TODO: From sd.c in Linux:
-		// "Some SD cards claims an out of spec VDD voltage range.
-		//  Let's treat these bits as being in-valid and especially also bit7."
-		if(!(ocr & SD_OCR_VOLT_MASK)) return SDMMC_ERR_VOLT_SUPPORT; // Voltage not supported.
-		if(ocr & SD_OCR_CCS) cardType = CTYPE_SDHC;
-	}
-	else // (e)MMC.
+	if(cardType == CTYPE_MMC) // (e)MMC.
 	{
 		// Loop until a timeout of 1 second or the card is ready.
 		u32 tries = 200;
 		u32 ocr;
-		do
+		while(1)
 		{
 			res = TOSHSD_sendCommand(port, MMC_SEND_OP_COND, MMC_OP_COND_ARG);
 			if(res != 0) return SDMMC_ERR_SEND_OP_COND;
@@ -201,7 +174,7 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const cardTypeOut)
 			// when polling with delay. Use 5 ms as compromise so not much
 			// time is wasted when the card becomes ready in the middle of the delay.
 			TIMER_sleepMs(5);
-		} while(1);
+		}
 
 		// (e)MMC didn't finish init within 1 second.
 		if(tries == 0) return SDMMC_ERR_OP_COND_TMOUT;
@@ -209,6 +182,34 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const cardTypeOut)
 		// Check if the (e)MMC supports the voltage and if it's high capacity.
 		if(!(ocr & MMC_OCR_VOLT_MASK)) return SDMMC_ERR_VOLT_SUPPORT; // Voltage not supported.
 		// TODO: High capacity (e)MMC check.
+	}
+	else // SD card.
+	{
+		// Loop until a timeout of 1 second or the card is ready.
+		u32 tries = 200;
+		u32 ocr;
+		while(1)
+		{
+			ocr = port->resp[0];
+			if(!--tries || (ocr & SD_OCR_NOT_BUSY)) break;
+
+			// Linux uses 10 ms but the card doesn't become ready faster
+			// when polling with delay. Use 5 ms as compromise so not much
+			// time is wasted when the card becomes ready in the middle of the delay.
+			TIMER_sleepMs(5);
+
+			res = sdSendAppCmd(port, SD_APP_SD_SEND_OP_COND, opCondArg, 0);
+			if(res != 0) return SDMMC_ERR_SEND_OP_COND;
+		}
+
+		// SD card didn't finish init within 1 second.
+		if(tries == 0) return SDMMC_ERR_OP_COND_TMOUT;
+
+		// TODO: From sd.c in Linux:
+		// "Some SD cards claims an out of spec VDD voltage range.
+		//  Let's treat these bits as being in-valid and especially also bit7."
+		if(!(ocr & SD_OCR_VOLT_MASK)) return SDMMC_ERR_VOLT_SUPPORT; // Voltage not supported.
+		if(ocr & SD_OCR_CCS)          cardType = CTYPE_SDHC;
 	}
 
 	*cardTypeOut = cardType;
@@ -235,15 +236,7 @@ static u32 initIdentState(SdmmcDev *const dev, const u8 cardType, u32 *const rca
 	ToshsdPort *const port = &dev->port;
 
 	u32 rca;
-	if(cardType < CTYPE_MMC)
-	{
-		// Ask the SD card to send its RCA.
-		u32 res = TOSHSD_sendCommand(port, SD_SEND_RELATIVE_ADDR, 0);
-		if(res != 0) return SDMMC_ERR_SET_SEND_RCA;
-
-		rca = port->resp[0]>>16; // RCA in upper 16 bits.
-	}
-	else
+	if(cardType < CTYPE_SDSC) // (e)MMC.
 	{
 		// Set the RCA of the (e)MMC to 1. 0 is reserved.
 		// A few extremely old, unbranded (but Nokia?) MMC's will time
@@ -254,6 +247,14 @@ static u32 initIdentState(SdmmcDev *const dev, const u8 cardType, u32 *const rca
 
 		rca = 1;
 	}
+	else // SD card.
+	{
+		// Ask the SD card to send its RCA.
+		u32 res = TOSHSD_sendCommand(port, SD_SEND_RELATIVE_ADDR, 0);
+		if(res != 0) return SDMMC_ERR_SET_SEND_RCA;
+
+		rca = port->resp[0]>>16; // RCA in upper 16 bits.
+	}
 
 	dev->rca = rca;
 	*rcaOut = rca<<16;
@@ -262,7 +263,7 @@ static u32 initIdentState(SdmmcDev *const dev, const u8 cardType, u32 *const rca
 }
 
 // Based on code from linux/drivers/mmc/core/sd.c.
-// Works only with u32[4] buffer.
+// Works only with u32[4] response.
 #define UNSTUFF_BITS(resp, start, size)                     \
 ({                                                          \
 	const u32 __size = size;                                \
@@ -322,7 +323,7 @@ static u32 initStandbyState(SdmmcDev *const dev, const u8 cardType, const u32 rc
 	parseCsd(dev, cardType);
 
 	// Select card and switch to transfer state.
-	const u16 selCardCmd = (cardType < CTYPE_MMC ? SD_SELECT_CARD : MMC_SELECT_CARD);
+	const u16 selCardCmd = (cardType < CTYPE_SDSC ? MMC_SELECT_CARD : SD_SELECT_CARD);
 	res = TOSHSD_sendCommand(port, selCardCmd, rca); // TODO: Should we check the R1 response?
 	if(res != 0) return SDMMC_ERR_SELECT_CARD;
 
@@ -336,11 +337,36 @@ static u32 initStandbyState(SdmmcDev *const dev, const u8 cardType, const u32 rc
 	return SDMMC_ERR_NONE;
 }
 
+// TODO: Set the timeout based on clock speed (Toshsd uses SDCLK for timeouts).
 static u32 initTranState(SdmmcDev *const dev, const u8 cardType, const u32 rca)
 {
 	ToshsdPort *const port = &dev->port;
 
-	if(cardType < CTYPE_MMC)
+	if(cardType < CTYPE_SDSC) // (e)MMC.
+	{
+		// Very old 1 bit bus MMC will time out and set the SWITCH_ERROR bit
+		// for these CMDs. Only try with (e)MMC spec >4.0.
+		if(dev->spec_vers >= 4) // Version 4.1–4.2–4.3 or higher.
+		{
+			// Switch to 4 bit bus mode.
+			u32 arg = MMC_SWITCH_ARG(MMC_SWITCH_ACC_WR_BYTE, 183, 1, 0);
+			u32 res = TOSHSD_sendCommand(port, MMC_SWITCH, arg);
+			if(res != 0) return SDMMC_ERR_SET_BUS_WIDTH;
+			TOSHSD_setBusWidth(port, 4);
+
+#ifndef TWL
+			// Switch to high speed timing (max. 52 MHz).
+			arg = MMC_SWITCH_ARG(MMC_SWITCH_ACC_WR_BYTE, 185, 1, 0);
+			res = TOSHSD_sendCommand(port, MMC_SWITCH, arg);
+			if(res != 0) return SDMMC_ERR_SWITCH_HS;
+			TOSHSD_setClock(port, HS_CLOCK);
+#endif
+
+			// We also should check in the ext CSD the power budget for the card.
+			// Nintendo seems to leave it on default (no change).
+		}
+	}
+	else // SD card.
 	{
 		// Remove DAT3 pull-up.
 		u32 res = sdSendAppCmd(port, SD_APP_SET_CLR_CARD_DETECT, 0, rca); // arg = 0 removes the pull-up.
@@ -366,40 +392,13 @@ static u32 initTranState(SdmmcDev *const dev, const u8 cardType, const u32 rca)
 			TOSHSD_setBlockLen(port, 512);
 
 			// [415:400] Support Bits of Functions in Function Group 1.
-			if(switchStat[63 - 400 / 8] & 1u<<1) // Is group 1, function 1 "High-Speed" supported?
+			if(switchStat[63u - 400 / 8] & 1u<<1) // Is group 1, function 1 "High-Speed" supported?
 			{
 				// High-Speed (max. 50 MHz at 3.3V) supported. Switch to highest supported clock.
-				// Stop clock at idle, High-speed clock.
-				TOSHSD_setClock(port, (1u<<9) | (1u<<8) | HS_CLOCK);
+				TOSHSD_setClock(port, HS_CLOCK);
 			}
 		}
 #endif
-	}
-	else
-	{
-		// Very old 1 bit bus MMC will time out and set the SWITCH_ERROR bit
-		// for these CMDs. Only try with (e)MMC spec >4.0.
-		if(dev->spec_vers >= 4) // Version 4.1–4.2–4.3 or higher.
-		{
-			// Switch to 4 bit bus mode.
-			u32 arg = MMC_SWITCH_ARG(MMC_SWITCH_ACC_WR_BYTE, 183, 1, 0);
-			u32 res = TOSHSD_sendCommand(port, MMC_SWITCH, arg);
-			if(res != 0) return SDMMC_ERR_SET_BUS_WIDTH;
-			TOSHSD_setBusWidth(port, 4);
-
-#ifndef TWL
-			// Switch to high speed timing (max. 52 MHz).
-			arg = MMC_SWITCH_ARG(MMC_SWITCH_ACC_WR_BYTE, 185, 1, 0);
-			res = TOSHSD_sendCommand(port, MMC_SWITCH, arg);
-			if(res != 0) return SDMMC_ERR_SWITCH_HS;
-
-			// Stop clock at idle, High-speed clock.
-			TOSHSD_setClock(port, (1u<<9) | (1u<<8) | HS_CLOCK);
-#endif
-
-			// We also should check in the ext CSD the power budget for the card.
-			// Nintendo seems to leave it on default (no change).
-		}
 	}
 
 	// SD:     The description for CMD SET_BLOCKLEN says 512 bytes is the default.
@@ -411,24 +410,24 @@ static u32 initTranState(SdmmcDev *const dev, const u8 cardType, const u32 rca)
 	return SDMMC_ERR_NONE;
 }
 
-static inline u8 dev2portNum(u8 devNum)
+ALWAYS_INLINE u8 dev2portNum(const u8 devNum)
 {
 	return (devNum == SDMMC_DEV_eMMC ? TOSHSD_eMMC_PORT : TOSHSD_CARD_PORT);
 }
 
 // TODO: In many places we also want to check the card's response.
-u32 SDMMC_init(u8 devNum)
+u32 SDMMC_init(const u8 devNum)
 {
 	if(devNum > SDMMC_DEV_eMMC) return SDMMC_ERR_INVAL_PARAM;
 
 	SdmmcDev *const dev = &g_devs[devNum];
-	ToshsdPort *const port = &dev->port;
-
 	if(dev->cardType != CTYPE_NONE) return SDMMC_ERR_INITIALIZED;
 
 	// TODO: When does the card detection timer start? Does not restart on controller reset.
+	//       Seems to start as soon as the port is mapped.
+	ToshsdPort *const port = &dev->port;
 	TOSHSD_initPort(port, dev2portNum(devNum));
-	TOSHSD_setClock(port, (1u<<8) | INIT_CLOCK); // Continuous clock, init clock.
+	TOSHSD_setClockImmediately(port, INIT_CLOCK); // Continuous init clock.
 	INIT_DELAY_FUNC();
 
 	u32 res = goIdleState(port);
@@ -440,7 +439,7 @@ u32 SDMMC_init(u8 devNum)
 	if(res != 0) return res;
 
 	// Stop clock at idle, init clock.
-	TOSHSD_setClock(port, (1u<<9) | (1u<<8) | INIT_CLOCK);
+	TOSHSD_setClock(port, SD_CLK_AUTO_OFF | INIT_CLOCK);
 
 	// SD/(e)MMC now in ready state (ready).
 	res = initReadyState(dev);
@@ -459,8 +458,7 @@ u32 SDMMC_init(u8 devNum)
 	// Since the absolute minimum clock rate is 20 MHz and we are in push-pull
 	// mode already can we cheat and switch to <=20 MHz before getting the CSD?
 	// Note: This seems to be working just fine in all tests.
-	// Stop clock at idle, default clock.
-	TOSHSD_setClock(port, (1u<<9) | (1u<<8) | DEFAULT_CLOCK);
+	TOSHSD_setClock(port, DEFAULT_CLOCK);
 
 	// SD/(e)MMC now in stand-by state (stby).
 	res = initStandbyState(dev, cardType, rca);
@@ -478,7 +476,7 @@ u32 SDMMC_init(u8 devNum)
 // TODO: Is there any "best practice" way of deinitializing cards?
 //       Kick the card back into idle state maybe?
 //       Linux seems to deselect cards on "suspend".
-u32 SDMMC_deinit(u8 devNum)
+u32 SDMMC_deinit(const u8 devNum)
 {
 	if(devNum > SDMMC_DEV_eMMC) return SDMMC_ERR_INVAL_PARAM;
 
@@ -488,7 +486,7 @@ u32 SDMMC_deinit(u8 devNum)
 }
 
 // TODO: Less controller dependent code.
-void SDMMC_getCardInfo(u8 devNum, SdmmcInfo *const infoOut)
+void SDMMC_getCardInfo(const u8 devNum, SdmmcInfo *const infoOut)
 {
 	if(devNum > SDMMC_DEV_eMMC) return;
 
@@ -503,10 +501,10 @@ void SDMMC_getCardInfo(u8 devNum, SdmmcInfo *const infoOut)
 	infoOut->clock     = TOSHSD_HCLK / (clkSetting ? clkSetting<<2 : 2u);
 	memcpy(infoOut->cid, dev->cid, 16);
 	infoOut->ccc       = dev->ccc;
-	infoOut->busWidth  = (port->sd_option & 1u<<15 ? 1u : 4u);
+	infoOut->busWidth  = (port->sd_option & OPTION_BUS_WIDTH1 ? 1u : 4u);
 }
 
-u32 SDMMC_getCid(u8 devNum, u32 *const cidOut)
+u32 SDMMC_getCid(const u8 devNum, u32 *const cidOut)
 {
 	if(devNum > SDMMC_DEV_eMMC) return SDMMC_ERR_INVAL_PARAM;
 
@@ -515,14 +513,16 @@ u32 SDMMC_getCid(u8 devNum, u32 *const cidOut)
 	return SDMMC_ERR_NONE;
 }
 
-u32 SDMMC_getSectors(u8 devNum)
+u32 SDMMC_getSectors(const u8 devNum)
 {
 	if(devNum > SDMMC_DEV_eMMC) return 0;
 
 	return g_devs[devNum].sectors;
 }
 
-u32 SDMMC_readSectors(u8 devNum, u32 sect, u32 *const buf, u16 count)
+// TODO: The specs say on multi-block read an error can occur reading the last block (out of bounds).
+//       This is normal and can be ignored.
+u32 SDMMC_readSectors(const u8 devNum, u32 sect, u32 *const buf, const u16 count)
 {
 	if(devNum > SDMMC_DEV_eMMC || count == 0) return SDMMC_ERR_INVAL_PARAM;
 
@@ -533,32 +533,35 @@ u32 SDMMC_readSectors(u8 devNum, u32 sect, u32 *const buf, u16 count)
 	ToshsdPort *const port = &dev->port;
 	TOSHSD_setBuffer(port, buf, count);
 
-	if(cardType == CTYPE_SDSC || cardType == CTYPE_MMC) sect *= 512;
 	// Read a single 512 bytes block. Same CMD for SD/(e)MMC.
 	// Read multiple 512 byte blocks. Same CMD for SD/(e)MMC.
 	const u16 cmd = (count == 1 ? MMC_READ_SINGLE_BLOCK : MMC_READ_MULTIPLE_BLOCK);
+	if(cardType == CTYPE_MMC || cardType == CTYPE_SDSC) sect *= 512; // Byte addressing.
 	const u32 res = TOSHSD_sendCommand(port, cmd, sect);
 	if(res != 0) return SDMMC_ERR_SECT_RW; // TODO: In case of errors check the card status.
 
 	return SDMMC_ERR_NONE;
 }
 
-u32 SDMMC_writeSectors(u8 devNum, u32 sect, const u32 *const buf, u16 count)
+// TODO: The specs say on multi-block write an error can occur writing the last block (out of bounds).
+//       This is normal and can be ignored.
+u32 SDMMC_writeSectors(const u8 devNum, u32 sect, const u32 *const buf, const u16 count)
 {
 	if(devNum > SDMMC_DEV_eMMC || count == 0) return SDMMC_ERR_INVAL_PARAM;
+	if(devNum == SDMMC_DEV_CARD && !TOSHSD_cardSliderUnlocked())
+		return SDMMC_ERR_WRITE_PROT;
 
 	SdmmcDev *const dev = &g_devs[devNum];
 	const u8 cardType = dev->cardType;
 	if(cardType == CTYPE_NONE) return SDMMC_ERR_NO_CARD;
 
 	ToshsdPort *const port = &dev->port;
-	if(!TOSHSD_cardSliderUnlocked()) return SDMMC_ERR_WRITE_PROT; // TODO: Don't do this check for eMMC.
 	TOSHSD_setBuffer(port, (u32*)buf, count);
 
-	if(cardType == CTYPE_SDSC || cardType == CTYPE_MMC) sect *= 512;
 	// Write a single 512 bytes block. Same CMD for SD/(e)MMC.
 	// Write multiple 512 byte blocks. Same CMD for SD/(e)MMC.
 	const u16 cmd = (count == 1 ? MMC_WRITE_BLOCK : MMC_WRITE_MULTIPLE_BLOCK);
+	if(cardType == CTYPE_MMC || cardType == CTYPE_SDSC) sect *= 512; // Byte addressing.
 	const u32 res = TOSHSD_sendCommand(port, cmd, sect);
 	if(res != 0) return SDMMC_ERR_SECT_RW; // TODO: In case of errors check the card status.
 

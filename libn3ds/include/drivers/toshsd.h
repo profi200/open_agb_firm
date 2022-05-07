@@ -68,28 +68,15 @@ typedef struct
 } Toshsd;
 static_assert(offsetof(Toshsd, sd_fifo32) == 0x10C, "Error: Member sd_fifo32 of Toshsd is not at offset 0x10C!");
 
-ALWAYS_INLINE Toshsd* getToshsdRegs(u8 controller)
+ALWAYS_INLINE Toshsd* getToshsdRegs(const u8 controller)
 {
-	Toshsd *regs;
-	switch(controller)
-	{
-		case 0:
-			regs = (Toshsd*)TOSHSD1_REGS_BASE;
-			break;
-		case 1:
-			regs = (Toshsd*)TOSHSD2_REGS_BASE;
-			break;
-		default:
-			regs = (Toshsd*)NULL;
-	}
-
-	return regs;
+	return (controller == 0u ? (Toshsd*)TOSHSD1_REGS_BASE : (Toshsd*)TOSHSD2_REGS_BASE);
 }
 
 ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 {
 #if (_3DS && ARM11)
-	return (vu32*)((uintptr_t)regs + 0x200000u);
+	return (vu32*)((uintptr_t)regs + 0x200000u); // FIFO is in the DMA region.
 #else
 	return &regs->sd_fifo32;
 #endif // #if (_3DS && ARM11)
@@ -97,9 +84,15 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 
 
 // REG_SD_CMD
+// Auto response supported commands:
+// CMD0, CMD2, CMD3 (only SD?), CMD7 (only select?), CMD9, CMD10, CMD12, CMD13,
+// CMD16, CMD17, CMD18, CMD25, CMD28, CMD55, ACMD6, ACMD23, ACMD42, ACMD51.
+//
+// When using auto response leave bits 11-13 unset (zero).
+
 // Bit 0-5 command index.
 #define CMD_ACMD                 (1u<<6)        // Application command.
-#define CMD_RESP_AUTO            (0u)           // Response type auto. Really?
+#define CMD_RESP_AUTO            (0u)           // Response type auto. Only works with certain commands.
 #define CMD_RESP_NONE            (3u<<8)        // Response type none.
 #define CMD_RESP_R1              (4u<<8)        // Response type R1 48 bit.
 #define CMD_RESP_R5              (CMD_RESP_R1)  // Response type R5 48 bit.
@@ -111,7 +104,7 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define CMD_RESP_R3              (7u<<8)        // Response type R3 48 bit OCR without CRC.
 #define CMD_RESP_R4              (CMD_RESP_R3)  // Response type R4 48 bit OCR without CRC.
 #define CMD_RESP_MASK            (CMD_RESP_R3)
-#define CMD_DT                   (1u<<11)       // Data transfer enable.
+#define CMD_DT_EN                (1u<<11)       // Data transfer enable.
 #define CMD_DIR_W                (0u)           // Data transfer direction write.
 #define CMD_DIR_R                (1u<<12)       // Data transfer direction read.
 #define CMD_MBT                  (1u<<13)       // Multi block transfer (auto STOP_TRANSMISSION).
@@ -145,10 +138,10 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define STATUS_ERR_CMD_IDX       (1u<<16) // (M) Bad CMD index in response.
 #define STATUS_ERR_CRC           (1u<<17) // (M) Bad CRC in response.
 #define STATUS_ERR_STOP_BIT      (1u<<18) // (M) Stop bit error. Failed to recognize response frame end?
-#define STATUS_ERR_DATA_TMOUT    (1u<<19) // (M) Response data timeout.
+#define STATUS_ERR_DATA_TIMEOUT  (1u<<19) // (M) Response data timeout.
 #define STATUS_ERR_RX_OVERF      (1u<<20) // (M) Receive FIFO overflow.
 #define STATUS_ERR_TX_UNDERF     (1u<<21) // (M) Send FIFO underflow.
-#define STATUS_ERR_CMD_TMOUT     (1u<<22) // (M) Response start bit timeout.
+#define STATUS_ERR_CMD_TIMEOUT   (1u<<22) // (M) Response start bit timeout.
 #define STATUS_SD_BUSY           (1u<<23) // SD card signals busy if this bit is 0 (DAT0 held low).
 #define STATUS_RX_RDY            (1u<<24) // (M) FIFO ready for read.
 #define STATUS_TX_REQ            (1u<<25) // (M) FIFO write request.
@@ -158,15 +151,15 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define STATUS_ERR_ILL_ACC       (1u<<31) // (M) Illegal access error. TODO: What does that mean?
 
 #define STATUS_MASK_ALL          (STATUS_ERR_ILL_ACC | (1u<<27) | STATUS_TX_REQ | STATUS_RX_RDY | \
-                                  STATUS_ERR_CMD_TMOUT | STATUS_ERR_TX_UNDERF | STATUS_ERR_RX_OVERF | \
-                                  STATUS_ERR_DATA_TMOUT | STATUS_ERR_STOP_BIT | STATUS_ERR_CRC | \
+                                  STATUS_ERR_CMD_TIMEOUT | STATUS_ERR_TX_UNDERF | STATUS_ERR_RX_OVERF | \
+                                  STATUS_ERR_DATA_TIMEOUT | STATUS_ERR_STOP_BIT | STATUS_ERR_CRC | \
                                   STATUS_ERR_CMD_IDX | STATUS_DAT3_INSERT | STATUS_DAT3_REMOVE | \
                                   STATUS_INSERT | STATUS_REMOVE | STATUS_DATA_END | STATUS_RESP_END)
 #define STATUS_MASK_DEFAULT      ((1u<<27) | STATUS_TX_REQ | STATUS_RX_RDY | \
-                                  STATUS_DAT3_INSERT | STATUS_DAT3_REMOVE | STATUS_DATA_END)
-#define STATUS_MASK_ERR          (STATUS_ERR_ILL_ACC | STATUS_ERR_CMD_TMOUT | STATUS_ERR_TX_UNDERF | \
-                                  STATUS_ERR_RX_OVERF | STATUS_ERR_DATA_TMOUT | STATUS_ERR_STOP_BIT | \
-                                  STATUS_ERR_CRC | STATUS_ERR_CMD_IDX)
+                                  STATUS_DAT3_INSERT | STATUS_DAT3_REMOVE)
+#define STATUS_MASK_ERR          (STATUS_ERR_ILL_ACC | STATUS_ERR_CMD_TIMEOUT | STATUS_ERR_TX_UNDERF | \
+                                  STATUS_ERR_RX_OVERF | STATUS_ERR_DATA_TIMEOUT | STATUS_ERR_STOP_BIT | \
+                                  STATUS_ERR_CRC | STATUS_ERR_CMD_IDX | STATUS_REMOVE)
 
 // REG_SD_CLK_CTRL
 #define SD_CLK_DIV_2             (0u)    // Clock divider 2.
@@ -221,9 +214,9 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 
 // REG_EXT_WRPROT
 // 1 = Write protected unlike SD_STATUS.
-#define EXT_WRPROT_PORT1         (1u)
-#define EXT_WRPROT_PORT2         (1u<<1)
-#define EXT_WRPROT_PORT3         (1u<<2)
+#define EXT_WRPROT_P1            (1u)
+#define EXT_WRPROT_P2            (1u<<1)
+#define EXT_WRPROT_P3            (1u<<2)
 
 // REG_EXT_CDET and REG_EXT_CDET_MASK
 // (M) = Maskable bit. 1 = disabled (no IRQ).
@@ -265,6 +258,7 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define FIFO32_NOT_EMPTY_IE      (1u<<12) // FIFO not empty IRQ enable.
 
 
+
 typedef struct
 {
 	u8 portNum;
@@ -277,48 +271,106 @@ typedef struct
 } ToshsdPort;
 
 
-// See status defines in regs/toshsd.h for details.
-#define TSD_ERR_CMD_IDX     (1u<<16)
-#define TSD_ERR_CRC         (1u<<17)
-#define TSD_ERR_STOP_BIT    (1u<<18)
-#define TSD_ERR_DATA_TMOUT  (1u<<19)
-#define TSD_ERR_RX_OVERF    (1u<<20)
-#define TSD_ERR_TX_UNDERF   (1u<<21)
-#define TSD_ERR_CMD_TMOUT   (1u<<22)
-#define TSD_ERR_ILL_ACC     (1u<<31)
 
-
-
+/**
+ * @brief      Initializes the toshsd driver.
+ */
 void TOSHSD_init(void);
-void TOSHSD_deinit(void);
-void TOSHSD_initPort(ToshsdPort *const port, u8 portNum);
-bool TOSHSD_cardDetected(void);
-bool TOSHSD_cardSliderUnlocked(void);
-void TOSHSD_setClock(ToshsdPort *const port, u16 clk);
-u32 TOSHSD_sendCommand(ToshsdPort *const port, u16 cmd, u32 arg);
 
+/**
+ * @brief      Deinitializes the toshsd driver.
+ */
+void TOSHSD_deinit(void);
+
+/**
+ * @brief      Initializes a toshsd port to defaults.
+ *
+ * @param      port     A pointer to the port struct.
+ * @param[in]  portNum  The port number.
+ */
+void TOSHSD_initPort(ToshsdPort *const port, const u8 portNum);
+
+/**
+ * @brief      Checks if a MMC/SD card is inserted.
+ *
+ * @return     Returns true if a card is inserted.
+ */
+bool TOSHSD_cardDetected(void);
+
+/**
+ * @brief      Checks if the write protect slider is set to locked.
+ *
+ * @return     Returns true if the card is unlocked.
+ */
+bool TOSHSD_cardSliderUnlocked(void);
+
+/**
+ * @brief      Sets the clock for a toshsd port and hardware.
+ *
+ * @param      port  A pointer to the port struct.
+ * @param[in]  clk   The clock settings.
+ */
+void TOSHSD_setClockImmediately(ToshsdPort *const port, u16 clk); // TODO: Change this to setInitClock()? This is the only use case anyway.
+
+/**
+ * @brief      Sends a command.
+ *
+ * @param      port  A pointer to the port struct.
+ * @param[in]  cmd   The command.
+ * @param[in]  arg   The argument for the command.
+ *
+ * @return     Returns 0 on success otherwise see REG_SD_STATUS1/2 bits.
+ */
+u32 TOSHSD_sendCommand(ToshsdPort *const port, const u16 cmd, const u32 arg);
+
+/**
+ * @brief      Sets the clock for a toshsd port.
+ *
+ * @param      port  A pointer to the port struct.
+ * @param[in]  clk   The clock settings.
+ */
+ALWAYS_INLINE void TOSHSD_setClock(ToshsdPort *const port, const u16 clk)
+{
+	// TODO: Clock in Hz?
+	port->sd_clk_ctrl = SD_CLK_EN | clk;
+}
+
+/**
+ * @brief      Sets the transfer block length for a toshsd port.
+ *
+ * @param      port      A pointer to the port struct.
+ * @param[in]  blockLen  The block length.
+ */
 ALWAYS_INLINE void TOSHSD_setBlockLen(ToshsdPort *const port, u16 blockLen)
 {
-	if(blockLen > 512)       blockLen = 512;
-	if(blockLen < 16)        blockLen = 0;
-	if((blockLen % 16) != 0) blockLen = 0;
+	if(blockLen > 512u)        blockLen = 512u;
+	if(blockLen < 16u)         blockLen = 0u;
+	if((blockLen % 16u) != 0u) blockLen = 0u; // Depends on doCpuTransfer() in toshsd.c.
 
 	port->sd_blocklen = blockLen;
 }
 
-ALWAYS_INLINE void TOSHSD_setBusWidth(ToshsdPort *const port, u8 width)
+/**
+ * @brief      Sets the bus width for a toshsd port.
+ *
+ * @param      port   A pointer to the port struct.
+ * @param[in]  width  The bus width.
+ */
+ALWAYS_INLINE void TOSHSD_setBusWidth(ToshsdPort *const port, const u8 width)
 {
-	// TODO: Make this more readable.
-	if(width == 4) port->sd_option = 1u<<14 | 0xE9;
-	else           port->sd_option = 1u<<15 | 1u<<14 | 0xE9u;
+	if(width == 4) port->sd_option = OPTION_BUS_WIDTH4 | OPTION_UNK14 | 0xE9u;
+	else           port->sd_option = OPTION_BUS_WIDTH1 | OPTION_UNK14 | 0xE9u;
 }
 
-ALWAYS_INLINE void TOSHSD_setBuffer(ToshsdPort *const port, u32 *buf, u16 blocks)
+/**
+ * @brief      Sets a transfer buffer for a toshsd port.
+ *
+ * @param      port    A pointer to the port struct.
+ * @param      buf     The buffer pointer.
+ * @param[in]  blocks  The number blocks to transfer.
+ */
+ALWAYS_INLINE void TOSHSD_setBuffer(ToshsdPort *const port, u32 *buf, const u16 blocks)
 {
 	port->buf    = buf;
 	port->blocks = blocks;
 }
-
-#ifdef ARM11
-void TOSHSD_dbgPrint(ToshsdPort *const port);
-#endif

@@ -13,7 +13,6 @@
 #include "drivers/toshsd.h"
 #include "drivers/mmc/sdmmc.h"
 #include "arm9/drivers/ndma.h"
-#include "arm.h"
 #include "drivers/cache.h"
 
 
@@ -76,7 +75,7 @@ DRESULT disk_read (
 		ndmaCh->tcnt = (u32)blockCount<<7;
 		ndmaCh->wcnt = 512u / 4;
 		ndmaCh->bcnt = NDMA_FASTEST;
-		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE | // TODO: IRQ enable missing?
+		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE |
 		               NDMA_BURST(64u / 4) | NDMA_SAD_FIX | NDMA_DAD_INC;
 
 		if(SDMMC_readSectors(SDMMC_DEV_CARD, sector, NULL, blockCount))
@@ -84,11 +83,6 @@ DRESULT disk_read (
 			ndmaCh->cnt = 0; // Stop DMA on error.
 			return RES_ERROR;
 		}
-
-		do
-		{
-			__wfi();
-		} while(ndmaCh->cnt & NDMA_EN); // Wait needed (tested).
 
 		buff += 512u * blockCount;
 		sector += blockCount;
@@ -129,7 +123,7 @@ DRESULT disk_write (
 		ndmaCh->tcnt = (u32)blockCount<<7;
 		ndmaCh->wcnt = 512u / 4;
 		ndmaCh->bcnt = NDMA_FASTEST;
-		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE | // TODO: IRQ enable missing?
+		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE |
 		               NDMA_BURST(64u / 4) | NDMA_SAD_INC | NDMA_DAD_FIX;
 
 		if(SDMMC_writeSectors(SDMMC_DEV_CARD, sector, NULL, blockCount))
@@ -137,11 +131,6 @@ DRESULT disk_write (
 			ndmaCh->cnt = 0; // Stop DMA on error.
 			return RES_ERROR;
 		}
-
-		do
-		{
-			__wfi();
-		} while(ndmaCh->cnt & NDMA_EN); // Wait needed (tested).
 
 		buff += 512u * blockCount;
 		sector += blockCount;

@@ -45,7 +45,7 @@ enum
 	SDMMC_ERR_CARD_STATUS    = 19, // The card returned an error via its status.
 	SDMMC_ERR_NO_CARD        = 20, // Card unitialized or not inserted.
 	SDMMC_ERR_SECT_RW        = 21, // Sector read/write error.
-	SDMMC_ERR_WRITE_PROT     = 22  // Can't write. The write protection slider is locked.
+	SDMMC_ERR_WRITE_PROT     = 22  // The card is write protected (write protection slider).
 };
 
 // SD/MMC device numbers.
@@ -62,7 +62,7 @@ typedef struct
 	u16 rca;      // Relative Card Address (RCA).
 	u32 sectors;  // Size in 512 byte units.
 	u32 clock;    // The current clock frequency in Hz.
-	u32 cid[4];   // Raw CID with the CRC zeroed out.
+	u32 cid[4];   // Raw CID without the CRC.
 	u16 ccc;      // SD/(e)MMC command class support from CSD. One per bit starting at 0.
 	u8 busWidth;  // The current bus width used to talk to the card.
 } SdmmcInfo;
@@ -76,7 +76,7 @@ typedef struct
  *
  * @return     { description_of_the_return_value }
  */
-u32 SDMMC_init(u8 devNum);
+u32 SDMMC_init(const u8 devNum);
 
 /**
  * @brief      { function_description }
@@ -85,7 +85,7 @@ u32 SDMMC_init(u8 devNum);
  *
  * @return     { description_of_the_return_value }
  */
-u32 SDMMC_deinit(u8 devNum);
+u32 SDMMC_deinit(const u8 devNum);
 
 /**
  * @brief      { function_description }
@@ -93,7 +93,7 @@ u32 SDMMC_deinit(u8 devNum);
  * @param[in]  devNum   The dev number
  * @param      infoOut  The information out
  */
-void SDMMC_getCardInfo(u8 devNum, SdmmcInfo *const infoOut);
+void SDMMC_getCardInfo(const u8 devNum, SdmmcInfo *const infoOut);
 
 /**
  * @brief      { function_description }
@@ -103,7 +103,7 @@ void SDMMC_getCardInfo(u8 devNum, SdmmcInfo *const infoOut);
  *
  * @return     { description_of_the_return_value }
  */
-u32 SDMMC_getCid(u8 devNum, u32 *const cidOut);
+u32 SDMMC_getCid(const u8 devNum, u32 *const cidOut);
 
 /**
  * @brief      { function_description }
@@ -112,7 +112,7 @@ u32 SDMMC_getCid(u8 devNum, u32 *const cidOut);
  *
  * @return     { description_of_the_return_value }
  */
-u32 SDMMC_getSectors(u8 devNum);
+u32 SDMMC_getSectors(const u8 devNum);
 
 /**
  * @brief      { function_description }
@@ -124,7 +124,7 @@ u32 SDMMC_getSectors(u8 devNum);
  *
  * @return     { description_of_the_return_value }
  */
-u32 SDMMC_readSectors(u8 devNum, u32 sect, u32 *const buf, u16 count);
+u32 SDMMC_readSectors(const u8 devNum, u32 sect, u32 *const buf, const u16 count);
 
 /**
  * @brief      { function_description }
@@ -136,4 +136,4 @@ u32 SDMMC_readSectors(u8 devNum, u32 sect, u32 *const buf, u16 count);
  *
  * @return     { description_of_the_return_value }
  */
-u32 SDMMC_writeSectors(u8 devNum, u32 sect, const u32 *const buf, u16 count);
+u32 SDMMC_writeSectors(const u8 devNum, u32 sect, const u32 *const buf, const u16 count);

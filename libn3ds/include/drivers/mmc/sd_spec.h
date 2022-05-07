@@ -28,83 +28,83 @@
 
 
 // Basic Commands (class 0).
-#define SD_GO_IDLE_STATE               (CMD_RESP_NONE |  0u) // Arg [31:0] stuff bits.
-#define SD_ALL_SEND_CID                (CMD_RESP_R2   |  2u) // Arg [31:0] stuff bits.
-#define SD_SEND_RELATIVE_ADDR          (CMD_RESP_R6   |  3u) // Arg [31:0] stuff bits.
-#define SD_SET_DSR                     (CMD_RESP_NONE |  4u) // Arg [31:16] DSR [15:0] stuff bits.
-#define SD_SELECT_CARD                 (CMD_RESP_R1b  |  7u) // Arg [31:16] RCA [15:0] stuff bits.
-#define SD_DESELECT_CARD               (CMD_RESP_NONE |  7u) // Arg [31:16] RCA [15:0] stuff bits.
-#define SD_SEND_IF_COND                (CMD_RESP_R7   |  8u) // Arg [31:12] reserved bits [11:8] supply voltage (VHS) [7:0] check pattern.
-#define SD_SEND_CSD                    (CMD_RESP_R2   |  9u) // Arg [31:16] RCA [15:0] stuff bits.
-#define SD_SEND_CID                    (CMD_RESP_R2   | 10u) // Arg [31:16] RCA [15:0] stuff bits.
-#define SD_VOLTAGE_SWITCH              (CMD_RESP_R1   | 11u) // Arg [31:0] reserved bits (all 0).
-#define SD_STOP_TRANSMISSION           (CMD_RESP_R1b  | 12u) // Arg [31:0] stuff bits.
-#define SD_SEND_STATUS                 (CMD_RESP_R1   | 13u) // Arg [31:16] RCA [15] Send Task Status Register [14:0] stuff bits.
-#define SD_SEND_TASK_STATUS            (CMD_RESP_R1   | 13u) // Arg [31:16] RCA [15] Send Task Status Register [14:0] stuff bits.
-#define SD_GO_INACTIVE_STATE           (CMD_RESP_NONE | 15u) // Arg [31:16] RCA [15:0] reserved bits.
+#define SD_GO_IDLE_STATE               (CMD_RESP_NONE |  0u) // Resp   -, Arg [31:0] stuff bits.
+#define SD_ALL_SEND_CID                (CMD_RESP_R2   |  2u) // Resp  R2, Arg [31:0] stuff bits.
+#define SD_SEND_RELATIVE_ADDR          (CMD_RESP_R6   |  3u) // Resp  R6, Arg [31:0] stuff bits.
+#define SD_SET_DSR                     (CMD_RESP_NONE |  4u) // Resp   -, Arg [31:16] DSR [15:0] stuff bits.
+#define SD_SELECT_CARD                 (CMD_RESP_R1b  |  7u) // Resp R1b, Arg [31:16] RCA [15:0] stuff bits.
+#define SD_DESELECT_CARD               (CMD_RESP_NONE |  7u) // Resp   -, Arg [31:16] RCA [15:0] stuff bits.
+#define SD_SEND_IF_COND                (CMD_RESP_R7   |  8u) // Resp  R7, Arg [31:12] reserved bits [11:8] supply voltage (VHS) [7:0] check pattern.
+#define SD_SEND_CSD                    (CMD_RESP_R2   |  9u) // Resp  R2, Arg [31:16] RCA [15:0] stuff bits.
+#define SD_SEND_CID                    (CMD_RESP_R2   | 10u) // Resp  R2, Arg [31:16] RCA [15:0] stuff bits.
+#define SD_VOLTAGE_SWITCH              (CMD_RESP_R1   | 11u) // Resp  R1, Arg [31:0] reserved bits (all 0).
+#define SD_STOP_TRANSMISSION           (CMD_RESP_R1b  | 12u) // Resp R1b, Arg [31:0] stuff bits.
+#define SD_SEND_STATUS                 (CMD_RESP_R1   | 13u) // Resp  R1, Arg [31:16] RCA [15] Send Task Status Register [14:0] stuff bits.
+#define SD_SEND_TASK_STATUS            (CMD_RESP_R1   | 13u) // Resp  R1, Arg [31:16] RCA [15] Send Task Status Register [14:0] stuff bits.
+#define SD_GO_INACTIVE_STATE           (CMD_RESP_NONE | 15u) // Resp   -, Arg [31:16] RCA [15:0] reserved bits.
 
 // Block-Oriented Read Commands (class 2).
-#define SD_SET_BLOCKLEN                (CMD_RESP_R1   | 16u) // Arg [31:0] block length.
-#define SD_READ_SINGLE_BLOCK           (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 17u) // Arg [31:0] data address.
-#define SD_READ_MULTIPLE_BLOCK         (CMD_MBT | CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 18u) // Arg [31:0] data address.
-#define SD_SEND_TUNING_BLOCK           (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 19u) // Arg [31:0] reserved bits (all 0).
-#define SD_SPEED_CLASS_CONTROL         (CMD_RESP_R1b  | 20u) // Arg [31:28] Speed Class Control [27:0] See command description.
-#define SD_ADDRESS_EXTENSION           (CMD_RESP_R1   | 22u) // Arg [31:6] reserved bits (all 0) [5:0] extended address.
-#define SD_SET_BLOCK_COUNT             (CMD_RESP_R1   | 23u) // Arg [31:0] Block Count.
+#define SD_SET_BLOCKLEN                (CMD_RESP_R1   | 16u) // Resp  R1, Arg [31:0] block length.
+#define SD_READ_SINGLE_BLOCK           (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 17u) // Resp  R1, Arg [31:0] data address.
+#define SD_READ_MULTIPLE_BLOCK         (CMD_MBT | CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 18u) // Resp  R1, Arg [31:0] data address.
+#define SD_SEND_TUNING_BLOCK           (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 19u) // Resp  R1, Arg [31:0] reserved bits (all 0).
+#define SD_SPEED_CLASS_CONTROL         (CMD_RESP_R1b  | 20u) // Resp R1b, Arg [31:28] Speed Class Control [27:0] See command description.
+#define SD_ADDRESS_EXTENSION           (CMD_RESP_R1   | 22u) // Resp  R1, Arg [31:6] reserved bits (all 0) [5:0] extended address.
+#define SD_SET_BLOCK_COUNT             (CMD_RESP_R1   | 23u) // Resp  R1, Arg [31:0] Block Count.
 
 // Block-Oriented Write Commands (class 4).
 // SET_BLOCKLEN
 // SPEED_CLASS_CONTROL
 // ADDRESS_EXTENSION
 // SET_BLOCK_COUNT
-#define SD_WRITE_BLOCK                 (CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 24u) // Arg [31:0] data address.
-#define SD_WRITE_MULTIPLE_BLOCK        (CMD_MBT | CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 25u) // Arg [31:0] data address.
-#define SD_PROGRAM_CSD                 (CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 27u) // Arg [31:0] stuff bits.
+#define SD_WRITE_BLOCK                 (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 24u) // Resp  R1, Arg [31:0] data address.
+#define SD_WRITE_MULTIPLE_BLOCK        (CMD_MBT | CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 25u) // Resp  R1, Arg [31:0] data address.
+#define SD_PROGRAM_CSD                 (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 27u) // Resp  R1, Arg [31:0] stuff bits.
 
 // Block Oriented Write Protection Commands (class 6).
-#define SD_SET_WRITE_PROT              (CMD_RESP_R1b  | 28u) // Arg [31:0] data address.
-#define SD_CLR_WRITE_PROT              (CMD_RESP_R1b  | 29u) // Arg [31:0] data address.
-#define SD_SEND_WRITE_PROT             (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 30u) // Arg [31:0] write protect data address.
+#define SD_SET_WRITE_PROT              (CMD_RESP_R1b  | 28u) // Resp R1b, Arg [31:0] data address.
+#define SD_CLR_WRITE_PROT              (CMD_RESP_R1b  | 29u) // Resp R1b, Arg [31:0] data address.
+#define SD_SEND_WRITE_PROT             (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 30u) // Resp  R1, Arg [31:0] write protect data address.
 
 // Erase Commands (class 5).
-#define SD_ERASE_WR_BLK_START          (CMD_RESP_R1   | 32u) // Arg [31:0] data address.
-#define SD_ERASE_WR_BLK_END            (CMD_RESP_R1   | 33u) // Arg [31:0] data address.
-#define SD_ERASE                       (CMD_RESP_R1b  | 38u) // Arg [31:0] Erase Function.
+#define SD_ERASE_WR_BLK_START          (CMD_RESP_R1   | 32u) // Resp  R1, Arg [31:0] data address.
+#define SD_ERASE_WR_BLK_END            (CMD_RESP_R1   | 33u) // Resp  R1, Arg [31:0] data address.
+#define SD_ERASE                       (CMD_RESP_R1b  | 38u) // Resp R1b, Arg [31:0] Erase Function.
 
 // Lock Card (class 7).
 // SET_BLOCKLEN
 // Command 40 "Defined by DPS Spec.".
-#define SD_LOCK_UNLOCK                 (CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 42u) // Arg [31:0] Reserved bits (Set all 0).
+#define SD_LOCK_UNLOCK                 (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 42u) // Resp  R1, Arg [31:0] Reserved bits (Set all 0).
 
 // Application-Specific Commands (class 8).
-#define SD_APP_CMD                     (CMD_RESP_R1   | 55u) // Arg [31:16] RCA [15:0] stuff bits.
-#define SD_GEN_CMD_R                   (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 56u) // Arg [31:1] stuff bits. [0]: RD/WR = 1.
-#define SD_GEN_CMD_W                   (CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 56u) // Arg [31:1] stuff bits. [0]: RD/WR = 0.
+#define SD_APP_CMD                     (CMD_RESP_R1   | 55u) // Resp  R1, Arg [31:16] RCA [15:0] stuff bits.
+#define SD_GEN_CMD_R                   (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 56u) // Resp  R1, Arg [31:1] stuff bits. [0]: RD/WR = 1.
+#define SD_GEN_CMD_W                   (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 56u) // Resp  R1, Arg [31:1] stuff bits. [0]: RD/WR = 0.
 
 // Application Specific Commands used/reserved by SD Memory Card.
-#define SD_APP_SET_BUS_WIDTH           (CMD_RESP_R1 | CMD_ACMD |  6u) // Arg [31:2] stuff bits [1:0] bus width.
-#define SD_APP_SD_STATUS               (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | CMD_ACMD | 13u) // Arg [31:0] stuff bits.
-#define SD_APP_SEND_NUM_WR_BLOCKS      (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | CMD_ACMD | 22u) // Arg [31:0] stuff bits.
-#define SD_APP_SET_WR_BLK_ERASE_COUNT  (CMD_RESP_R1 | CMD_ACMD | 23u) // Arg [31:23] stuff bits [22:0]Number of blocks.
-#define SD_APP_SD_SEND_OP_COND         (CMD_RESP_R3 | CMD_ACMD | 41u) // Arg [31] reserved bit [30] HCS (OCR[30]) [29] reserved for eSD [28] XPC [27:25] reserved bits [24] S18R [23:0] VDD Voltage Window (OCR[23:0]).
-#define SD_APP_SET_CLR_CARD_DETECT     (CMD_RESP_R1 | CMD_ACMD | 42u) // Arg [31:1] stuff bits [0] set_cd.
-#define SD_APP_SEND_SCR                (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | CMD_ACMD | 51u) // Arg [31:0] stuff bits.
+#define SD_APP_SET_BUS_WIDTH           (CMD_RESP_R1 | CMD_ACMD |  6u) // Resp  R1, Arg [31:2] stuff bits [1:0] bus width.
+#define SD_APP_SD_STATUS               (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | CMD_ACMD | 13u) // Resp  R1, Arg [31:0] stuff bits.
+#define SD_APP_SEND_NUM_WR_BLOCKS      (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | CMD_ACMD | 22u) // Resp  R1, Arg [31:0] stuff bits.
+#define SD_APP_SET_WR_BLK_ERASE_COUNT  (CMD_RESP_R1 | CMD_ACMD | 23u) // Resp  R1, Arg [31:23] stuff bits [22:0]Number of blocks.
+#define SD_APP_SD_SEND_OP_COND         (CMD_RESP_R3 | CMD_ACMD | 41u) // Resp  R3, Arg [31] reserved bit [30] HCS (OCR[30]) [29] reserved for eSD [28] XPC [27:25] reserved bits [24] S18R [23:0] VDD Voltage Window (OCR[23:0]).
+#define SD_APP_SET_CLR_CARD_DETECT     (CMD_RESP_R1 | CMD_ACMD | 42u) // Resp  R1, Arg [31:1] stuff bits [0] set_cd.
+#define SD_APP_SEND_SCR                (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | CMD_ACMD | 51u) // Resp  R1, Arg [31:0] stuff bits.
 
 // Switch Function Commands (class 10).
-#define SD_SWITCH_FUNC                 (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 6u) // Arg [31] Mode 0: Check function 1: Switch function [30:24] reserved (All '0') [23:20] reserved for function group 6 (0h or Fh) [19:16] reserved for function group 5 (0h or Fh) [15:12] function group 4 for PowerLimit [11:8] function group 3 for Drive Strength [7:4] function group 2 for Command System [3:0] function group 1 for Access Mode.
+#define SD_SWITCH_FUNC                 (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 6u) // Resp  R1, Arg [31] Mode 0: Check function 1: Switch function [30:24] reserved (All '0') [23:20] reserved for function group 6 (0h or Fh) [19:16] reserved for function group 5 (0h or Fh) [15:12] function group 4 for PowerLimit [11:8] function group 3 for Drive Strength [7:4] function group 2 for Command System [3:0] function group 1 for Access Mode.
 
 // Function Extension Commands (class 11).
-#define SD_READ_EXTR_SINGLE            (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 48u) // Arg [31] MIO0: Memory, 1: I/O [30:27] FNO[26] Reserved (=0) [25:9] ADDR [8:0] LEN.
-#define SD_WRITE_EXTR_SINGLE           (CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 49u) // Arg [31] MIO0: Memory, 1: I/O [30:27] FNO [26] MW [25:9] ADDR [8:0] LEN/MASK.
-#define SD_READ_EXTR_MULTI             (CMD_MBT | CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 58u) // Arg [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
-#define SD_WRITE_EXTR_MULTI            (CMD_MBT | CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 59u) // Arg [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
+#define SD_READ_EXTR_SINGLE            (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 48u) // Resp  R1, Arg [31] MIO0: Memory, 1: I/O [30:27] FNO[26] Reserved (=0) [25:9] ADDR [8:0] LEN.
+#define SD_WRITE_EXTR_SINGLE           (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 49u) // Resp  R1, Arg [31] MIO0: Memory, 1: I/O [30:27] FNO [26] MW [25:9] ADDR [8:0] LEN/MASK.
+#define SD_READ_EXTR_MULTI             (CMD_MBT | CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 58u) // Resp  R1, Arg [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
+#define SD_WRITE_EXTR_MULTI            (CMD_MBT | CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 59u) // Resp  R1, Arg [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
 
 // Command Queue Function Commands (class 1).
-#define SD_Q_MANAGEMENT                (CMD_RESP_R1b  | 43u) // Arg [31:21] Reserved [20:16]: Task ID [3:0]: Operation Code (Abort tasks etc.).
-#define SD_Q_TASK_INFO_A               (CMD_RESP_R1   | 44u) // Arg [31] Reserved [30] Direction [29:24] Extended Address [23] Priority [22:21] Reserved [20:16] Task ID [15:0] Number of Blocks.
-#define SD_Q_TASK_INFO_B               (CMD_RESP_R1   | 45u) // Arg [31:0] Start block address.
-#define SD_Q_RD_TASK                   (CMD_DIR_R | CMD_DT | CMD_RESP_R1 | 46u) // Arg [31:21] Reserved [20:16] Task ID [15:0] Reserved.
-#define SD_Q_WR_TASK                   (CMD_DIR_W | CMD_DT | CMD_RESP_R1 | 47u) // Arg [31:21] Reserved [20:16] Task ID [15:0] Reserved.
+#define SD_Q_MANAGEMENT                (CMD_RESP_R1b  | 43u) // Resp R1b, Arg [31:21] Reserved [20:16]: Task ID [3:0]: Operation Code (Abort tasks etc.).
+#define SD_Q_TASK_INFO_A               (CMD_RESP_R1   | 44u) // Resp  R1, Arg [31] Reserved [30] Direction [29:24] Extended Address [23] Priority [22:21] Reserved [20:16] Task ID [15:0] Number of Blocks.
+#define SD_Q_TASK_INFO_B               (CMD_RESP_R1   | 45u) // Resp  R1, Arg [31:0] Start block address.
+#define SD_Q_RD_TASK                   (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | 46u) // Resp  R1, Arg [31:21] Reserved [20:16] Task ID [15:0] Reserved.
+#define SD_Q_WR_TASK                   (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | 47u) // Resp  R1, Arg [31:21] Reserved [20:16] Task ID [15:0] Reserved.
 
 
 // SD R1 card status.

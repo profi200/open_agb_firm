@@ -39,6 +39,7 @@ void WEAK __systemInit(void)
 
 void WEAK __systemDeinit(void)
 {
+	TOSHSD_deinit();
 	DMA330_init();
 	NDMA_init();
 	IRQ_init();
