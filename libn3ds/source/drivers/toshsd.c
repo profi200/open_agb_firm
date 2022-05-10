@@ -20,16 +20,6 @@
 #include "types.h"
 #include "drivers/toshsd.h"
 #include "drivers/toshsd_config.h"
-#ifdef _3DS
-#ifdef ARM9
-#include "arm9/drivers/interrupt.h"
-#include "arm9/drivers/cfg9.h"
-#elif ARM11
-#include "arm11/drivers/interrupt.h"
-#endif // #ifdef ARM9
-#elif TWL
-#error "Missing TWL includes."
-#endif // #ifdef _3DS
 
 
 static u32 g_status[2] = {0};
@@ -43,15 +33,7 @@ ALWAYS_INLINE u8 portNum2Controller(const u8 portNum)
 
 ALWAYS_INLINE u8 irq2controller(const u32 id)
 {
-#ifdef _3DS
-#ifdef ARM9
-	return (id == IRQ_TOSHSD1 ? 0u : 1u);
-#elif ARM11
-	return (id == IRQ_TOSHSD2 ? 0u : 1u);
-#endif // #ifdef ARM9
-#elif TWL
-	#error "Unimplemented TWL IRQ to controller ID function."
-#endif // #ifdef _3DS
+	return (id == TOSHSD_IRQ_ID_CONTROLLER1 ? 0u : 1u);
 }
 
 static void toshsdIsr(const u32 id)
@@ -67,33 +49,21 @@ static void toshsdIsr(const u32 id)
 
 void TOSHSD_init(void)
 {
-// TODO: Move most of these #ifs to toshsd_config.h.
-#if (_3DS && ARM9)
-	// Note: The power bits don't affect regular card detect. Port remapping does.
-	// TODO: Can we switch controllers/ports glitch-free?
-	const u32 cardPort = (TOSHSD_CARD_PORT == 2u ? SDMMCCTL_SLOT_TOSHSD3_SEL : SDMMCCTL_SLOT_TOSHSD1_SEL);
-	const u32 c2Map = (TOSHSD_C2_MAP == 1u ? SDMMCCTL_TOSHSD3_MAP11 : SDMMCCTL_TOSHSD3_MAP9);
-	getCfg9Regs()->sdmmcctl = cardPort | c2Map | SDMMCCTL_UNK_BIT6 | SDMMCCTL_UNK_PWR_OFF;
-#endif // #if (_3DS && ARM9)
+	// Do controller and port mapping (see toshsd_config.h).
+	TOSHSD_MAP_CONTROLLERS();
 
-	atomic_store_explicit(&g_status[0], 0, memory_order_relaxed);
-	atomic_store_explicit(&g_status[1], 0, memory_order_relaxed);
+	// Clear the controller status fields.
+	for(u32 i = 0; i < TOSHSD_NUM_CONTROLLERS; i++)
+	{
+		atomic_store_explicit(&g_status[i], 0, memory_order_relaxed);
+	}
 
-	// TODO: 3DS: Do we get controller 3 IRQs on the side the controller is NOT mapped to?
-#ifdef _3DS
-#ifdef ARM9
-	IRQ_registerIsr(IRQ_TOSHSD1, toshsdIsr);
-	IRQ_registerIsr(IRQ_TOSHSD3, toshsdIsr);
-#elif ARM11
-	IRQ_registerIsr(IRQ_TOSHSD2, 14, 0, toshsdIsr);
-	IRQ_registerIsr(IRQ_TOSHSD3, 14, 0, toshsdIsr);
-#endif // #ifdef ARM9
-#elif TWL
-	#error "Unimplemented TWL register ISR."
-#endif // #ifdef _3DS
+	// Register ISR and enable IRQs.
+	// IRQs are only fired on the side a controller is mapped to.
+	TOSHSD_REGISTER_ISR(toshsdIsr);
 
 	// Reset all controllers.
-	for(u8 i = 0; i < 2; i++) // TODO: 3DS: Don't touch controller 3 if not mapped.
+	for(u32 i = 0; i < TOSHSD_NUM_CONTROLLERS; i++)
 	{
 		Toshsd *const regs = getToshsdRegs(i);
 		// Setup 32 bit FIFO.
@@ -109,42 +79,35 @@ void TOSHSD_init(void)
 		regs->sd_portsel         = PORTSEL_P0;
 		regs->sd_blockcount      = 1;
 		regs->sd_status_mask     = STATUS_MASK_DEFAULT;
-		regs->sd_clk_ctrl        = SD_CLK_DIV_128; // TODO: Different default on 3DS.
+		regs->sd_clk_ctrl        = SD_CLK_DEFAULT;
 		regs->sd_blocklen        = 512;
-		regs->sd_option          = OPTION_BUS_WIDTH1 | OPTION_UNK14 | 0xE9; // ~7 ms card detection time.
+		regs->sd_option          = OPTION_BUS_WIDTH1 | OPTION_UNK14 | OPTION_DEFAULT_TIMINGS;
 		regs->ext_cdet_mask      = EXT_CDET_MASK_ALL;
 		regs->ext_cdet_dat3_mask = EXT_CDET_DAT3_MASK_ALL;
 
-		// SDIO init here?
+		// Disable SDIO.
+		regs->sdio_mode        = 0;
+		regs->sdio_status_mask = SDIO_STATUS_MASK_ALL;
+		regs->ext_sdio_irq     = EXT_SDIO_IRQ_MASK_ALL;
 	}
 }
 
-// TODO: Powerdown argument?
 void TOSHSD_deinit(void)
 {
-	// TODO: Should we unregister the SDIO IRQs too or leave it external like registering?
-#ifdef _3DS
-#ifdef ARM9
-	IRQ_unregisterIsr(IRQ_TOSHSD1);
-	IRQ_unregisterIsr(IRQ_TOSHSD3);
+	// Unregister ISR and disable IRQs.
+	TOSHSD_UNREGISTER_ISR();
 
-	getCfg9Regs()->sdmmcctl = SDMMCCTL_UNK_BIT6 | SDMMCCTL_UNK_PWR_OFF | SDMMCCTL_SLOT_PWR_OFF;
-#elif ARM11
-	IRQ_unregisterIsr(IRQ_TOSHSD2);
-	IRQ_unregisterIsr(IRQ_TOSHSD3);
-#endif // #ifdef ARM9
-#elif TWL
-	#error "Unimplemented TWL register ISR."
-#endif // #ifdef _3DS
+	// Reset controller and port mapping (see toshsd_config.h).
+	TOSHSD_UNMAP_CONTROLLERS();
 }
 
 void TOSHSD_initPort(ToshsdPort *const port, const u8 portNum)
 {
 	// Reset port state.
 	port->portNum     = portNum;
-	port->sd_clk_ctrl = SD_CLK_DIV_128; // TODO: Different default on 3DS.
+	port->sd_clk_ctrl = SD_CLK_DEFAULT;
 	port->sd_blocklen = 512;
-	port->sd_option   = OPTION_BUS_WIDTH1 | OPTION_UNK14 | 0xE9;
+	port->sd_option   = OPTION_BUS_WIDTH1 | OPTION_UNK14 | OPTION_DEFAULT_TIMINGS;
 }
 
 static void setPort(Toshsd *const regs, const ToshsdPort *const port)
@@ -205,7 +168,7 @@ static void getResponse(const Toshsd *const regs, ToshsdPort *const port, const 
 // TODO: Can the controller send data end early and should we treat it as an error?
 static void doCpuTransfer(Toshsd *const regs, const u16 cmd, u32 *buf, const u32 *const statusPtr)
 {
-	const u32 blockLen = regs->sd_blocklen; // gcc generates an invisible "& ~3u" here. Why?
+	const u32 blockLen = regs->sd_blocklen;
 	u32 blockCount = regs->sd_blockcount;
 	vu32 *const fifo = getToshsdFifo(regs);
 	if(cmd & CMD_DIR_R)

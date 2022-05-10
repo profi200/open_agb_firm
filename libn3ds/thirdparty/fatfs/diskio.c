@@ -11,6 +11,7 @@
 #include "diskio.h"		/* Declarations of disk functions */
 #include "types.h"
 #include "drivers/toshsd.h"
+#include "arm.h"
 #include "drivers/mmc/sdmmc.h"
 #include "arm9/drivers/ndma.h"
 #include "drivers/cache.h"
@@ -27,6 +28,16 @@ DSTATUS disk_status (
 {
 	(void)pdrv;
 
+	/*DSTATUS dstat = 0; // TODO: Testing.
+	if(!TOSHSD_cardDetected())
+	{
+		// Assumes IRQs are on and the controller IRQ is the only one that fires.
+		// TODO: Better strategy.
+		__wfi();
+		dstat = (TOSHSD_cardDetected() == true ? 0u : STA_NODISK);
+	}
+
+	return dstat;*/
 	return (TOSHSD_cardDetected() == true ? 0u : STA_NODISK);
 }
 
@@ -70,7 +81,7 @@ DRESULT disk_read (
 	do
 	{
 		const u16 blockCount = (count > 0xFFFFu ? 0xFFFFu : count);
-		ndmaCh->sad  = (u32)getToshsdFifo(getToshsdRegs(1));
+		ndmaCh->sad  = (u32)getToshsdFifo(getToshsdRegs(1)); // TODO: SDMMC dev to FIFO function.
 		ndmaCh->dad  = (u32)buff;
 		ndmaCh->tcnt = (u32)blockCount<<7;
 		ndmaCh->wcnt = 512u / 4;
@@ -119,7 +130,7 @@ DRESULT disk_write (
 	{
 		const u16 blockCount = (count > 0xFFFFu ? 0xFFFFu : count);
 		ndmaCh->sad  = (const u32)buff;
-		ndmaCh->dad  = (u32)getToshsdFifo(getToshsdRegs(1));
+		ndmaCh->dad  = (u32)getToshsdFifo(getToshsdRegs(1)); // TODO: SDMMC dev to FIFO function.
 		ndmaCh->tcnt = (u32)blockCount<<7;
 		ndmaCh->wcnt = 512u / 4;
 		ndmaCh->bcnt = NDMA_FASTEST;

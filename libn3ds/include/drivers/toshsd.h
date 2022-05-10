@@ -37,7 +37,7 @@ typedef struct
 	vu32 sd_status_mask;      // 0x020 SD_STATUS1_MASK and SD_STATUS2_MASK combined.
 	vu16 sd_clk_ctrl;         // 0x024
 	vu16 sd_blocklen;         // 0x026
-	vu16 sd_option;           // 0x028 Data timeout: 0x2000<<12 / (67027964 / 2) = 1.001206959 sec. Card detect: 0x400<<9 / 67027964 = 0.007821929 sec.
+	vu16 sd_option;           // 0x028 Card detect timer, data timeout and bus width.
 	u8 _0x2a[2];
 	const vu32 sd_err_status; // 0x02C SD_ERR_STATUS1 and SD_ERR_STATUS2 combined.
 	vu16 sd_fifo;             // 0x030
@@ -52,7 +52,7 @@ typedef struct
 	const vu16 revision;      // 0x0E2 Controller version/revision?
 	u8 _0xe4[0xe];
 	vu16 unkF2;               // 0x0F2 Power related? Default 0. Other values do nothing?
-	vu16 unkF4;               // 0x0F4 Unknwon. SDIO IRQ related.
+	vu16 ext_sdio_irq;        // 0x0F4 Port 1/2/3 SDIO IRQ control.
 	const vu16 ext_wrprot;    // 0x0F6 Apparently for eMMC.
 	vu16 ext_cdet;            // 0x0F8 Card detect status.
 	vu16 ext_cdet_dat3;       // 0x0FA DAT3 card detect status.
@@ -123,8 +123,8 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define STOP_STOP                (1u)    // Stop/abort a transfer.
 #define STOP_AUTO_STOP           (1u<<8) // Automatically send CMD12 on block transfer end.
 
-// REG_SD_STATUS1/2 and REG_SD_STATUS1/2_MASK
-// (M) = Maskable bit. 1 = disabled.
+// REG_SD_STATUS1/2       Write 0 to acknowledge a bit.
+// REG_SD_STATUS1/2_MASK  (M) = Maskable bit. 1 = disabled.
 // Unmaskable bits act as status only, don't trigger IRQs and can't be acknowledged.
 #define STATUS_RESP_END          (1u)     // (M) Response end.
 #define STATUS_DATA_END          (1u<<2)  // (M) Data transfer end (triggers after last block).
@@ -175,14 +175,36 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define SD_CLK_AUTO_OFF          (1u<<9) // Disables clock on idle.
 // Bit 10 is writable... at least according to gbatek (can't confirm). Purpose unknown.
 
+#ifdef _3DS
+// 67027964 / 256 = 261827.984375 Hz.
+#define SD_CLK_DEFAULT           (SD_CLK_AUTO_OFF | SD_CLK_EN | SD_CLK_DIV_256)
+#elif TWL
+// 33513982 / 128 = 261827.984375 Hz.
+#define SD_CLK_DEFAULT           (SD_CLK_AUTO_OFF | SD_CLK_EN | SD_CLK_DIV_128)
+#endif // #ifdef _3DS
+
 // REG_SD_OPTION
-// TODO: Bit 0-3 card detect timer 0x400<<x HCLKs. 0xF timer test.
-// TODO: Bit 4-7 data timeout 0x2000<<x (HCLK / divider). 0xF timeout test.
+// Note on card detection time:
+// The card detection timer starts only on inserting cards (including cold boot with inserted card)
+// and when mapping ports between controllers. Card power doesn't have any effect on the timer.
+//
+// Bit 0-3 card detect timer 0x400<<x HCLKs. 0xF timer test (0x100 HCLKs).
+// Bit 4-7 data timeout 0x2000<<x SDCLKs. 0xF timeout test (0x100 SDCLKs).
 #define OPTION_UNK14             (1u<<14) // "no C2 module" What the fuck is a C2 module?
 #define OPTION_BUS_WIDTH4        (0u)     // 4 bit bus width.
 #define OPTION_BUS_WIDTH1        (1u<<15) // 1 bit bus width.
 
-// REG_SD_ERR_STATUS1/2
+#ifdef _3DS
+// Card detect time: 0x400<<9 / 67027964 = 0.007821929 seconds.
+// Data timeout:     0x2000<<12 / (67027964 / 2) = 1.001206959 seconds.
+#define OPTION_DEFAULT_TIMINGS   (12u<<4 | 9u)
+#elif TWL
+// Card detect time: 0x400<<8 / 33513982 = 0.007821929 seconds.
+// Data timeout:     0x2000<<11 / (33513982 / 2) = 1.001206959 seconds.
+#define OPTION_DEFAULT_TIMINGS   (11u<<4 | 8u)
+#endif // #ifdef _3DS
+
+// REG_SD_ERR_STATUS1/2  Write 0 to acknowledge a bit.
 // TODO: Are all of these actually supported on this controller?
 #define ERR_RESP_CMD_IDX         (1u)     // Manual command index error in response.
 #define ERR_RESP_CMD12_IDX       (1u<<1)  // Auto command index error in response.
@@ -200,8 +222,21 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 // TODO: Add the correct remaining ones.
 
 // REG_SDIO_MODE
+#define SDIO_MODE_SDIO_IRQ_EN    (1u)    // SDIO IRQ enable (DAT1 low).
+#define SDIO_MODE_UNK2_EN        (1u<<2) // IRQ on "read wait" requests?
+#define SDIO_MODE_UNK8           (1u<<8) // Aborts command and data transfer?
+#define SDIO_MODE_UNK9           (1u<<9) // Aborts command but not data transfer? CMD52 related.
 
-// REG_SDIO_STATUS and REG_SDIO_STATUS_MASK
+// REG_SDIO_STATUS       Write 0 to acknowledge a bit.
+// REG_SDIO_STATUS_MASK  (M) = Maskable bit. 1 = disabled.
+#define SDIO_STATUS_SDIO_IRQ     (1u)     // (M) SDIO IRQ (DAT1 low).
+#define SDIO_STATUS_UNK1_IRQ     (1u<<1)  // (M) IRQ once CMD52 can be used after abort?
+#define SDIO_STATUS_UNK2_IRQ     (1u<<2)  // (M) Related to SDIO_MODE_UNK2_EN?
+#define SDIO_STATUS_UNK14_IRQ    (1u<<14) // (M) Related to SDIO_MODE_UNK9?
+#define SDIO_STATUS_UNK15_IRQ    (1u<<15) // (M) Related to SDIO_MODE_UNK2_EN?
+
+#define SDIO_STATUS_MASK_ALL     (SDIO_STATUS_UNK15_IRQ | SDIO_STATUS_UNK14_IRQ | SDIO_STATUS_UNK2_IRQ | \
+                                  SDIO_STATUS_UNK1_IRQ | SDIO_STATUS_SDIO_IRQ)
 
 // REG_DMA_EXT_MODE
 #define DMA_EXT_CPU_MODE         (0u)    // Disables DMA requests. Actually also turns off the 32 bit FIFO.
@@ -212,14 +247,26 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define SOFT_RST_RST             (0u) // Reset.
 #define SOFT_RST_NORST           (1u) // No reset.
 
-// REG_EXT_WRPROT
-// 1 = Write protected unlike SD_STATUS.
+// REG_EXT_SDIO_IRQ
+#define EXT_SDIO_IRQ_P1          (1u)     // Port 1 SDIO IRQ (DAT1 low). Write 0 to acknowledge.
+#define EXT_SDIO_IRQ_P2          (1u<<1)  // Port 2 SDIO IRQ (DAT1 low). Write 0 to acknowledge.
+#define EXT_SDIO_IRQ_P3          (1u<<2)  // Port 3 SDIO IRQ (DAT1 low). Write 0 to acknowledge.
+#define EXT_SDIO_IRQ_P1_EN       (1u<<4)  // Port 1 SDIO IRQ enable (controller).
+#define EXT_SDIO_IRQ_P2_EN       (1u<<5)  // Port 2 SDIO IRQ enable (controller).
+#define EXT_SDIO_IRQ_P3_EN       (1u<<6)  // Port 3 SDIO IRQ enable (controller).
+#define EXT_SDIO_IRQ_P1_MASK     (1u<<8)  // Port 1 SDIO IRQ mask. 1 = disable IRQ (CPU).
+#define EXT_SDIO_IRQ_P2_MASK     (1u<<9)  // Port 2 SDIO IRQ mask. 1 = disable IRQ (CPU).
+#define EXT_SDIO_IRQ_P3_MASK     (1u<<10) // Port 3 SDIO IRQ mask. 1 = disable IRQ (CPU).
+
+#define EXT_SDIO_IRQ_MASK_ALL    (EXT_SDIO_IRQ_P3_MASK | EXT_SDIO_IRQ_P2_MASK | EXT_SDIO_IRQ_P1_MASK)
+
+// REG_EXT_WRPROT  Each bit 1 = write protected unlike SD_STATUS.
 #define EXT_WRPROT_P1            (1u)
 #define EXT_WRPROT_P2            (1u<<1)
 #define EXT_WRPROT_P3            (1u<<2)
 
-// REG_EXT_CDET and REG_EXT_CDET_MASK
-// (M) = Maskable bit. 1 = disabled (no IRQ).
+// REG_EXT_CDET       Acknowledgeable?
+// REG_EXT_CDET_MASK  (M) = Maskable bit. 1 = disabled (no IRQ).
 #define EXT_CDET_P1_REMOVE       (1u)    // (M) Port 1 card got removed.
 #define EXT_CDET_P1_INSERT       (1u<<1) // (M) Port 1 card got inserted. TODO: With detection timer?
 #define EXT_CDET_P1_DETECT       (1u<<2) // Port 1 card detect status. 1 = inserted. TODO: With detection timer?
@@ -233,8 +280,8 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define EXT_CDET_MASK_ALL        (EXT_CDET_P3_INSERT | EXT_CDET_P3_REMOVE | EXT_CDET_P2_INSERT | \
                                   EXT_CDET_P2_REMOVE | EXT_CDET_P1_INSERT | EXT_CDET_P1_REMOVE)
 
-// REG_EXT_CDET_DAT3 and REG_EXT_CDET_DAT3_MASK
-// (M) = Maskable bit. 1 = disabled (no IRQ).
+// REG_EXT_CDET_DAT3       Acknowledgeable?
+// REG_EXT_CDET_DAT3_MASK  (M) = Maskable bit. 1 = disabled (no IRQ).
 #define EXT_CDET_DAT3_P1_REMOVE  (1u)    // (M) Port 1 card DAT3 got removed (low).
 #define EXT_CDET_DAT3_P1_INSERT  (1u<<1) // (M) Port 1 card DAT3 got inserted (high).
 #define EXT_CDET_DAT3_P1_DETECT  (1u<<2) // Port 1 card DAT3 status. 1 = inserted.
@@ -249,7 +296,7 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
                                   EXT_CDET_DAT3_P2_REMOVE | EXT_CDET_DAT3_P1_INSERT | EXT_CDET_DAT3_P1_REMOVE)
 
 // REG_SD_FIFO32_CNT
-#define FIFO32_UNK1              (1u)     // Unknown bit.
+// Bit 0 unknown, non-writable.
 #define FIFO32_EN                (1u<<1)  // Enables the 32 bit FIFO.
 #define FIFO32_FULL              (1u<<8)  // FIFO is full.
 #define FIFO32_NOT_EMPTY         (1u<<9)  // FIFO is not empty. Inverted bit. 0 means empty.
@@ -310,7 +357,7 @@ bool TOSHSD_cardSliderUnlocked(void);
  * @param      port  A pointer to the port struct.
  * @param[in]  clk   The clock settings.
  */
-void TOSHSD_setClockImmediately(ToshsdPort *const port, u16 clk); // TODO: Change this to setInitClock()? This is the only use case anyway.
+void TOSHSD_setClockImmediately(ToshsdPort *const port, u16 clk);
 
 /**
  * @brief      Sends a command.
@@ -358,8 +405,8 @@ ALWAYS_INLINE void TOSHSD_setBlockLen(ToshsdPort *const port, u16 blockLen)
  */
 ALWAYS_INLINE void TOSHSD_setBusWidth(ToshsdPort *const port, const u8 width)
 {
-	if(width == 4) port->sd_option = OPTION_BUS_WIDTH4 | OPTION_UNK14 | 0xE9u;
-	else           port->sd_option = OPTION_BUS_WIDTH1 | OPTION_UNK14 | 0xE9u;
+	port->sd_option = (width == 4 ? OPTION_BUS_WIDTH4 : OPTION_BUS_WIDTH1) |
+	                  OPTION_UNK14 | OPTION_DEFAULT_TIMINGS;
 }
 
 /**

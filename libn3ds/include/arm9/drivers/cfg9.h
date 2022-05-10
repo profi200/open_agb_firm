@@ -74,8 +74,8 @@ ALWAYS_INLINE Cfg9* getCfg9Regs(void)
 #define SYSPROT11_ROM_H2_LOCK      (1u) // Disables access to the second half of the ARM11 bootrom. Also enables FCRAM access.
 
 // REG_CFG9_XDMA_REQ
-#define XDMA_REQ_TOSHSD1           (1u)    // Toshsd controller 1 (SD/eMMC).
-#define XDMA_REQ_TOSHSD3           (1u<<1) // Toshsd controller 3.
+#define XDMA_REQ_TOSHSD1           (1u)    // Toshsd controller 1 (SD card slot/eMMC).
+#define XDMA_REQ_TOSHSD3           (1u<<1) // Toshsd controller 3 (SD card slot).
 #define XDMA_REQ_AES_IN            (1u<<2)
 #define XDMA_REQ_AES_OUT           (1u<<3)
 
@@ -95,18 +95,18 @@ ALWAYS_INLINE Cfg9* getCfg9Regs(void)
 #define CARD_POWER_OFF_REQ         (3u<<2) // Power off request.
 
 // REG_CFG9_SDMMCCTL
-#define SDMMCCTL_SLOT_PWR_OFF      (1u)    // Controller 1/3 port 0 (MMC/SD card slot).
+#define SDMMCCTL_CARD_PWR_OFF      (1u)    // Controller 1/3 port 0 (MMC/SD card slot).
 #define SDMMCCTL_eMMC_PWR_OFF      (1u<<1) // Controller 1 port 1.
 #define SDMMCCTL_WiFi_PWR_OFF      (1u<<2) // Controller 2 port 0.
 #define SDMMCCTL_UNK_PWR_OFF       (1u<<3) // Controller 3 port 1 power off? Set at cold boot.
 #define SDMMCCTL_UNK_BIT6          (1u<<6) // Wifi port related? Pull up? Set at cold boot.
 #define SDMMCCTL_TOSHSD3_MAP9      (0u)    // Controller 3 mapping ARM9 0x10007000.
 #define SDMMCCTL_TOSHSD3_MAP11     (1u<<8) // Controller 3 mapping ARM11 0x10100000.
-#define SDMMCCTL_SLOT_TOSHSD3_SEL  (0u)    // SD slot controller select TOSHSD3 0x10007000/0x10100000.
-#define SDMMCCTL_SLOT_TOSHSD1_SEL  (1u<<9) // SD slot controller select TOSHSD1 0x10006000.
+#define SDMMCCTL_CARD_TOSHSD3_SEL  (0u)    // SD card slot controller select TOSHSD3 0x10007000/0x10100000.
+#define SDMMCCTL_CARD_TOSHSD1_SEL  (1u<<9) // SD card slot controller select TOSHSD1 0x10006000.
 
 // REG_CFG9_EXTMEMCNT9
-#define EXTMEMCNT9_WRAM_EXT_E      (1u) // Enables extra WRAM aka. ARM9 mem extension.
+#define EXTMEMCNT9_WRAM_EXT_E      (1u)    // Enables extra WRAM aka. ARM9 mem extension.
 
 // REG_CFG9_SOCINFO
 #define SOCINFO_CTR                (1u)    // Also set on New 3DS.

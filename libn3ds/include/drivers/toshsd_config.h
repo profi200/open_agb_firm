@@ -18,6 +18,17 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef _3DS
+#ifdef ARM9
+#include "arm9/drivers/interrupt.h"
+#include "arm9/drivers/cfg9.h"
+#elif ARM11
+#include "arm11/drivers/interrupt.h"
+#endif // #ifdef ARM9
+#elif TWL
+#error "Missing TWL includes."
+#endif // #ifdef _3DS
+
 
 // Note on port numbers:
 // To make things easier 2 ports are assigned to each controller.
@@ -44,4 +55,54 @@
 
 #define TOSHSD_CARD_PORT  (0u)
 #define TOSHSD_eMMC_PORT  (1u)
+#endif // #ifdef _3DS
+
+
+
+// Don't modify anything below!
+#ifdef _3DS
+#ifdef ARM9
+#define TOSHSD_MAP_CONTROLLERS() \
+{ \
+	getCfg9Regs()->sdmmcctl = (TOSHSD_CARD_PORT == 2u ? SDMMCCTL_CARD_TOSHSD3_SEL : SDMMCCTL_CARD_TOSHSD1_SEL) | \
+	                          (TOSHSD_C2_MAP == 1u ? SDMMCCTL_TOSHSD3_MAP11 : SDMMCCTL_TOSHSD3_MAP9) | \
+	                          SDMMCCTL_UNK_BIT6 | SDMMCCTL_UNK_PWR_OFF; \
+}
+
+#define TOSHSD_UNMAP_CONTROLLERS()  {getCfg9Regs()->sdmmcctl = SDMMCCTL_UNK_BIT6 | SDMMCCTL_UNK_PWR_OFF | SDMMCCTL_CARD_PWR_OFF;}
+#define TOSHSD_NUM_CONTROLLERS      (TOSHSD_C2_MAP == 0u ? 2u : 1u)
+#define TOSHSD_IRQ_ID_CONTROLLER1   (IRQ_TOSHSD1)
+#define TOSHSD_REGISTER_ISR(isr) \
+{ \
+	IRQ_registerIsr(IRQ_TOSHSD1, (isr)); \
+	if(TOSHSD_NUM_CONTROLLERS == 2u) \
+		IRQ_registerIsr(IRQ_TOSHSD3, (isr)); \
+}
+#elif ARM11
+#define TOSHSD_MAP_CONTROLLERS()
+#define TOSHSD_UNMAP_CONTROLLERS()
+#define TOSHSD_NUM_CONTROLLERS      (TOSHSD_C2_MAP == 1u ? 2u : 1u)
+#define TOSHSD_IRQ_ID_CONTROLLER1   (IRQ_TOSHSD2)
+#define TOSHSD_REGISTER_ISR(isr) \
+{ \
+	IRQ_registerIsr(IRQ_TOSHSD2, 14, 0, (isr)); \
+	if(TOSHSD_NUM_CONTROLLERS == 2u) \
+		IRQ_registerIsr(IRQ_TOSHSD3, 14, 0, (isr)); \
+}
+#endif // #ifdef ARM9
+
+#define TOSHSD_UNREGISTER_ISR() \
+{ \
+	IRQ_unregisterIsr(TOSHSD_IRQ_ID_CONTROLLER1); \
+	if(TOSHSD_NUM_CONTROLLERS == 2u) \
+		IRQ_unregisterIsr(IRQ_TOSHSD3); \
+}
+
+#elif TWL
+
+#define TOSHSD_MAP_CONTROLLERS()
+#define TOSHSD_UNMAP_CONTROLLERS()
+#define TOSHSD_NUM_CONTROLLERS      (2u)
+#error "Missing TWL controller 1 IRQ ID."
+#error "Unimplemented TWL register ISR."
 #endif // #ifdef _3DS

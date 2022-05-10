@@ -52,7 +52,7 @@
 
 #elif TWL
 
-//#define INIT_DELAY     (1u * 128 * 74) // Assumes ARM9 timers. Same clock as controller.
+//#define INIT_DELAY_FUNC()  TIMER_sleepTicks(1 * 128 * 74) // ARM9 timer clock = controller clock.
 #error "SD/MMC necessary delay unimplemented."
 
 #define INIT_CLOCK     (SD_CLK_DIV_128) // 261 kHz (maximum 400 kHz).
@@ -301,13 +301,13 @@ static void parseCsd(SdmmcDev *const dev, const u8 cardType)
 	else
 	{
 		// SD CSD version 3.0 format.
-		// For version 2.0 this is 22 bits however the uppe bits
+		// For version 2.0 this is 22 bits however the upper bits
 		// are reserved and zero filled so this is fine.
 		const u32 c_size = UNSTUFF_BITS(csd, 48, 28); // [75:48]
 
 		sectors = (c_size + 1) * 1024u;
 	}
-	// TODO: High capacity (e)MMC encodes the size in the ext CSD.
+	// TODO: High capacity (e)MMC encodes the size in the ext CSD. We have to implement this for N2DS XL.
 	dev->sectors = sectors;
 
 	dev->ccc = UNSTUFF_BITS(csd, 84, 12); // [95:84]
@@ -423,8 +423,6 @@ u32 SDMMC_init(const u8 devNum)
 	SdmmcDev *const dev = &g_devs[devNum];
 	if(dev->cardType != CTYPE_NONE) return SDMMC_ERR_INITIALIZED;
 
-	// TODO: When does the card detection timer start? Does not restart on controller reset.
-	//       Seems to start as soon as the port is mapped.
 	ToshsdPort *const port = &dev->port;
 	TOSHSD_initPort(port, dev2portNum(devNum));
 	TOSHSD_setClockImmediately(port, INIT_CLOCK); // Continuous init clock.
@@ -486,9 +484,9 @@ u32 SDMMC_deinit(const u8 devNum)
 }
 
 // TODO: Less controller dependent code.
-void SDMMC_getCardInfo(const u8 devNum, SdmmcInfo *const infoOut)
+u32 SDMMC_getDevInfo(const u8 devNum, SdmmcInfo *const infoOut)
 {
-	if(devNum > SDMMC_DEV_eMMC) return;
+	if(devNum > SDMMC_DEV_eMMC) return SDMMC_ERR_INVAL_PARAM;
 
 	const SdmmcDev *const dev = &g_devs[devNum];
 	const ToshsdPort *const port = &dev->port;
@@ -497,14 +495,18 @@ void SDMMC_getCardInfo(const u8 devNum, SdmmcInfo *const infoOut)
 	infoOut->spec_vers = dev->spec_vers;
 	infoOut->rca       = dev->rca;
 	infoOut->sectors   = dev->sectors;
+
 	const u32 clkSetting = port->sd_clk_ctrl & 0xFFu;
 	infoOut->clock     = TOSHSD_HCLK / (clkSetting ? clkSetting<<2 : 2u);
+
 	memcpy(infoOut->cid, dev->cid, 16);
 	infoOut->ccc       = dev->ccc;
 	infoOut->busWidth  = (port->sd_option & OPTION_BUS_WIDTH1 ? 1u : 4u);
+
+	return SDMMC_ERR_NONE;
 }
 
-u32 SDMMC_getCid(const u8 devNum, u32 *const cidOut)
+u32 SDMMC_getCid(const u8 devNum, u32 cidOut[4])
 {
 	if(devNum > SDMMC_DEV_eMMC) return SDMMC_ERR_INVAL_PARAM;
 
