@@ -40,26 +40,26 @@ void printError(Result res)
 		"Not found",
 		"Path too long",
 
-		// fatfs errors.
-		"fatfs disk error",
-		"fatfs assertion failed",
-		"fatfs disk not ready",
-		"fatfs file not found",
-		"fatfs path not found",
-		"fatfs invalid path name",
-		"fatfs access denied",
-		"fatfs already exists",
-		"fatfs invalid file/directory object",
-		"fatfs drive write protected",
-		"fatfs invalid drive",
-		"fatfs drive not mounted",
-		"fatfs no filesystem",
-		"fatfs f_mkfs() aborted",
-		"fatfs thread lock timeout",
-		"fatfs file locked",
-		"fatfs not enough memory",
-		"fatfs too many open objects",
-		"fatfs invalid parameter"
+		// FatFs errors.
+		"FatFs disk error",
+		"FatFs assertion failed",
+		"FatFs disk not ready",
+		"FatFs file not found",
+		"FatFs path not found",
+		"FatFs invalid path name",
+		"FatFs access denied",
+		"FatFs already exists",
+		"FatFs invalid file/directory object",
+		"FatFs drive write protected",
+		"FatFs invalid drive",
+		"FatFs drive not mounted",
+		"FatFs no filesystem",
+		"FatFs f_mkfs() aborted",
+		"FatFs thread lock timeout",
+		"FatFs file locked",
+		"FatFs not enough memory",
+		"FatFs too many open objects",
+		"FatFs invalid parameter"
 	};
 	static const char *const custom[] =
 	{
@@ -67,11 +67,8 @@ void printError(Result res)
 		"Failed to set GBA RTC"
 	};
 
-	if(res < CUSTOM_ERR_OFFSET) ee_printf("Error: %s.\n", common[res]);
-	else
-	{
-		ee_printf("Error: %s.\n", custom[res - CUSTOM_ERR_OFFSET]);
-	}
+	const char *const errStr = (res < CUSTOM_ERR_OFFSET ? common[res] : custom[res - CUSTOM_ERR_OFFSET]);
+	ee_printf("Error: %s.\n", errStr);
 }
 
 void printErrorWaitInput(Result res, u32 waitKeys)
