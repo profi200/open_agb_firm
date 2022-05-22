@@ -59,13 +59,13 @@ int main(void)
 
 	if(res == RES_OK && (res = oafInitAndRun()) == RES_OK)
 	{
-		do
+		while(1)
 		{
 			hidScanInput();
 			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
 
 			oafUpdate();
-		} while(1);
+		}
 
 		oafFinish();
 	}

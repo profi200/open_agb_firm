@@ -571,7 +571,7 @@ static Result showFileBrowser(char romAndSavePath[512])
 		do
 		{
 			// Get last ROM launch path.
-			if((res = fsLoadPathFromFile("lastdir.txt", lastDir)) != FR_OK)
+			if((res = fsLoadPathFromFile("lastdir.txt", lastDir)) != RES_OK)
 			{
 				if(res == RES_FR_NO_FILE) strcpy(lastDir, "sdmc:/");
 				else                      break;

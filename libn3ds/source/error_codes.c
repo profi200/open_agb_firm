@@ -75,14 +75,21 @@ void printErrorWaitInput(Result res, u32 waitKeys)
 {
 	printError(res);
 
-	do
+	// In case we were already in the process of powering off
+	// don't do so now. Ask the user to press power again.
+	// Error messages will get lost otherwise.
+	// Do not clear the power held flag here because the system
+	// is powering off soon.
+	(void)hidGetExtraKeys(KEY_POWER);
+
+	while(1)
 	{
 		GFX_waitForVBlank0();
 
 		hidScanInput();
 
 		if(hidKeysDown() & waitKeys) break;
-		if(hidGetExtraKeys(KEY_POWER) & KEY_POWER) break;
-	} while(1);
+		if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
+	}
 }
 #endif // ifdef ARM11
