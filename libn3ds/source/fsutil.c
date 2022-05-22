@@ -26,9 +26,9 @@
 
 Result fsQuickRead(const char *const path, void *const buf, u32 size) // TODO: Output how many bytes we read?
 {
-	Result res;
 	FHandle f;
-	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	Result res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ);
+	if(res == RES_OK)
 	{
 		res = fRead(f, buf, size, NULL);
 
@@ -40,16 +40,19 @@ Result fsQuickRead(const char *const path, void *const buf, u32 size) // TODO: O
 
 Result fsQuickWrite(const char *const path, const void *const buf, u32 size)
 {
-	Result res;
 	FHandle f;
-	if((res = fOpen(&f, path, FA_OPEN_ALWAYS | FA_WRITE)) == RES_OK)
+	Result res = fOpen(&f, path, FA_OPEN_ALWAYS | FA_WRITE);
+	Result closeRes;
+	if(res == RES_OK)
 	{
 		res = fWrite(f, buf, size, NULL);
 
-		fClose(f);
+		// Because of the disk cache errors on small writes
+		// happen on close when the cache is written back to disk.
+		closeRes = fClose(f);
 	}
 
-	return res;
+	return (res != RES_OK ? res : closeRes);;
 }
 
 Result fsMakePath(const char *const path)
