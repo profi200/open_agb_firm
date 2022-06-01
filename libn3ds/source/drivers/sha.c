@@ -23,7 +23,7 @@
 
 void SHA_getState(u32 *const out);
 
-static inline void waitBusy(const Sha *const sha)
+ALWAYS_INLINE void waitBusy(const Sha *const sha)
 {
 	while(sha->cnt & SHA_EN);
 }

@@ -39,18 +39,20 @@ ST
 WMB
 END
 */
-void printSlotCardInfos(void)
+static u32 printCardInfos(void)
 {
 	SdmmcInfo info;
-	SDMMC_getCardInfo(SDMMC_DEV_SLOT, &info);
+	SDMMC_getDevInfo(SDMMC_DEV_CARD, &info);
 
-	ee_printf("Card infos:\n type: %u\n spec_vers: %u\n rca: 0x%X\n ccc: 0x%X\n sectors: %lu\n CID: ",
-	          info.type, info.spec_vers, info.rca, info.ccc, info.sectors);
+	ee_printf("Card infos:\n type: %u\n wrProt: %u\n rca: 0x%X\n sectors: %lu (~%lu MiB)\n ccc: 0x%X\n CID: ",
+	          info.type, info.wrProt, info.rca, info.sectors, info.sectors / 2048, info.ccc);
 	for(u32 i = 0; i < 4; i++)
 	{
 		ee_printf("%08lX", info.cid[i]);
 	}
 	ee_printf("\n Bus width: %u bit\n Clock: %lu Hz\n", info.busWidth, info.clock);
+
+	return info.sectors;
 }
 
 int main(void)
@@ -63,26 +65,26 @@ int main(void)
 	TOSHSD_init();
 
 	ee_puts("Insert SD/MMC and press A.");
-	do
+	while(1)
 	{
-		do
+		while(1)
 		{
 			hidScanInput();
 			if(hidGetExtraKeys(0) & (KEY_POWER | KEY_POWER_HELD)) goto pooff;
 			if(hidKeysDown() & KEY_A) break;
 			GFX_waitForVBlank0();
-		} while(1);
+		}
 
 		ee_printf("\x1b[1;0H\x1b[0J\x1b[1;0H");
-		ee_printf("Card inserted/unlocked: %u/%u\n", TOSHSD_cardDetected(), TOSHSD_cardSliderUnlocked());
-		const u32 initRes = SDMMC_init(SDMMC_DEV_SLOT);
-		u32 sect[1024 / 4] = {0};
-		const u32 read = SDMMC_readSectors(SDMMC_DEV_SLOT, 0, sect, 1);
-		const u32 read2 = SDMMC_readSectors(SDMMC_DEV_SLOT, 1, &sect[512 / 4], 1);
-		printSlotCardInfos();
-		SDMMC_deinit(SDMMC_DEV_SLOT);
-		ee_printf("init: %lu, read: %lu, read2: %lu, sector[127]: 0x%lX\n", initRes, read, read2, sect[511 / 4]);
-	} while(1);
+		ee_printf("Card inserted: %u\n", TOSHSD_cardDetected());
+		const u32 initRes = SDMMC_init(SDMMC_DEV_CARD);
+		const u32 sectors = printCardInfos();
+		u32 buf[1536 / 4] = {0};
+		const u32 read = SDMMC_readSectors(SDMMC_DEV_CARD, 0, buf, 1);
+		const u32 read2 = SDMMC_readSectors(SDMMC_DEV_CARD, sectors - 2, &buf[512 / 4], 2);
+		SDMMC_deinit(SDMMC_DEV_CARD);
+		ee_printf("init: %lu, read: %lu, read2: %lu, sector[127]: 0x%lX\n", initRes, read, read2, buf[511 / 4]);
+	}
 
 pooff:
 	GFX_deinit();

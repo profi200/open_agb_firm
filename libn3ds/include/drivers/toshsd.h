@@ -70,13 +70,13 @@ static_assert(offsetof(Toshsd, sd_fifo32) == 0x10C, "Error: Member sd_fifo32 of 
 
 ALWAYS_INLINE Toshsd* getToshsdRegs(const u8 controller)
 {
-	return (controller == 0u ? (Toshsd*)TOSHSD1_REGS_BASE : (Toshsd*)TOSHSD2_REGS_BASE);
+	return (controller == 0 ? (Toshsd*)TOSHSD1_REGS_BASE : (Toshsd*)TOSHSD2_REGS_BASE);
 }
 
 ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 {
 #if (_3DS && ARM11)
-	return (vu32*)((uintptr_t)regs + 0x200000u); // FIFO is in the DMA region.
+	return (vu32*)((uintptr_t)regs + 0x200000); // FIFO is in the DMA region.
 #else
 	return &regs->sd_fifo32;
 #endif // #if (_3DS && ARM11)
@@ -105,8 +105,8 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define CMD_RESP_R4              (CMD_RESP_R3)  // Response type R4 48 bit OCR without CRC.
 #define CMD_RESP_MASK            (CMD_RESP_R3)
 #define CMD_DT_EN                (1u<<11)       // Data transfer enable.
-#define CMD_DIR_W                (0u)           // Data transfer direction write.
 #define CMD_DIR_R                (1u<<12)       // Data transfer direction read.
+#define CMD_DIR_W                (0u)           // Data transfer direction write.
 #define CMD_MBT                  (1u<<13)       // Multi block transfer (auto STOP_TRANSMISSION).
 #define CMD_SEC_SDIO             (1u<<14)       // Security/SDIO command.
 
@@ -150,16 +150,12 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define STATUS_CMD_BUSY          (1u<<30) // Command register busy.
 #define STATUS_ERR_ILL_ACC       (1u<<31) // (M) Illegal access error. TODO: What does that mean?
 
-#define STATUS_MASK_ALL          (STATUS_ERR_ILL_ACC | (1u<<27) | STATUS_TX_REQ | STATUS_RX_RDY | \
-                                  STATUS_ERR_CMD_TIMEOUT | STATUS_ERR_TX_UNDERF | STATUS_ERR_RX_OVERF | \
-                                  STATUS_ERR_DATA_TIMEOUT | STATUS_ERR_STOP_BIT | STATUS_ERR_CRC | \
-                                  STATUS_ERR_CMD_IDX | STATUS_DAT3_INSERT | STATUS_DAT3_REMOVE | \
-                                  STATUS_INSERT | STATUS_REMOVE | STATUS_DATA_END | STATUS_RESP_END)
+#define STATUS_MASK_ALL          (0xFFFFFFFFu)
 #define STATUS_MASK_DEFAULT      ((1u<<27) | STATUS_TX_REQ | STATUS_RX_RDY | \
                                   STATUS_DAT3_INSERT | STATUS_DAT3_REMOVE)
 #define STATUS_MASK_ERR          (STATUS_ERR_ILL_ACC | STATUS_ERR_CMD_TIMEOUT | STATUS_ERR_TX_UNDERF | \
                                   STATUS_ERR_RX_OVERF | STATUS_ERR_DATA_TIMEOUT | STATUS_ERR_STOP_BIT | \
-                                  STATUS_ERR_CRC | STATUS_ERR_CMD_IDX | STATUS_REMOVE)
+                                  STATUS_ERR_CRC | STATUS_ERR_CMD_IDX)
 
 // REG_SD_CLK_CTRL
 #define SD_CLK_DIV_2             (0u)    // Clock divider 2.
@@ -235,8 +231,7 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define SDIO_STATUS_UNK14_IRQ    (1u<<14) // (M) Related to SDIO_MODE_UNK9?
 #define SDIO_STATUS_UNK15_IRQ    (1u<<15) // (M) Related to SDIO_MODE_UNK2_EN?
 
-#define SDIO_STATUS_MASK_ALL     (SDIO_STATUS_UNK15_IRQ | SDIO_STATUS_UNK14_IRQ | SDIO_STATUS_UNK2_IRQ | \
-                                  SDIO_STATUS_UNK1_IRQ | SDIO_STATUS_SDIO_IRQ)
+#define SDIO_STATUS_MASK_ALL     (0xFFFFu)
 
 // REG_DMA_EXT_MODE
 #define DMA_EXT_CPU_MODE         (0u)    // Disables DMA requests. Actually also turns off the 32 bit FIFO.
@@ -277,8 +272,7 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define EXT_CDET_P3_INSERT       (1u<<7) // (M) Port 3 card got inserted. TODO: With detection timer?
 #define EXT_CDET_P3_DETECT       (1u<<8) // Port 3 card detect status. 1 = inserted. TODO: With detection timer?
 
-#define EXT_CDET_MASK_ALL        (EXT_CDET_P3_INSERT | EXT_CDET_P3_REMOVE | EXT_CDET_P2_INSERT | \
-                                  EXT_CDET_P2_REMOVE | EXT_CDET_P1_INSERT | EXT_CDET_P1_REMOVE)
+#define EXT_CDET_MASK_ALL        (0xFFFFu)
 
 // REG_EXT_CDET_DAT3       Acknowledgeable?
 // REG_EXT_CDET_DAT3_MASK  (M) = Maskable bit. 1 = disabled (no IRQ).
@@ -292,8 +286,7 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define EXT_CDET_DAT3_P3_INSERT  (1u<<7) // (M) Port 3 card DAT3 got inserted (high).
 #define EXT_CDET_DAT3_P3_DETECT  (1u<<8) // Port 3 card DAT3 status. 1 = inserted.
 
-#define EXT_CDET_DAT3_MASK_ALL   (EXT_CDET_DAT3_P3_INSERT | EXT_CDET_DAT3_P3_REMOVE | EXT_CDET_DAT3_P2_INSERT | \
-                                  EXT_CDET_DAT3_P2_REMOVE | EXT_CDET_DAT3_P1_INSERT | EXT_CDET_DAT3_P1_REMOVE)
+#define EXT_CDET_DAT3_MASK_ALL   (0xFFFFu)
 
 // REG_SD_FIFO32_CNT
 // Bit 0 unknown, non-writable.
@@ -349,7 +342,7 @@ bool TOSHSD_cardDetected(void);
  *
  * @return     Returns true if the card is unlocked.
  */
-bool TOSHSD_cardSliderUnlocked(void);
+bool TOSHSD_cardWritable(void);
 
 /**
  * @brief      Sets the clock for a toshsd port and hardware.
@@ -390,9 +383,9 @@ ALWAYS_INLINE void TOSHSD_setClock(ToshsdPort *const port, const u16 clk)
  */
 ALWAYS_INLINE void TOSHSD_setBlockLen(ToshsdPort *const port, u16 blockLen)
 {
-	if(blockLen > 512u)        blockLen = 512u;
-	if(blockLen < 16u)         blockLen = 0u;
-	if((blockLen % 16u) != 0u) blockLen = 0u; // Depends on doCpuTransfer() in toshsd.c.
+	if(blockLen > 512)       blockLen = 512;
+	if(blockLen < 16)        blockLen = 0; // | Depends on doCpuTransfer() in toshsd.c.
+	if((blockLen % 16) != 0) blockLen = 0; // |
 
 	port->sd_blocklen = blockLen;
 }
@@ -414,7 +407,7 @@ ALWAYS_INLINE void TOSHSD_setBusWidth(ToshsdPort *const port, const u8 width)
  *
  * @param      port    A pointer to the port struct.
  * @param      buf     The buffer pointer.
- * @param[in]  blocks  The number blocks to transfer.
+ * @param[in]  blocks  The number of blocks to transfer.
  */
 ALWAYS_INLINE void TOSHSD_setBuffer(ToshsdPort *const port, u32 *buf, const u16 blocks)
 {

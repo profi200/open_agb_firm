@@ -11,7 +11,6 @@
 #include "diskio.h"		/* Declarations of disk functions */
 #include "types.h"
 #include "drivers/toshsd.h"
-#include "arm.h"
 #include "drivers/mmc/sdmmc.h"
 #include "arm9/drivers/ndma.h"
 #include "drivers/cache.h"
@@ -28,17 +27,9 @@ DSTATUS disk_status (
 {
 	(void)pdrv;
 
-	/*DSTATUS dstat = 0; // TODO: Testing.
-	if(!TOSHSD_cardDetected())
-	{
-		// Assumes IRQs are on and the controller IRQ is the only one that fires.
-		// TODO: Better strategy.
-		__wfi();
-		dstat = (TOSHSD_cardDetected() == true ? 0u : STA_NODISK);
-	}
-
-	return dstat;*/
-	return (TOSHSD_cardDetected() == true ? 0u : STA_NODISK);
+	// TODO: On hotswap the old write protection bits are stuck which may cause issues.
+	return (SDMMC_getWriteProtBits(SDMMC_DEV_CARD) != 0 ? STA_PROTECT : 0) |
+	       (TOSHSD_cardDetected() == true ? 0 : (STA_NODISK | STA_NOINIT));
 }
 
 
@@ -53,7 +44,7 @@ DSTATUS disk_initialize (
 {
 	(void)pdrv;
 
-	return (SDMMC_init(SDMMC_DEV_CARD) == RES_OK ? 0u : STA_NOINIT);
+	return (SDMMC_init(SDMMC_DEV_CARD) == RES_OK ? 0 : STA_NOINIT);
 }
 
 
@@ -70,37 +61,42 @@ DRESULT disk_read (
 )
 {
 	(void)pdrv;
-	// TODO: fatfs will use memcpy() for sizes under 512 bytes
+
+	// TODO: FatFs will use memcpy() for sizes under 512 bytes
 	//       but larger transfers run into this check if unaligned.
-	if((uintptr_t)buff % 4u) return RES_PARERR;
-
-	// Warning! Flush before transfer only works on ARM9 (no speculative prefetching)!
-	flushDCacheRange(buff, 512u * count);
-
-	NdmaCh *const ndmaCh = getNdmaChRegs(5);
-	do
+	DRESULT res = RES_OK;
+	if((uintptr_t)buff % 4 == 0)
 	{
-		const u16 blockCount = (count > 0xFFFFu ? 0xFFFFu : count);
+		// Warning! Flush before transfer only works on ARM9 (no speculative prefetching)!
+		flushDCacheRange(buff, 512 * count);
+
+		NdmaCh *const ndmaCh = getNdmaChRegs(5);
 		ndmaCh->sad  = (u32)getToshsdFifo(getToshsdRegs(1)); // TODO: SDMMC dev to FIFO function.
 		ndmaCh->dad  = (u32)buff;
-		ndmaCh->tcnt = (u32)blockCount<<7;
-		ndmaCh->wcnt = 512u / 4;
+		ndmaCh->wcnt = 512 / 4;
 		ndmaCh->bcnt = NDMA_FASTEST;
-		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE |
-		               NDMA_BURST(64u / 4) | NDMA_SAD_FIX | NDMA_DAD_INC;
+		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_REPEAT_MODE |
+		               NDMA_BURST(64 / 4) | NDMA_SAD_FIX | NDMA_DAD_INC;
 
-		if(SDMMC_readSectors(SDMMC_DEV_CARD, sector, NULL, blockCount))
+		do
 		{
-			ndmaCh->cnt = 0; // Stop DMA on error.
-			return RES_ERROR;
-		}
+			const u16 blockCount = (count > 0xFFFF ? 0xFFFF : count);
+			if(SDMMC_readSectors(SDMMC_DEV_CARD, sector, NULL, blockCount) != SDMMC_ERR_NONE)
+			{
+				res = RES_ERROR;
+				break;
+			}
 
-		buff += 512u * blockCount;
-		sector += blockCount;
-		count -= blockCount;
-	} while(count > 0u);
+			sector += blockCount;
+			count -= blockCount;
+		} while(count > 0);
 
-	return RES_OK;
+		// Stop DMA.
+		ndmaCh->cnt = 0;
+	}
+	else res = RES_PARERR;
+
+	return res;
 }
 
 
@@ -119,36 +115,41 @@ DRESULT disk_write (
 )
 {
 	(void)pdrv;
-	// TODO: fatfs will use memcpy() for sizes under 512 bytes
+
+	// TODO: FatFs will use memcpy() for sizes under 512 bytes
 	//       but larger transfers run into this check if unaligned.
-	if((uintptr_t)buff % 4u) return RES_PARERR;
-
-	flushDCacheRange(buff, 512u * count);
-
-	NdmaCh *const ndmaCh = getNdmaChRegs(5);
-	do
+	DRESULT res = RES_OK;
+	if((uintptr_t)buff % 4 == 0)
 	{
-		const u16 blockCount = (count > 0xFFFFu ? 0xFFFFu : count);
-		ndmaCh->sad  = (const u32)buff;
+		flushDCacheRange(buff, 512 * count);
+
+		NdmaCh *const ndmaCh = getNdmaChRegs(5);
+		ndmaCh->sad  = (u32)buff;
 		ndmaCh->dad  = (u32)getToshsdFifo(getToshsdRegs(1)); // TODO: SDMMC dev to FIFO function.
-		ndmaCh->tcnt = (u32)blockCount<<7;
-		ndmaCh->wcnt = 512u / 4;
+		ndmaCh->wcnt = 512 / 4;
 		ndmaCh->bcnt = NDMA_FASTEST;
-		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_TCNT_MODE |
-		               NDMA_BURST(64u / 4) | NDMA_SAD_INC | NDMA_DAD_FIX;
+		ndmaCh->cnt  = NDMA_EN | NDMA_START_TOSHSD3 | NDMA_REPEAT_MODE |
+		               NDMA_BURST(64 / 4) | NDMA_SAD_INC | NDMA_DAD_FIX;
 
-		if(SDMMC_writeSectors(SDMMC_DEV_CARD, sector, NULL, blockCount))
+		do
 		{
-			ndmaCh->cnt = 0; // Stop DMA on error.
-			return RES_ERROR;
-		}
+			const u16 blockCount = (count > 0xFFFF ? 0xFFFF : count);
+			if(SDMMC_writeSectors(SDMMC_DEV_CARD, sector, NULL, blockCount) != SDMMC_ERR_NONE)
+			{
+				res = RES_ERROR;
+				break;
+			}
 
-		buff += 512u * blockCount;
-		sector += blockCount;
-		count -= blockCount;
-	} while(count > 0u);
+			sector += blockCount;
+			count -= blockCount;
+		} while(count > 0);
 
-	return RES_OK;
+		// Stop DMA.
+		ndmaCh->cnt = 0;
+	}
+	else res = RES_PARERR;
+
+	return res;
 }
 
 #endif
@@ -173,10 +174,10 @@ DRESULT disk_ioctl (
 			*(DWORD*)buff = SDMMC_getSectors(SDMMC_DEV_CARD);
 			break;
 		case GET_SECTOR_SIZE:
-			*(WORD*)buff = 512u;
+			*(WORD*)buff = 512;
 			break;
 		case GET_BLOCK_SIZE:
-			*(DWORD*)buff = 0x100u; // Default to 128 KiB. TODO: Get this from the driver.
+			*(DWORD*)buff = 0x100; // Default to 128 KiB. TODO: Get this from the driver.
 		case CTRL_TRIM:
 			// TODO: Implement this.
 		case CTRL_SYNC:
