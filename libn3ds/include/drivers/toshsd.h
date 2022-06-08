@@ -146,7 +146,7 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define STATUS_RX_RDY            (1u<<24) // (M) FIFO ready for read.
 #define STATUS_TX_REQ            (1u<<25) // (M) FIFO write request.
 // Bit 27 is maskable. Purpose unknown.
-// Bit 29 exists (not maskable). Unknown purpose.
+// Bit 29 exists (not maskable). Signals when clock divider changes are allowed?
 #define STATUS_CMD_BUSY          (1u<<30) // Command register busy.
 #define STATUS_ERR_ILL_ACC       (1u<<31) // (M) Illegal access error. TODO: What does that mean?
 
@@ -171,13 +171,18 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define SD_CLK_AUTO_OFF          (1u<<9) // Disables clock on idle.
 // Bit 10 is writable... at least according to gbatek (can't confirm). Purpose unknown.
 
-#ifdef _3DS
-// 67027964 / 256 = 261827.984375 Hz.
-#define SD_CLK_DEFAULT           (SD_CLK_AUTO_OFF | SD_CLK_EN | SD_CLK_DIV_256)
-#elif TWL
-// 33513982 / 128 = 261827.984375 Hz.
-#define SD_CLK_DEFAULT           (SD_CLK_AUTO_OFF | SD_CLK_EN | SD_CLK_DIV_128)
-#endif // #ifdef _3DS
+// Outputs the matching divider for clk.
+// Shift the output right by 2 to get the value for REG_SD_CLK_CTRL.
+#define TOSHSD_CLK2DIV(clk)                        \
+({                                                 \
+	u32 __shift = 1;                               \
+	while((clk) < TOSHSD_HCLK>>__shift) ++__shift; \
+	1u<<__shift;                                   \
+})
+
+// Clock off by default.
+// Nearest possible for 400 kHz is 261.827984375 kHz.
+#define SD_CLK_DEFAULT  (TOSHSD_CLK2DIV(400000)>>2)
 
 // REG_SD_OPTION
 // Note on card detection time:
@@ -345,12 +350,12 @@ bool TOSHSD_cardDetected(void);
 bool TOSHSD_cardWritable(void);
 
 /**
- * @brief      Sets the clock for a toshsd port and hardware.
+ * @brief      Outputs a continuous clock for initialization.
  *
  * @param      port  A pointer to the port struct.
- * @param[in]  clk   The clock settings.
+ * @param[in]  clk   The target clock in Hz. Usually 400 kHz.
  */
-void TOSHSD_setClockImmediately(ToshsdPort *const port, u16 clk);
+void TOSHSD_startInitClock(ToshsdPort *const port, const u32 clk);
 
 /**
  * @brief      Sends a command.
@@ -367,12 +372,11 @@ u32 TOSHSD_sendCommand(ToshsdPort *const port, const u16 cmd, const u32 arg);
  * @brief      Sets the clock for a toshsd port.
  *
  * @param      port  A pointer to the port struct.
- * @param[in]  clk   The clock settings.
+ * @param[in]  clk   The target clock in Hz.
  */
-ALWAYS_INLINE void TOSHSD_setClock(ToshsdPort *const port, const u16 clk)
+ALWAYS_INLINE void TOSHSD_setClock(ToshsdPort *const port, const u32 clk)
 {
-	// TODO: Clock in Hz?
-	port->sd_clk_ctrl = SD_CLK_EN | clk;
+	port->sd_clk_ctrl = SD_CLK_AUTO_OFF | SD_CLK_EN | TOSHSD_CLK2DIV(clk)>>2;
 }
 
 /**

@@ -5,6 +5,7 @@
 #include "arm11/fmt.h"
 #include "arm11/drivers/hid.h"
 #include "drivers/mmc/sdmmc.h"
+#include "arm11/drivers/codec.h"
 #include "arm11/power.h"
 
 
@@ -77,16 +78,23 @@ int main(void)
 
 		ee_printf("\x1b[1;0H\x1b[0J\x1b[1;0H");
 		ee_printf("Card inserted: %u\n", TOSHSD_cardDetected());
-		const u32 initRes = SDMMC_init(SDMMC_DEV_CARD);
+		u32 tries = 3;
+		u32 initRes;
+		do
+		{
+			initRes = SDMMC_init(SDMMC_DEV_CARD);
+			TIMER_sleepMs(10);
+		} while(--tries && initRes != 0);
 		const u32 sectors = printCardInfos();
 		u32 buf[1536 / 4] = {0};
 		const u32 read = SDMMC_readSectors(SDMMC_DEV_CARD, 0, buf, 1);
 		const u32 read2 = SDMMC_readSectors(SDMMC_DEV_CARD, sectors - 2, &buf[512 / 4], 2);
 		SDMMC_deinit(SDMMC_DEV_CARD);
-		ee_printf("init: %lu, read: %lu, read2: %lu, sector[127]: 0x%lX\n", initRes, read, read2, buf[511 / 4]);
+		ee_printf("init: %lu (try %lu), read: %lu, read2: %lu, sector[127]: 0x%lX\n", initRes, 3 - tries, read, read2, buf[511 / 4]);
 	}
 
 pooff:
+	CODEC_deinit();
 	GFX_deinit();
 	power_off();
 

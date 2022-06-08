@@ -38,25 +38,25 @@
 // 400 kHz is allowed by the specs. 523 kHz has been proven to work reliably
 // for SD cards and eMMC but very early MMCs can fail at init.
 // We lose about 5 ms of time on init by using 261 kHz.
+#define INIT_CLOCK     (400000u)   // Maximum 400 kHz.
+#define DEFAULT_CLOCK  (20000000u) // Maximum 20 MHz.
+#define HS_CLOCK       (50000000u) // Maximum 50 MHz.
+
 #ifdef _3DS
 #ifdef ARM9
 // TODO: Use a timer instead? The delay is only ~283 µs at ~261 kHz though.
-#define INIT_DELAY_FUNC()  wait_cycles(2 * 256 * 74)      // ARM9 timer clock = controller clock. CPU is x2 timer clock.
+// ARM9 timer clock = controller clock. CPU is x2 timer clock.
+#define INIT_DELAY_FUNC()  wait_cycles(2 * TOSHSD_CLK2DIV(INIT_CLOCK) * 74)
 #elif ARM11
-#define INIT_DELAY_FUNC()  TIMER_sleepTicks(2 * 256 * 74) // ARM11 timer is x2 controller clock.
+// ARM11 timer is x2 controller clock.
+#define INIT_DELAY_FUNC()  TIMER_sleepTicks(2 * TOSHSD_CLK2DIV(INIT_CLOCK) * 74)
 #endif // #ifdef ARM9
-
-#define INIT_CLOCK     (SD_CLK_DIV_256)                 // 261 kHz (maximum 400 kHz).
-#define DEFAULT_CLOCK  (SD_CLK_AUTO_OFF | SD_CLK_DIV_4) // 16.756991 MHz (maximum 20 MHz).
-#define HS_CLOCK       (SD_CLK_AUTO_OFF | SD_CLK_DIV_2) // 33.513982 MHz (maximum 50 MHz).
 
 #elif TWL
 
-//#define INIT_DELAY_FUNC()  TIMER_sleepTicks(1 * 128 * 74) // ARM9 timer clock = controller clock.
+// ARM9 timer clock = controller clock.
+//#define INIT_DELAY_FUNC()  TIMER_sleepTicks(1 * TOSHSD_CLK2DIV(INIT_CLOCK) * 74)
 #error "SD/MMC necessary delay unimplemented."
-
-#define INIT_CLOCK     (SD_CLK_DIV_128) // 261 kHz (maximum 400 kHz).
-#define DEFAULT_CLOCK  (SD_CLK_DIV_2)   // 16.756991 MHz (maximum 20 MHz).
 #endif // #ifdef _3DS
 
 
@@ -230,9 +230,6 @@ static u32 initReadyState(SdmmcDev *const dev)
 	return SDMMC_ERR_NONE;
 }
 
-/*#ifdef ARM11
-#include "arm11/fmt.h"
-#endif*/
 static u32 initIdentState(SdmmcDev *const dev, const u8 devType, u32 *const rcaOut)
 {
 	ToshsdPort *const port = &dev->port;
@@ -241,26 +238,9 @@ static u32 initIdentState(SdmmcDev *const dev, const u8 devType, u32 *const rcaO
 	if(devType < DEV_TYPE_SDSC) // (e)MMC.
 	{
 		// Set the RCA of the (e)MMC to 1. 0 is reserved.
-		// A few extremely old, unbranded (but Nokia?) MMC's will time
-		// out here for unknown reason. They won't work on DSi anyway (FAT12).
 		// The RCA is in the upper 16 bits of the argument.
 		u32 res = TOSHSD_sendCommand(port, MMC_SET_RELATIVE_ADDR, 1u<<16);
 		if(res != 0) return SDMMC_ERR_SET_SEND_RCA;
-		/*if(res != 0)
-		{
-#ifdef ARM11
-	ee_printf("SET_RELATIVE_ADDR: %lu\n", res);
-#endif
-			res = sendCardStatus(port, 0);
-#ifdef ARM11
-	ee_printf("SEND_STATUS: %lu, 0x%lX\n", res, port->resp[0]);
-#endif
-			if(res != 0 || (port->resp[0] & MMC_R1_ERR_ALL) != MMC_R1_ILLEGAL_COMMAND)
-				return SDMMC_ERR_SET_SEND_RCA;
-#ifdef ARM11
-	ee_puts("Warning: Illegal command error on SET_RELATIVE_ADDR. Ignoring.");
-#endif
-		}*/
 
 		rca = 1;
 	}
@@ -467,9 +447,10 @@ u32 SDMMC_init(const u8 devNum)
 	if(devNum == SDMMC_DEV_CARD)
 		dev->wrProt = !TOSHSD_cardWritable();
 
+	// Init port, enable clock output and wait 74 clocks.
 	ToshsdPort *const port = &dev->port;
 	TOSHSD_initPort(port, dev2portNum(devNum));
-	TOSHSD_setClockImmediately(port, INIT_CLOCK); // Continuous init clock.
+	TOSHSD_startInitClock(port, INIT_CLOCK); // Continuous init clock.
 	INIT_DELAY_FUNC();
 
 	u32 res = goIdleState(port);
@@ -481,7 +462,7 @@ u32 SDMMC_init(const u8 devNum)
 	if(res != 0) return res;
 
 	// Stop clock at idle, init clock.
-	TOSHSD_setClock(port, SD_CLK_AUTO_OFF | INIT_CLOCK);
+	TOSHSD_setClock(port, INIT_CLOCK);
 
 	// (e)MMC/SD now in ready state (ready).
 	res = initReadyState(dev);

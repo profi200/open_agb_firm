@@ -141,15 +141,14 @@ bool TOSHSD_cardWritable(void)
 	return getToshsdRegs(port2Controller(TOSHSD_CARD_PORT))->sd_status & STATUS_NO_WRPROT;
 }
 
-// TODO: Clock in Hz?
 // TODO: This might be a little dodgy not using setPort() before changing clock.
 //       It's fine as long as only one port is used per controller
 //       and there is no concurrent access to it.
-void TOSHSD_setClockImmediately(ToshsdPort *const port, u16 clk)
+void TOSHSD_startInitClock(ToshsdPort *const port, const u32 clk)
 {
-	clk |= SD_CLK_EN;
-	port->sd_clk_ctrl = clk;
-	getToshsdRegs(port2Controller(port->portNum))->sd_clk_ctrl = clk;
+	const u16 sd_clk_ctrl = SD_CLK_EN | TOSHSD_CLK2DIV(clk)>>2;
+	port->sd_clk_ctrl = sd_clk_ctrl;
+	getToshsdRegs(port2Controller(port->portNum))->sd_clk_ctrl = sd_clk_ctrl;
 }
 
 static void getResponse(const Toshsd *const regs, ToshsdPort *const port, const u16 cmd)
