@@ -226,6 +226,22 @@ void LGYFB_deinit(void)
 	g_frameReadyEvent = 0;
 }
 
+void LGYFB_stop(void)
+{
+	getLgyFbRegs(true)->cnt &= ~LGYFB_EN;
+
+	DMA330_kill(0);
+
+	clearEvent(g_frameReadyEvent);
+}
+
+void LGYFB_start(void)
+{
+	if(DMA330_run(0, g_gbaFrameDmaProg)) return;
+
+	getLgyFbRegs(true)->cnt |= LGYFB_EN;
+}
+
 #ifndef NDEBUG
 #include "fsutil.h"
 /*void LGYFB_dbgDumpFrame(void)

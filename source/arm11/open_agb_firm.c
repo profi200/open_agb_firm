@@ -437,6 +437,9 @@ static void adjustGammaTableForGba(void)
 
 static Result dumpFrameTex(void)
 {
+	// Stop LgyFb before dumping the frame to prevent glitches.
+	LGYFB_stop();
+
 	// 512x-512 (hight negative to flip vertically).
 	// Pixels at offset 0x40.
 	alignas(4) static const u8 bmpHeader[54] =
@@ -455,10 +458,18 @@ static Result dumpFrameTex(void)
 	//fsQuickWrite("sdmc:/lgyfb_dbg_frame.bgr", (void*)0x18400000, 256 * 160 * 3);*/
 	GX_displayTransfer((u32*)0x18200000, 240u<<16 | 512u, (u32*)0x18400040, 240u<<16 | 512u, 1u<<12 | 1u<<8);
 	GFX_waitForPPF();
-
 	memcpy((void*)0x18400000, bmpHeader, sizeof(bmpHeader));
 
-	return fsQuickWrite("texture_dump.bmp", (void*)0x18400000, 0x40 + 512 * 512 * 3);
+	RtcTimeDate td;
+	char fn[32];
+	MCU_getRtcTimeDate(&td);
+	ee_sprintf(fn, "texture_dump_%04X%02X%02X%02X%02X%02X.bmp", td.y + 0x2000, td.mon, td.d, td.h, td.min, td.s);
+	const Result res = fsQuickWrite(fn, (void*)0x18400000, 0x40 + 512 * 512 * 3);
+
+	// Restart LgyFb.
+	LGYFB_start();
+
+	return res;
 }
 
 static void gbaGfxHandler(void *args)
@@ -497,9 +508,7 @@ static void gbaGfxHandler(void *args)
 
 		// Trigger only if both are held and at least one is detected as newly pressed down.
 		if(hidKeysHeld() == (KEY_Y | KEY_SELECT) && hidKeysDown() != 0)
-		{
 			dumpFrameTex();
-		}
 	}
 
 	taskExit();
