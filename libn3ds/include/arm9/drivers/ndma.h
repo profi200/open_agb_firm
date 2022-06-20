@@ -85,8 +85,8 @@ enum
 	NDMA_START_TIMER1       =  1u<<24,
 	NDMA_START_TIMER2       =  2u<<24,
 	NDMA_START_TIMER3       =  3u<<24,
-	NDMA_START_CTRCARD1     =  4u<<24, // Fires with SPICARD aswell but seems to be broken.
-	NDMA_START_CTRCARD2     =  5u<<24, // Fires with SPICARD aswell but seems to be broken.
+	NDMA_START_CTRCARD1     =  4u<<24, // And for SPICARD.
+	NDMA_START_CTRCARD2     =  5u<<24, // And for SPICARD?
 	NDMA_START_TOSHSD1      =  6u<<24,
 	NDMA_START_TOSHSD3      =  7u<<24,
 	NDMA_START_AES_IN       =  8u<<24, // AES write fifo.

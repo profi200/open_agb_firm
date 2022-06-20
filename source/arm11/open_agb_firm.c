@@ -495,7 +495,11 @@ static void gbaGfxHandler(void *args)
 		GFX_waitForPPF();
 		GFX_swapFramebufs();
 
-		if(hidKeysDown() == (KEY_Y | KEY_SELECT)) dumpFrameTex();
+		// Trigger only if both are held and at least one is detected as newly pressed down.
+		if(hidKeysHeld() == (KEY_Y | KEY_SELECT) && hidKeysDown() != 0)
+		{
+			dumpFrameTex();
+		}
 	}
 
 	taskExit();

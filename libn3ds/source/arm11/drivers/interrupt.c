@@ -74,48 +74,16 @@ static void configPrivateInterrupts(GicDist *const gicDist)
 
 static void configExternalInterrupts(GicDist *const gicDist)
 {
-	// Kernel11 config.
-	/*static const u32 configTable[6] =
-	{
-		// Interrupts 32-47.
-		MAKE_ICONF(ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 32-35
-		           ICONF_E_1N, ICONF_L_1N, ICONF_RSVD, ICONF_RSVD,  // 36-39
-		           ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 40-43
-		           ICONF_L_1N, ICONF_L_1N, ICONF_RSVD, ICONF_RSVD), // 44-47
-		// Interrupts 48-63.
-		MAKE_ICONF(ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 48-51
-		           ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 52-55
-		           ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 56-59
-		           ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_RSVD), // 60-63
-		// Interrupts 64-79.
-		MAKE_ICONF(ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 64-67
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_RSVD,  // 68-71
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 72-75
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_L_1N), // 76-79
-		// Interrupts 80-95.
-		MAKE_ICONF(ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 80-83
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 84-87
-		           ICONF_L_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 88-91
-		           ICONF_RSVD, ICONF_RSVD, ICONF_RSVD, ICONF_E_1N), // 92-95
-		// Interrupts 96-111.
-		MAKE_ICONF(ICONF_E_1N, ICONF_E_1N, ICONF_RSVD, ICONF_RSVD,  // 96-99
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_RSVD,  // 100-103
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 104-107
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N), // 108-111
-		// Interrupts 112-127.
-		MAKE_ICONF(ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 112-115
-		           ICONF_E_1N, ICONF_E_1N, ICONF_L_1N, ICONF_L_1N,  // 116-119
-		           ICONF_E_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 120-123
-		           ICONF_L_1N, ICONF_L_1N, ICONF_RSVD, ICONF_RSVD)  // 124-127
-	};*/
-	// Modified.
+	// Kernel11 config with slight modifications.
 	static const u32 configTable[6] =
 	{
 		// Interrupts 32-47.
 		MAKE_ICONF(ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 32-35
 		           ICONF_E_1N, ICONF_L_1N, ICONF_RSVD, ICONF_RSVD,  // 36-39
-		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 40-43
-		           ICONF_E_1N, ICONF_E_1N, ICONF_RSVD, ICONF_RSVD), // 44-47
+		           /*ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 40-43
+		           ICONF_L_1N, ICONF_L_1N, ICONF_RSVD, ICONF_RSVD),*/ // 44-47
+		           ICONF_E_1N, ICONF_E_1N, ICONF_E_1N, ICONF_E_1N,  // 40-43 Modified to prevent IRQ storms.
+		           ICONF_E_1N, ICONF_E_1N, ICONF_RSVD, ICONF_RSVD), // 44-47 Modified to prevent IRQ storms.
 		// Interrupts 48-63.
 		MAKE_ICONF(ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 48-51
 		           ICONF_L_1N, ICONF_L_1N, ICONF_L_1N, ICONF_L_1N,  // 52-55
@@ -238,6 +206,10 @@ void IRQ_setPriority(Interrupt id, u8 prio)
 	leaveCriticalSection(oldState);
 }
 
+// TODO: The reg write is atomic.
+//       The ISR table write could be moved somewhere else by the compiler. Signal fence is enough?
+//       Without critical section the ISR for this exact IRQ could re-enable it between the 2 writes.
+//       Could be fixed by doing an acquire fence + doing the table write first.
 void IRQ_unregisterIsr(Interrupt id)
 {
 	const u32 oldState = enterCriticalSection();
