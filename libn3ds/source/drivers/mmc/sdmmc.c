@@ -60,11 +60,11 @@
 #endif // #ifdef _3DS
 
 
-#define SD_IF_COND_ARG     (SD_CMD8_VHS_2_7_3_6V | SD_CMD8_CHK_PATT)
-#define SD_OP_COND_ARG     (SD_ACMD41_XPC | SD_OCR_3_2_3_3V)         // We support 150 mA and 3.3V. Without HCS bit.
-#define MMC_OP_COND_ARG    (MMC_OCR_SECT_MODE | MMC_OCR_3_2_3_3V)    // We support sector addressing and 3.3V.
 #define MMC_OCR_VOLT_MASK  (MMC_OCR_3_2_3_3V)                        // We support 3.3V only.
 #define SD_OCR_VOLT_MASK   (SD_OCR_3_2_3_3V)                         // We support 3.3V only.
+#define SD_IF_COND_ARG     (SD_CMD8_VHS_2_7_3_6V | SD_CMD8_CHK_PATT)
+#define SD_OP_COND_ARG     (SD_ACMD41_XPC | SD_OCR_VOLT_MASK)        // We support 150 mA and 3.3V. Without HCS bit.
+#define MMC_OP_COND_ARG    (MMC_OCR_SECT_MODE | MMC_OCR_VOLT_MASK)   // We support sector addressing and 3.3V.
 
 // Note: DEV_TYPE_NONE must be zero.
 enum
@@ -384,7 +384,7 @@ static u32 initTranState(SdmmcDev *const dev, const u8 devType, const u32 rca, c
 				// Get sector count from EXT_CSD only if sector addressing is used because
 				// byte addressed (e)MMC may set sector count to 0.
 				dev->sectors = ext_csd[EXT_CSD_SEC_COUNT + 3]<<24 | ext_csd[EXT_CSD_SEC_COUNT + 2]<<16 |
-				               ext_csd[EXT_CSD_SEC_COUNT + 1]<<8 | ext_csd[EXT_CSD_SEC_COUNT + 0];
+				               ext_csd[EXT_CSD_SEC_COUNT + 1]<<8  | ext_csd[EXT_CSD_SEC_COUNT + 0];
 			}
 		}
 	}
