@@ -43,18 +43,19 @@
 #define OAF_WORK_DIR    "sdmc:/3ds/open_agb_firm"
 #define OAF_SAVE_DIR    "saves"                   // Relative to work dir.
 #define INI_BUF_SIZE    (1024u)
-#define DEFAULT_CONFIG  "[general]\n"           \
-                        "backlight=64\n"        \
-                        "directBoot=false\n"    \
-                        "useGbaDb=true\n\n"     \
-                        "[video]\n"             \
-                        "scaler=2\n"            \
-                        "gbaGamma=2.2\n"        \
-                        "lcdGamma=1.54\n"       \
-                        "contrast=1.0\n"        \
-                        "brightness=0.0\n\n"    \
-                        "[advanced]\n"          \
-                        "saveOverride=false\n"  \
+#define DEFAULT_CONFIG  "[general]\n"             \
+                        "backlight=64\n"          \
+						"backlightAdjustment=5\n" \
+                        "directBoot=false\n"      \
+                        "useGbaDb=true\n\n"       \
+                        "[video]\n"               \
+                        "scaler=2\n"              \
+                        "gbaGamma=2.2\n"          \
+                        "lcdGamma=1.54\n"         \
+                        "contrast=1.0\n"          \
+                        "brightness=0.0\n\n"      \
+                        "[advanced]\n"            \
+                        "saveOverride=false\n"    \
                         "defaultSave=14"
 
 
@@ -62,6 +63,7 @@ typedef struct
 {
 	// [general]
 	u8 backlight; // Both LCDs.
+	u8 backlightAdjustment;
 	bool directBoot;
 	bool useGbaDb;
 
@@ -95,6 +97,7 @@ static OafConfig g_oafConfig =
 {
 	// [general]
 	64,    // backlight
+	5,     // backlightAdjustment
 	false, // directBoot
 	true,  // useGbaDb
 
@@ -114,6 +117,51 @@ static OafConfig g_oafConfig =
 };
 static KHandle g_frameReadyEvent = 0;
 
+static u8 currentBacklight = 64;
+static u8 backChange = 5;
+
+void brightnessUp(void)
+{
+
+	u8 backlightMax;
+	if(MCU_getSystemModel() >= 4)
+	{
+		backlightMax=142;
+	}
+	else
+	{
+		backlightMax=117;
+	}
+
+	const u8 newBacklight = currentBacklight+backChange > currentBacklight ? currentBacklight+backChange : backlightMax;
+	if (newBacklight > backlightMax) GFX_setBrightness(backlightMax, backlightMax);
+	else 
+	{
+		GFX_setBrightness(newBacklight, newBacklight);
+		currentBacklight = newBacklight;
+	}
+}
+void brightnessDown(void)
+{
+
+	u8 backlightMin;
+	if(MCU_getSystemModel() >= 4)
+	{
+		backlightMin=16;
+	}
+	else
+	{
+		backlightMin=20;
+	}
+
+	const u8 newBacklight = currentBacklight-backChange < currentBacklight ? currentBacklight-backChange : backlightMin;
+	if (newBacklight < backlightMin) GFX_setBrightness(backlightMin, backlightMin);
+	else 
+	{
+		GFX_setBrightness(newBacklight, newBacklight);
+		currentBacklight = newBacklight;
+	}
+}
 
 
 static u32 fixRomPadding(u32 romFileSize)
@@ -509,6 +557,13 @@ static void gbaGfxHandler(void *args)
 		// Trigger only if both are held and at least one is detected as newly pressed down.
 		if(hidKeysHeld() == (KEY_Y | KEY_SELECT) && hidKeysDown() != 0)
 			dumpFrameTex();
+
+		//adjust screen brightness up
+		if(hidKeysHeld() == (KEY_X | KEY_DUP) && hidKeysDown() != 0)
+			brightnessUp();
+		//adjust screen brightness down
+		if(hidKeysHeld() == (KEY_X | KEY_DDOWN) && hidKeysDown() != 0)
+			brightnessDown();
 	}
 
 	taskExit();
@@ -522,6 +577,8 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 	{
 		if(strcmp(name, "backlight") == 0)
 			config->backlight = (u8)strtoul(value, NULL, 10);
+		else if(strcmp(name, "backlightAdjustment") == 0)
+			config->backlightAdjustment = (u8)strtoul(value, NULL, 10);
 		else if(strcmp(name, "directBoot") == 0)
 			config->directBoot = (strcmp(value, "false") == 0 ? false : true);
 		else if(strcmp(name, "useGbaDb") == 0)
@@ -672,6 +729,9 @@ u8 oafGetBacklightConfig(void)
 {
 	return g_oafConfig.backlight;
 }
+u8 oafGetBacklightAdjustmentConfig(void) {
+	return g_oafConfig.backlightAdjustment;
+}
 
 Result oafInitAndRun(void)
 {
@@ -681,6 +741,8 @@ Result oafInitAndRun(void)
 	{
 		do
 		{
+			currentBacklight = oafGetBacklightConfig();
+			backChange = oafGetBacklightAdjustmentConfig();
 			// Try to load the ROM path from autoboot.txt.
 			// If this file doesn't exist show the file browser.
 			if((res = fsLoadPathFromFile("autoboot.txt", filePath)) == RES_FR_NO_FILE)
