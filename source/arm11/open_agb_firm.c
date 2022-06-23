@@ -564,6 +564,12 @@ static void gbaGfxHandler(void *args)
 		//adjust screen brightness down
 		if(hidKeysHeld() == (KEY_X | KEY_DDOWN) && hidKeysDown() != 0)
 			brightnessDown();
+		//turn off screen
+		if(hidKeysHeld() == (KEY_X | KEY_DLEFT) && hidKeysDown() != 0)
+			GFX_setBrightness(0, 0);
+		//turn on screen
+		if(hidKeysHeld() == (KEY_X | KEY_DRIGHT) && hidKeysDown() != 0)
+			GFX_setBrightness(currentBacklight, currentBacklight);
 	}
 
 	taskExit();
