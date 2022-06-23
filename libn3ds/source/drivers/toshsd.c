@@ -28,6 +28,13 @@
 #define SET_STATUS(ptr, val)  atomic_store_explicit((ptr), (val), memory_order_relaxed)
 
 
+#ifdef _3DS
+#define WAIT_IRQ()  __wfi()
+#elif TWL
+#define WAIT_IRQ()  swiSleep()
+#endif // #ifdef _3DS
+
+
 static u32 g_status[2] = {0};
 
 
@@ -186,7 +193,7 @@ static void doCpuTransfer(Toshsd *const regs, const u16 cmd, u32 *buf, const u32
 	{
 		do
 		{
-			__wfi();
+			WAIT_IRQ();
 			if(regs->sd_fifo32_cnt & FIFO32_FULL) // RX ready.
 			{
 				const u32 *const blockEnd = buf + wordBlockLen;
@@ -208,7 +215,7 @@ static void doCpuTransfer(Toshsd *const regs, const u16 cmd, u32 *buf, const u32
 		// gbatek Command/Param/Response/Data at bottom of page.
 		do
 		{
-			__wfi();
+			WAIT_IRQ();
 			if(!(regs->sd_fifo32_cnt & FIFO32_NOT_EMPTY)) // TX request.
 			{
 				const u32 *const blockEnd = buf + wordBlockLen;
@@ -255,13 +262,13 @@ u32 TOSHSD_sendCommand(ToshsdPort *const port, const u16 cmd, const u32 arg)
 	// Response end usually comes immediately after the command
 	// has been sent so we need to check before __wfi().
 	// On error response end still fires.
-	while((GET_STATUS(statusPtr) & STATUS_RESP_END) == 0) __wfi();
+	while((GET_STATUS(statusPtr) & STATUS_RESP_END) == 0) WAIT_IRQ();
 	getResponse(regs, port, cmd);
 
 	// Wait for data end if needed.
 	// On error data end still fires.
 	if(cmd & CMD_DT_EN)
-		while((GET_STATUS(statusPtr) & STATUS_DATA_END) == 0) __wfi();
+		while((GET_STATUS(statusPtr) & STATUS_DATA_END) == 0) WAIT_IRQ();
 
 	// STATUS_CMD_BUSY is no longer set at this point.
 

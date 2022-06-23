@@ -20,7 +20,6 @@
 
 // Based on JEDEC eMMC Card Product Standard V4.41.
 
-#include <assert.h>
 #include "drivers/toshsd.h"
 
 

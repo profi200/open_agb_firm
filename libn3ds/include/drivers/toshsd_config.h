@@ -26,7 +26,7 @@
 #include "arm11/drivers/interrupt.h"
 #endif // #ifdef ARM9
 #elif TWL
-#error "Missing TWL includes."
+#include <nds.h>
 #endif // #ifdef _3DS
 
 
@@ -103,6 +103,17 @@
 #define TOSHSD_MAP_CONTROLLERS()
 #define TOSHSD_UNMAP_CONTROLLERS()
 #define TOSHSD_NUM_CONTROLLERS      (2u)
-#error "Missing TWL controller 1 IRQ ID."
-#error "Unimplemented TWL register ISR."
+#define TOSHSD_IRQ_ID_CONTROLLER1   (IRQ_SDMMC)
+#define TOSHSD_REGISTER_ISR(isr) \
+{ \
+	irqSetAUX(TOSHSD_IRQ_ID_CONTROLLER1, (isr)); \
+	/*irqSetAUX(..., (isr)); // Missing IRQ for controller 2.*/ \
+	irqEnableAUX(TOSHSD_IRQ_ID_CONTROLLER1); \
+	/*irqEnableAUX(...); // Missing IRQ for controller 2.*/ \
+}
+#define TOSHSD_UNREGISTER_ISR() \
+{ \
+	irqClearAUX(TOSHSD_IRQ_ID_CONTROLLER1); \
+	/*irqClearAUX(...); // Missing IRQ for controller 2.*/ \
+}
 #endif // #ifdef _3DS
