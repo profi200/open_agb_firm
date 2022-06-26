@@ -28,7 +28,7 @@
 #include "arm11/drivers/timer.h"
 #endif // #ifdef ARM9
 #elif TWL
-#error "Missing TWL includes."
+#include <nds.h>
 #endif // #ifdef _3DS
 #include "drivers/mmc/mmc_spec.h"
 #include "drivers/mmc/sd_spec.h"
@@ -52,19 +52,23 @@
 #define INIT_DELAY_FUNC()  TIMER_sleepTicks(2 * TOSHSD_CLK2DIV(INIT_CLOCK) * 74)
 #endif // #ifdef ARM9
 
+#define SLEEP_MS_FUNC(ms)  TIMER_sleepMs(ms)
+
 #elif TWL
 
-// ARM9 timer clock = controller clock.
-//#define INIT_DELAY_FUNC()  TIMER_sleepTicks(1 * TOSHSD_CLK2DIV(INIT_CLOCK) * 74)
-#error "SD/MMC necessary delay unimplemented."
+// ARM7 timer clock = controller clock = CPU clock.
+// swiDelay() doesn't seem to be cycle accurate meaning
+// one cycle is 4 (?) CPU cycles.
+#define INIT_DELAY_FUNC()  swiDelay(TOSHSD_CLK2DIV(INIT_CLOCK) * 74 / 4)
+#define SLEEP_MS_FUNC(ms)  swiDelay(8378 * (ms))
 #endif // #ifdef _3DS
 
 
-#define SD_IF_COND_ARG     (SD_CMD8_VHS_2_7_3_6V | SD_CMD8_CHK_PATT)
-#define SD_OP_COND_ARG     (SD_ACMD41_XPC | SD_OCR_3_2_3_3V)         // We support 150 mA and 3.3V. Without HCS bit.
-#define MMC_OP_COND_ARG    (MMC_OCR_SECT_MODE | MMC_OCR_3_2_3_3V)    // We support sector addressing and 3.3V.
 #define MMC_OCR_VOLT_MASK  (MMC_OCR_3_2_3_3V)                        // We support 3.3V only.
 #define SD_OCR_VOLT_MASK   (SD_OCR_3_2_3_3V)                         // We support 3.3V only.
+#define SD_IF_COND_ARG     (SD_CMD8_VHS_2_7_3_6V | SD_CMD8_CHK_PATT)
+#define SD_OP_COND_ARG     (SD_ACMD41_XPC | SD_OCR_VOLT_MASK)        // We support 150 mA and 3.3V. Without HCS bit.
+#define MMC_OP_COND_ARG    (MMC_OCR_SECT_MODE | MMC_OCR_VOLT_MASK)   // We support sector addressing and 3.3V.
 
 // Note: DEV_TYPE_NONE must be zero.
 enum
@@ -175,7 +179,7 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const devTypeOut)
 			// Linux uses 10 ms but the card doesn't become ready faster
 			// when polling with delay. Use 5 ms as compromise so not much
 			// time is wasted when the card becomes ready in the middle of the delay.
-			TIMER_sleepMs(5);
+			SLEEP_MS_FUNC(5);
 		}
 
 		// (e)MMC didn't finish init within 1 second.
@@ -198,7 +202,7 @@ static u32 initIdleState(ToshsdPort *const port, u8 *const devTypeOut)
 			// Linux uses 10 ms but the card doesn't become ready faster
 			// when polling with delay. Use 5 ms as compromise so not much
 			// time is wasted when the card becomes ready in the middle of the delay.
-			TIMER_sleepMs(5);
+			SLEEP_MS_FUNC(5);
 
 			res = sendAppCmd(port, SD_APP_SD_SEND_OP_COND, opCondArg, 0);
 			if(res != 0) return SDMMC_ERR_SEND_OP_COND;
@@ -384,7 +388,7 @@ static u32 initTranState(SdmmcDev *const dev, const u8 devType, const u32 rca, c
 				// Get sector count from EXT_CSD only if sector addressing is used because
 				// byte addressed (e)MMC may set sector count to 0.
 				dev->sectors = ext_csd[EXT_CSD_SEC_COUNT + 3]<<24 | ext_csd[EXT_CSD_SEC_COUNT + 2]<<16 |
-				               ext_csd[EXT_CSD_SEC_COUNT + 1]<<8 | ext_csd[EXT_CSD_SEC_COUNT + 0];
+				               ext_csd[EXT_CSD_SEC_COUNT + 1]<<8  | ext_csd[EXT_CSD_SEC_COUNT + 0];
 			}
 		}
 	}

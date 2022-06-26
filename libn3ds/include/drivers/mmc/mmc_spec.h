@@ -20,13 +20,12 @@
 
 // Based on JEDEC eMMC Card Product Standard V4.41.
 
-#include <assert.h>
 #include "drivers/toshsd.h"
 
 
 // Controller specific macros. Add controller specific bits here.
 // MMC_CMD_[response type]_[transfer type]
-// Transfer type: R = read, MR = multi-block read, W = write, MW = multi-block write.
+// Transfer type: R = read, W = write.
 #define MMC_CMD_NONE(id)   (CMD_RESP_NONE | (id))
 #define MMC_CMD_R1(id)     (CMD_RESP_R1   | (id))
 #define MMC_CMD_R1b(id)    (CMD_RESP_R1b  | (id))
@@ -36,69 +35,67 @@
 #define MMC_CMD_R5(id)     (CMD_RESP_R5   | (id))
 #define MMC_CMD_R1_R(id)   (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | (id))
 #define MMC_CMD_R1_W(id)   (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | (id))
-#define MMC_CMD_R1_MR(id)  (CMD_MBT | CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | (id))
-#define MMC_CMD_R1_MW(id)  (CMD_MBT | CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | (id))
 
 
 // Basic commands and read-stream command (class 0 and class 1).
-#define MMC_GO_IDLE_STATE           MMC_CMD_NONE(0u) //   -, [31:0] 0x00000000 GO_IDLE_STATE, 0xF0F0F0F0 GO_PRE_IDLE_STATE, 0xFFFFFFFA BOOT_INITIATION.
-#define MMC_SEND_OP_COND              MMC_CMD_R3(1u) //  R3, [31:0] OCR with-out busy.
-#define MMC_ALL_SEND_CID              MMC_CMD_R2(2u) //  R2, [31:0] stuff bits.
-#define MMC_SET_RELATIVE_ADDR         MMC_CMD_R1(3u) //  R1, [31:16] RCA [15:0] stuff bits.
-#define MMC_SET_DSR                 MMC_CMD_NONE(4u) //   -, [31:16] DSR [15:0] stuff bits.
-#define MMC_SLEEP_AWAKE              MMC_CMD_R1b(5u) // R1b, [31:16] RCA [15] Sleep/Awake [14:0] stuff bits.
-#define MMC_SWITCH                   MMC_CMD_R1b(6u) // R1b, [31:26] Set to 0 [25:24] Access [23:16] Index [15:8] Value [7:3] Set to 0 [2:0] Cmd Set.
-#define MMC_SELECT_CARD               MMC_CMD_R1(7u) //  R1, [31:16] RCA [15:0] stuff bits.
-#define MMC_DESELECT_CARD           MMC_CMD_NONE(7u) //   -, [31:16] RCA [15:0] stuff bits.
-#define MMC_SELECT_CARD_R1b          MMC_CMD_R1b(7u) // R1b, [31:16] RCA [15:0] stuff bits.
-#define MMC_SEND_EXT_CSD            MMC_CMD_R1_R(8u) //  R1, [31:0] stuff bits.
-#define MMC_SEND_CSD                  MMC_CMD_R2(9u) //  R2, [31:16] RCA [15:0] stuff bits.
-#define MMC_SEND_CID                 MMC_CMD_R2(10u) //  R2, [31:16] RCA [15:0] stuff bits.
-#define MMC_READ_DAT_UNTIL_STOP   MMC_CMD_R1_MR(11u) //  R1, [31:0] data address.
-#define MMC_STOP_TRANSMISSION_R      MMC_CMD_R1(12u) //  R1, [31:16] RCA [15:1] stuff bits [0] HPI.
-#define MMC_STOP_TRANSMISSION_W     MMC_CMD_R1b(12u) // R1b, [31:16] RCA [15:1] stuff bits [0] HPI.
-#define MMC_SEND_STATUS              MMC_CMD_R1(13u) //  R1, [31:16] RCA [15:1] stuff bits [0] HPI.
-#define MMC_BUSTEST_R              MMC_CMD_R1_R(14u) //  R1, [31:0] stuff bits.
-#define MMC_GO_INACTIVE_STATE      MMC_CMD_NONE(15u) //   -, [31:16] RCA [15:0] stuff bits.
-#define MMC_BUSTEST_W              MMC_CMD_R1_W(19u) //  R1, [31:0] stuff bits.
+#define MMC_GO_IDLE_STATE          MMC_CMD_NONE(0u) //   -, [31:0] 0x00000000 GO_IDLE_STATE, 0xF0F0F0F0 GO_PRE_IDLE_STATE, 0xFFFFFFFA BOOT_INITIATION.
+#define MMC_SEND_OP_COND             MMC_CMD_R3(1u) //  R3, [31:0] OCR with-out busy.
+#define MMC_ALL_SEND_CID             MMC_CMD_R2(2u) //  R2, [31:0] stuff bits.
+#define MMC_SET_RELATIVE_ADDR        MMC_CMD_R1(3u) //  R1, [31:16] RCA [15:0] stuff bits.
+#define MMC_SET_DSR                MMC_CMD_NONE(4u) //   -, [31:16] DSR [15:0] stuff bits.
+#define MMC_SLEEP_AWAKE             MMC_CMD_R1b(5u) // R1b, [31:16] RCA [15] Sleep/Awake [14:0] stuff bits.
+#define MMC_SWITCH                  MMC_CMD_R1b(6u) // R1b, [31:26] Set to 0 [25:24] Access [23:16] Index [15:8] Value [7:3] Set to 0 [2:0] Cmd Set.
+#define MMC_SELECT_CARD              MMC_CMD_R1(7u) //  R1, [31:16] RCA [15:0] stuff bits.
+#define MMC_DESELECT_CARD          MMC_CMD_NONE(7u) //   -, [31:16] RCA [15:0] stuff bits.
+#define MMC_SELECT_CARD_R1b         MMC_CMD_R1b(7u) // R1b, [31:16] RCA [15:0] stuff bits.
+#define MMC_SEND_EXT_CSD           MMC_CMD_R1_R(8u) //  R1, [31:0] stuff bits.
+#define MMC_SEND_CSD                 MMC_CMD_R2(9u) //  R2, [31:16] RCA [15:0] stuff bits.
+#define MMC_SEND_CID                MMC_CMD_R2(10u) //  R2, [31:16] RCA [15:0] stuff bits.
+#define MMC_READ_DAT_UNTIL_STOP   MMC_CMD_R1_R(11u) //  R1, [31:0] data address.
+#define MMC_STOP_TRANSMISSION_R     MMC_CMD_R1(12u) //  R1, [31:16] RCA [15:1] stuff bits [0] HPI.
+#define MMC_STOP_TRANSMISSION_W    MMC_CMD_R1b(12u) // R1b, [31:16] RCA [15:1] stuff bits [0] HPI.
+#define MMC_SEND_STATUS             MMC_CMD_R1(13u) //  R1, [31:16] RCA [15:1] stuff bits [0] HPI.
+#define MMC_BUSTEST_R             MMC_CMD_R1_R(14u) //  R1, [31:0] stuff bits.
+#define MMC_GO_INACTIVE_STATE     MMC_CMD_NONE(15u) //   -, [31:16] RCA [15:0] stuff bits.
+#define MMC_BUSTEST_W             MMC_CMD_R1_W(19u) //  R1, [31:0] stuff bits.
 
 // Block-oriented read commands (class 2).
-#define MMC_SET_BLOCKLEN             MMC_CMD_R1(16u) //  R1, [31:0] block length.
-#define MMC_READ_SINGLE_BLOCK      MMC_CMD_R1_R(17u) //  R1, [31:0] data address.
-#define MMC_READ_MULTIPLE_BLOCK   MMC_CMD_R1_MR(18u) //  R1, [31:0] data address.
+#define MMC_SET_BLOCKLEN            MMC_CMD_R1(16u) //  R1, [31:0] block length.
+#define MMC_READ_SINGLE_BLOCK     MMC_CMD_R1_R(17u) //  R1, [31:0] data address.
+#define MMC_READ_MULTIPLE_BLOCK   MMC_CMD_R1_R(18u) //  R1, [31:0] data address.
 
 // Stream write commands (class 3).
-#define MMC_WRITE_DAT_UNTIL_STOP  MMC_CMD_R1_MW(20u) //  R1, [31:0] data address.
+#define MMC_WRITE_DAT_UNTIL_STOP  MMC_CMD_R1_W(20u) //  R1, [31:0] data address.
 
 // Block-oriented write commands (class 4).
-#define MMC_SET_BLOCK_COUNT          MMC_CMD_R1(23u) //  R1, [31] Reliable Write Request [30:16] set to 0 [15:0] number of blocks.
-#define MMC_WRITE_BLOCK            MMC_CMD_R1_W(24u) //  R1, [31:0] data address.
-#define MMC_WRITE_MULTIPLE_BLOCK  MMC_CMD_R1_MW(25u) //  R1, [31:0] data address.
-#define MMC_PROGRAM_CID            MMC_CMD_R1_W(26u) //  R1, [31:0] stuff bits.
-#define MMC_PROGRAM_CSD            MMC_CMD_R1_W(27u) //  R1, [31:0] stuff bits.
+#define MMC_SET_BLOCK_COUNT         MMC_CMD_R1(23u) //  R1, [31] Reliable Write Request [30:16] set to 0 [15:0] number of blocks.
+#define MMC_WRITE_BLOCK           MMC_CMD_R1_W(24u) //  R1, [31:0] data address.
+#define MMC_WRITE_MULTIPLE_BLOCK  MMC_CMD_R1_W(25u) //  R1, [31:0] data address.
+#define MMC_PROGRAM_CID           MMC_CMD_R1_W(26u) //  R1, [31:0] stuff bits.
+#define MMC_PROGRAM_CSD           MMC_CMD_R1_W(27u) //  R1, [31:0] stuff bits.
 
 // Block-oriented write protection commands (class 6).
-#define MMC_SET_WRITE_PROT          MMC_CMD_R1b(28u) // R1b, [31:0] data address.
-#define MMC_CLR_WRITE_PROT          MMC_CMD_R1b(29u) // R1b, [31:0] data address.
-#define MMC_SEND_WRITE_PROT        MMC_CMD_R1_R(30u) //  R1, [31:0] write protect data address.
-#define MMC_SEND_WRITE_PROT_TYPE   MMC_CMD_R1_R(31u) //  R1, [31:0] write protect data address.
+#define MMC_SET_WRITE_PROT         MMC_CMD_R1b(28u) // R1b, [31:0] data address.
+#define MMC_CLR_WRITE_PROT         MMC_CMD_R1b(29u) // R1b, [31:0] data address.
+#define MMC_SEND_WRITE_PROT       MMC_CMD_R1_R(30u) //  R1, [31:0] write protect data address.
+#define MMC_SEND_WRITE_PROT_TYPE  MMC_CMD_R1_R(31u) //  R1, [31:0] write protect data address.
 
 // Erase commands (class 5).
-#define MMC_ERASE_GROUP_START        MMC_CMD_R1(35u) //  R1, [31:0] data address.
-#define MMC_ERASE_GROUP_END          MMC_CMD_R1(36u) //  R1, [31:0] data address.
-#define MMC_ERASE                   MMC_CMD_R1b(38u) // R1b, [31] Secure request [30:16] set to 0 [15] Force Garbage Collect request [14:1] set to 0 [0] Identify Write block for Erase.
+#define MMC_ERASE_GROUP_START       MMC_CMD_R1(35u) //  R1, [31:0] data address.
+#define MMC_ERASE_GROUP_END         MMC_CMD_R1(36u) //  R1, [31:0] data address.
+#define MMC_ERASE                  MMC_CMD_R1b(38u) // R1b, [31] Secure request [30:16] set to 0 [15] Force Garbage Collect request [14:1] set to 0 [0] Identify Write block for Erase.
 
 // I/O mode commands (class 9).
-#define MMC_FAST_IO                  MMC_CMD_R4(39u) //  R4, [31:16] RCA [15:15] register write flag [14:8] register address [7:0] register data.
-#define MMC_GO_IRQ_STATE             MMC_CMD_R5(40u) //  R5, [31:0] stuff bits.
+#define MMC_FAST_IO                 MMC_CMD_R4(39u) //  R4, [31:16] RCA [15:15] register write flag [14:8] register address [7:0] register data.
+#define MMC_GO_IRQ_STATE            MMC_CMD_R5(40u) //  R5, [31:0] stuff bits.
 
 // Lock card commands (class 7).
-#define MMC_LOCK_UNLOCK            MMC_CMD_R1_W(42u) //  R1, [31:0] stuff bits.
+#define MMC_LOCK_UNLOCK           MMC_CMD_R1_W(42u) //  R1, [31:0] stuff bits.
 
 // Application-specific commands (class 8).
-#define MMC_APP_CMD                  MMC_CMD_R1(55u) //  R1, [31:16] RCA [15:0] stuff bits.
-#define MMC_GEN_CMD_R              MMC_CMD_R1_R(56u) //  R1, [31:1] stuff bits [0] RD/WR = 1.
-#define MMC_GEN_CMD_W              MMC_CMD_R1_W(56u) //  R1, [31:1] stuff bits [0] RD/WR = 0.
+#define MMC_APP_CMD                 MMC_CMD_R1(55u) //  R1, [31:16] RCA [15:0] stuff bits.
+#define MMC_GEN_CMD_R             MMC_CMD_R1_R(56u) //  R1, [31:1] stuff bits [0] RD/WR = 1.
+#define MMC_GEN_CMD_W             MMC_CMD_R1_W(56u) //  R1, [31:1] stuff bits [0] RD/WR = 0.
 
 
 // 7.13 Card status.

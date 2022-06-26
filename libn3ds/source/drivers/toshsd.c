@@ -22,6 +22,19 @@
 #include "drivers/toshsd_config.h"
 
 
+// Using atomic load/store produces better code than volatile
+// but still ensures that the status is always read from memory.
+#define GET_STATUS(ptr)       atomic_load_explicit((ptr), memory_order_relaxed)
+#define SET_STATUS(ptr, val)  atomic_store_explicit((ptr), (val), memory_order_relaxed)
+
+
+#ifdef _3DS
+#define WAIT_IRQ()  __wfi()
+#elif TWL
+#define WAIT_IRQ()  swiSleep()
+#endif // #ifdef _3DS
+
+
 static u32 g_status[2] = {0};
 
 
@@ -31,14 +44,9 @@ ALWAYS_INLINE u8 port2Controller(const u8 portNum)
 	return portNum / 2;
 }
 
-ALWAYS_INLINE u8 irq2controller(const u32 id)
-{
-	return (id == TOSHSD_IRQ_ID_CONTROLLER1 ? 0 : 1);
-}
-
 static void toshsdIsr(const u32 id)
 {
-	const u8 controller = irq2controller(id);
+	const u8 controller = (id == TOSHSD_IRQ_ID_CONTROLLER1 ? 0 : 1);
 	Toshsd *const regs = getToshsdRegs(controller);
 
 	g_status[controller] |= regs->sd_status;
@@ -67,6 +75,9 @@ void TOSHSD_init(void)
 		regs->dma_ext_mode    = DMA_EXT_DMA_MODE;
 
 		// Reset. Unlike similar controllers no delay is needed.
+		// Resets the following regs:
+		// REG_SD_STOP, REG_SD_RESP0-7, REG_SD_STATUS1-2, REG_SD_ERR_STATUS1-2,
+		// REG_SD_CLK_CTRL, REG_SD_OPTION, REG_SDIO_STATUS.
 		regs->soft_rst = SOFT_RST_RST;
 		regs->soft_rst = SOFT_RST_NORST;
 
@@ -175,30 +186,28 @@ static void getResponse(const Toshsd *const regs, ToshsdPort *const port, const 
 //       single block read transfer.
 static void doCpuTransfer(Toshsd *const regs, const u16 cmd, u32 *buf, const u32 *const statusPtr)
 {
-	const u32 blockLen = regs->sd_blocklen;
-	u32 blockCount = regs->sd_blockcount;
+	const u32 wordBlockLen = regs->sd_blocklen / 4;
+	u32 blockCount         = regs->sd_blockcount;
 	vu32 *const fifo = getToshsdFifo(regs);
 	if(cmd & CMD_DIR_R)
 	{
 		do
 		{
-			__wfi();
+			WAIT_IRQ();
 			if(regs->sd_fifo32_cnt & FIFO32_FULL) // RX ready.
 			{
-				const u32 *const blockEnd = buf + (blockLen / 4);
+				const u32 *const blockEnd = buf + wordBlockLen;
 				do
 				{
-					buf[0] = *fifo;
-					buf[1] = *fifo;
-					buf[2] = *fifo;
-					buf[3] = *fifo;
-
-					buf += 4;
+					*buf++ = *fifo;
+					*buf++ = *fifo;
+					*buf++ = *fifo;
+					*buf++ = *fifo;
 				} while(buf < blockEnd);
 
 				blockCount--;
 			}
-		} while((atomic_load_explicit(statusPtr, memory_order_relaxed) & STATUS_MASK_ERR) == 0 && blockCount);
+		} while((GET_STATUS(statusPtr) & STATUS_MASK_ERR) == 0 && blockCount > 0);
 	}
 	else
 	{
@@ -206,23 +215,21 @@ static void doCpuTransfer(Toshsd *const regs, const u16 cmd, u32 *buf, const u32
 		// gbatek Command/Param/Response/Data at bottom of page.
 		do
 		{
-			__wfi();
+			WAIT_IRQ();
 			if(!(regs->sd_fifo32_cnt & FIFO32_NOT_EMPTY)) // TX request.
 			{
-				const u32 *const blockEnd = buf + (blockLen / 4);
+				const u32 *const blockEnd = buf + wordBlockLen;
 				do
 				{
-					*fifo = buf[0];
-					*fifo = buf[1];
-					*fifo = buf[2];
-					*fifo = buf[3];
-
-					buf += 4;
+					*fifo = *buf++;
+					*fifo = *buf++;
+					*fifo = *buf++;
+					*fifo = *buf++;
 				} while(buf < blockEnd);
 
 				blockCount--;
 			}
-		} while((atomic_load_explicit(statusPtr, memory_order_relaxed) & STATUS_MASK_ERR) == 0 && blockCount);
+		} while((GET_STATUS(statusPtr) & STATUS_MASK_ERR) == 0 && blockCount > 0);
 	}
 }
 
@@ -233,18 +240,20 @@ u32 TOSHSD_sendCommand(ToshsdPort *const port, const u16 cmd, const u32 arg)
 
 	// Clear status before sending another command.
 	u32 *const statusPtr = &g_status[controller];
-	atomic_store_explicit(statusPtr, 0, memory_order_relaxed);
+	SET_STATUS(statusPtr, 0);
 
 	setPort(regs, port);
-	regs->sd_blockcount = port->blocks;                           // sd_blockcount32 doesn't need to be set.
-	regs->sd_stop       = ((cmd & CMD_MBT) ? STOP_AUTO_STOP : 0); // Auto CMD12 on multi-block transfer.
+	const u16 blocks = port->blocks;
+	regs->sd_blockcount = blocks;         // sd_blockcount32 doesn't need to be set.
+	regs->sd_stop       = STOP_AUTO_STOP; // Auto STOP_TRANSMISSION (CMD12) on multi-block transfer.
 	regs->sd_arg        = arg;
 
 	// We don't need FIFO IRQs when using DMA. buf = NULL means DMA.
 	u32 *buf = port->buf;
-	const u16 fifoIrqs = (buf != NULL ? (cmd & CMD_DIR_R ? FIFO32_FULL_IE : FIFO32_NOT_EMPTY_IE) : 0u);
-	regs->sd_fifo32_cnt = fifoIrqs | FIFO32_CLEAR | FIFO32_EN;
-	regs->sd_cmd        = cmd; // Start.
+	u16 f32Cnt = FIFO32_CLEAR | FIFO32_EN;
+	if(buf != NULL) f32Cnt |= (cmd & CMD_DIR_R ? FIFO32_FULL_IE : FIFO32_NOT_EMPTY_IE);
+	regs->sd_fifo32_cnt = f32Cnt;
+	regs->sd_cmd        = (blocks > 1 ? CMD_MBT | cmd : cmd); // Start.
 
 	// If we have to transfer data do so now.
 	if((cmd & CMD_DT_EN) && (buf != NULL))
@@ -253,15 +262,15 @@ u32 TOSHSD_sendCommand(ToshsdPort *const port, const u16 cmd, const u32 arg)
 	// Response end usually comes immediately after the command
 	// has been sent so we need to check before __wfi().
 	// On error response end still fires.
-	while(!(atomic_load_explicit(statusPtr, memory_order_relaxed) & STATUS_RESP_END)) __wfi();
+	while((GET_STATUS(statusPtr) & STATUS_RESP_END) == 0) WAIT_IRQ();
 	getResponse(regs, port, cmd);
 
 	// Wait for data end if needed.
 	// On error data end still fires.
 	if(cmd & CMD_DT_EN)
-		while(!(atomic_load_explicit(statusPtr, memory_order_relaxed) & STATUS_DATA_END)) __wfi();
+		while((GET_STATUS(statusPtr) & STATUS_DATA_END) == 0) WAIT_IRQ();
 
 	// STATUS_CMD_BUSY is no longer set at this point.
 
-	return atomic_load_explicit(statusPtr, memory_order_relaxed) & STATUS_MASK_ERR;
+	return GET_STATUS(statusPtr) & STATUS_MASK_ERR;
 }

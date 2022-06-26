@@ -120,8 +120,8 @@ ALWAYS_INLINE vu32* getToshsdFifo(Toshsd *const regs)
 #define PORTSEL_UNK10            (1u<<10) // Unknown writable bit 10?
 
 // REG_SD_STOP
-#define STOP_STOP                (1u)    // Stop/abort a transfer.
-#define STOP_AUTO_STOP           (1u<<8) // Automatically send CMD12 on block transfer end.
+#define STOP_STOP                (1u)    // Abort data transfer and send STOP_TRANSMISSION CMD.
+#define STOP_AUTO_STOP           (1u<<8) // Automatically send STOP_TRANSMISSION on multi-block transfer end.
 
 // REG_SD_STATUS1/2       Write 0 to acknowledge a bit.
 // REG_SD_STATUS1/2_MASK  (M) = Maskable bit. 1 = disabled.

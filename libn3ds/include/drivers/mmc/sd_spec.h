@@ -26,7 +26,7 @@
 // Controller specific macros. Add controller specific bits here.
 // SD_[command type]_[response type]_[transfer type]
 // Command type: CMD = regular command, ACMD = Application-Specific Command.
-// Transfer type: R = read, MR = multi-block read, W = write, MW = multi-block write.
+// Transfer type: R = read, W = write.
 #define SD_CMD_NONE(id)   (CMD_RESP_NONE | (id))
 #define SD_CMD_R1(id)     (CMD_RESP_R1   | (id))
 #define SD_CMD_R1b(id)    (CMD_RESP_R1b  | (id))
@@ -35,8 +35,6 @@
 #define SD_CMD_R7(id)     (CMD_RESP_R7   | (id))
 #define SD_CMD_R1_R(id)   (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | (id))
 #define SD_CMD_R1_W(id)   (CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | (id))
-#define SD_CMD_R1_MR(id)  (CMD_MBT | CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | (id))
-#define SD_CMD_R1_MW(id)  (CMD_MBT | CMD_DIR_W | CMD_DT_EN | CMD_RESP_R1 | (id))
 #define SD_ACMD_R1(id)    (CMD_RESP_R1 | CMD_ACMD | (id))
 #define SD_ACMD_R3(id)    (CMD_RESP_R3 | CMD_ACMD | (id))
 #define SD_ACMD_R1_R(id)  (CMD_DIR_R | CMD_DT_EN | CMD_RESP_R1 | CMD_ACMD | (id))
@@ -61,7 +59,7 @@
 // Block-Oriented Read Commands (class 2).
 #define SD_SET_BLOCKLEN                   SD_CMD_R1(16u) //  R1, [31:0] block length.
 #define SD_READ_SINGLE_BLOCK            SD_CMD_R1_R(17u) //  R1, [31:0] data address.
-#define SD_READ_MULTIPLE_BLOCK         SD_CMD_R1_MR(18u) //  R1, [31:0] data address.
+#define SD_READ_MULTIPLE_BLOCK          SD_CMD_R1_R(18u) //  R1, [31:0] data address.
 #define SD_SEND_TUNING_BLOCK            SD_CMD_R1_R(19u) //  R1, [31:0] reserved bits (all 0).
 #define SD_SPEED_CLASS_CONTROL           SD_CMD_R1b(20u) // R1b, [31:28] Speed Class Control [27:0] See command description.
 #define SD_ADDRESS_EXTENSION              SD_CMD_R1(22u) //  R1, [31:6] reserved bits (all 0) [5:0] extended address.
@@ -73,7 +71,7 @@
 // ADDRESS_EXTENSION
 // SET_BLOCK_COUNT
 #define SD_WRITE_BLOCK                  SD_CMD_R1_W(24u) //  R1, [31:0] data address.
-#define SD_WRITE_MULTIPLE_BLOCK        SD_CMD_R1_MW(25u) //  R1, [31:0] data address.
+#define SD_WRITE_MULTIPLE_BLOCK         SD_CMD_R1_W(25u) //  R1, [31:0] data address.
 #define SD_PROGRAM_CSD                  SD_CMD_R1_W(27u) //  R1, [31:0] stuff bits.
 
 // Block Oriented Write Protection Commands (class 6).
@@ -111,8 +109,8 @@
 // Function Extension Commands (class 11).
 #define SD_READ_EXTR_SINGLE             SD_CMD_R1_R(48u) //  R1, [31] MIO0: Memory, 1: I/O [30:27] FNO[26] Reserved (=0) [25:9] ADDR [8:0] LEN.
 #define SD_WRITE_EXTR_SINGLE            SD_CMD_R1_W(49u) //  R1, [31] MIO0: Memory, 1: I/O [30:27] FNO [26] MW [25:9] ADDR [8:0] LEN/MASK.
-#define SD_READ_EXTR_MULTI             SD_CMD_R1_MR(58u) //  R1, [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
-#define SD_WRITE_EXTR_MULTI            SD_CMD_R1_MW(59u) //  R1, [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
+#define SD_READ_EXTR_MULTI              SD_CMD_R1_R(58u) //  R1, [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
+#define SD_WRITE_EXTR_MULTI             SD_CMD_R1_W(59u) //  R1, [31] MIO0: Memory, 1: I/O [30:27] FNO [26] BUS0: 512B, 1: 32KB [25:9] ADDR [8:0] BUC.
 
 // Command Queue Function Commands (class 1).
 #define SD_Q_MANAGEMENT                  SD_CMD_R1b(43u) // R1b, [31:21] Reserved [20:16]: Task ID [3:0]: Operation Code (Abort tasks etc.).
