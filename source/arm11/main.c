@@ -61,6 +61,8 @@ int main(void)
 	{
 		while(1)
 		{
+			adjustBrightness();
+
 			hidScanInput();
 			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
 

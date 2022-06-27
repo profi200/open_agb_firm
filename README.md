@@ -27,8 +27,10 @@ SELECT+Y - Dump screen output to `/3ds/open_agb_firm/texture_dump.bmp`
 * If the screen output freezes, press HOME to fix it. This is a hard to track down bug that will be fixed.
 
 X+UP/DOWN - Adjust screen brightness up or down by `backlightAdjustment` units
-X+LEFT - Turn off (both) screens
-X+RIGHT - Turn on (both) screens
+
+X+LEFT - Turn off display
+
+X+RIGHT - Turn on display
 
 Hold the power button to turn off the 3DS.
 
