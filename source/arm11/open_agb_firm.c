@@ -45,7 +45,7 @@
 #define INI_BUF_SIZE    (1024u)
 #define DEFAULT_CONFIG  "[general]\n"             \
                         "backlight=64\n"          \
-						"backlightAdjustment=5\n" \
+                        "backlightAdjustment=5\n" \
                         "directBoot=false\n"      \
                         "useGbaDb=true\n\n"       \
                         "[video]\n"               \
@@ -119,50 +119,65 @@ static KHandle g_frameReadyEvent = 0;
 
 static u8 currentBacklight = 64;
 static u8 backChange = 5;
+static bool displayOn = true;
 
-void brightnessUp(void)
-{
-
+static void changeBrightness(int16_t amount) {
 	u8 backlightMax;
-	if(MCU_getSystemModel() >= 4)
-	{
-		backlightMax=142;
-	}
-	else
-	{
-		backlightMax=117;
-	}
-
-	const u8 newBacklight = currentBacklight+backChange > currentBacklight ? currentBacklight+backChange : backlightMax;
-	if (newBacklight > backlightMax) GFX_setBrightness(backlightMax, backlightMax);
-	else 
-	{
-		GFX_setBrightness(newBacklight, newBacklight);
-		currentBacklight = newBacklight;
-	}
-}
-void brightnessDown(void)
-{
-
 	u8 backlightMin;
 	if(MCU_getSystemModel() >= 4)
 	{
 		backlightMin=16;
+		backlightMax=142;
 	}
 	else
 	{
 		backlightMin=20;
+		backlightMax=117;
 	}
+	u8 newBacklight;
+	const int16_t newVal = currentBacklight+amount;
+	if (amount < 0)
+		newBacklight = newVal >= 0 && newVal < currentBacklight && newVal >= backlightMin ? newVal : backlightMin;
+	else
+		newBacklight = newVal >= currentBacklight && newVal <= backlightMax ? newVal : backlightMax;
 
-	const u8 newBacklight = currentBacklight-backChange < currentBacklight ? currentBacklight-backChange : backlightMin;
-	if (newBacklight < backlightMin) GFX_setBrightness(backlightMin, backlightMin);
-	else 
-	{
-		GFX_setBrightness(newBacklight, newBacklight);
-		currentBacklight = newBacklight;
-	}
+	//checks prevent newBacklight from exceding u8 bounds, so we can safely cast it down
+	GFX_setBrightness(newBacklight, newBacklight);
+	currentBacklight = (u8)newBacklight;
 }
 
+void adjustBrightness(void) {
+	//check for special button combos
+	const int kHeld = hidKeysHeld();
+	const int kDown = hidKeysDown();
+	if (kDown && kHeld) {
+		//adjust screen brightness up
+		if(kHeld == (KEY_X | KEY_DUP))
+			changeBrightness(backChange);
+		//adjust screen brightness down
+		if(kHeld == (KEY_X | KEY_DDOWN))
+			changeBrightness(-backChange);
+
+		//turn off screen
+		if(displayOn && kHeld == (KEY_X | KEY_DLEFT)) {
+#ifdef NDEBUG
+			GFX_powerOffBacklights(GFX_BLIGHT_TOP);
+#else
+			GFX_powerOffBacklights(GFX_BLIGHT_BOTH);
+#endif
+			displayOn = false;
+		}
+		//turn on screen
+		if(!displayOn && kHeld == (KEY_X | KEY_DRIGHT)) {
+#ifdef NDEBUG
+			GFX_powerOnBacklights(GFX_BLIGHT_TOP);
+#else
+			GFX_powerOnBacklights(GFX_BLIGHT_BOTH);
+#endif
+			displayOn = true;
+		}
+	}
+}
 
 static u32 fixRomPadding(u32 romFileSize)
 {
@@ -557,19 +572,6 @@ static void gbaGfxHandler(void *args)
 		// Trigger only if both are held and at least one is detected as newly pressed down.
 		if(hidKeysHeld() == (KEY_Y | KEY_SELECT) && hidKeysDown() != 0)
 			dumpFrameTex();
-
-		//adjust screen brightness up
-		if(hidKeysHeld() == (KEY_X | KEY_DUP) && hidKeysDown() != 0)
-			brightnessUp();
-		//adjust screen brightness down
-		if(hidKeysHeld() == (KEY_X | KEY_DDOWN) && hidKeysDown() != 0)
-			brightnessDown();
-		//turn off screen
-		if(hidKeysHeld() == (KEY_X | KEY_DLEFT) && hidKeysDown() != 0)
-			GFX_setBrightness(0, 0);
-		//turn on screen
-		if(hidKeysHeld() == (KEY_X | KEY_DRIGHT) && hidKeysDown() != 0)
-			GFX_setBrightness(currentBacklight, currentBacklight);
 	}
 
 	taskExit();
