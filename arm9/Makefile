@@ -8,6 +8,7 @@ endif
 
 TOPDIR ?= $(CURDIR)
 include $(DEVKITARM)/base_rules
+include $(TOPDIR)/../libn3ds/libn3ds9.mk
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -18,10 +19,9 @@ include $(DEVKITARM)/base_rules
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	../libn3ds/source ../libn3ds/source/drivers/mmc ../libn3ds/source/drivers ../libn3ds/source/arm9 \
-				../libn3ds/source/arm9/drivers ../libn3ds/thirdparty/fatfs ../source/arm9
+SOURCES		+=	../source/arm9
 DATA		:=
-INCLUDES	:=	../libn3ds/include ../libn3ds/thirdparty ../include ../thirdparty
+INCLUDES	+=	../include ../thirdparty
 DEFINES		:=	-DARM9 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
 				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
 
