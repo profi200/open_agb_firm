@@ -27,33 +27,12 @@
 
 
 
-static void setBacklight(void)
-{
-	u8 backlightMax;
-	u8 backlightMin;
-	if(MCU_getSystemModel() >= 4)
-	{
-		backlightMax=142;
-		backlightMin=16;
-	}
-	else
-	{
-		backlightMax=117;
-		backlightMin=20;
-	}
-
-	const u8 backlight = oafGetBacklightConfig();
-	if (backlight > backlightMax) GFX_setBrightness(backlightMax, backlightMax);
-	else if (backlight < backlightMin) GFX_setBrightness(backlightMin, backlightMin);
-	else GFX_setBrightness(backlight, backlight);
-}
-
 int main(void)
 {
 	Result res = fMount(FS_DRIVE_SDMC);
 	if(res == RES_OK) res = oafParseConfigEarly();
 	GFX_init(GFX_BGR8, GFX_RGB565);
-	setBacklight();
+	changeBacklight(0); // Apply backlight config.
 	consoleInit(SCREEN_BOT, NULL);
 	//CODEC_init();
 
@@ -61,8 +40,6 @@ int main(void)
 	{
 		while(1)
 		{
-			adjustBrightness();
-
 			hidScanInput();
 			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
 

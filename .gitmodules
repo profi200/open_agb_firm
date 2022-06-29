@@ -1,0 +1,3 @@
+[submodule "libn3ds"]
+	path = libn3ds
+	url = https://github.com/profi200/libn3ds.git

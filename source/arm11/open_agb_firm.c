@@ -45,7 +45,7 @@
 #define INI_BUF_SIZE    (1024u)
 #define DEFAULT_CONFIG  "[general]\n"             \
                         "backlight=64\n"          \
-                        "backlightAdjustment=5\n" \
+                        "backlightSteps=5\n"      \
                         "directBoot=false\n"      \
                         "useGbaDb=true\n\n"       \
                         "[video]\n"               \
@@ -62,13 +62,13 @@
 typedef struct
 {
 	// [general]
-	u8 backlight; // Both LCDs.
-	u8 backlightAdjustment;
+	u8 backlight;      // Both LCDs.
+	u8 backlightSteps;
 	bool directBoot;
 	bool useGbaDb;
 
 	// [video]
-	u8 scaler;      // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
+	u8 scaler;        // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
 	float gbaGamma;
 	float lcdGamma;
 	float contrast;
@@ -97,7 +97,7 @@ static OafConfig g_oafConfig =
 {
 	// [general]
 	64,    // backlight
-	5,     // backlightAdjustment
+	5,     // backlightSteps
 	false, // directBoot
 	true,  // useGbaDb
 
@@ -117,67 +117,7 @@ static OafConfig g_oafConfig =
 };
 static KHandle g_frameReadyEvent = 0;
 
-static u8 currentBacklight = 64;
-static u8 backChange = 5;
-static bool displayOn = true;
 
-static void changeBrightness(int16_t amount) {
-	u8 backlightMax;
-	u8 backlightMin;
-	if(MCU_getSystemModel() >= 4)
-	{
-		backlightMin=16;
-		backlightMax=142;
-	}
-	else
-	{
-		backlightMin=20;
-		backlightMax=117;
-	}
-	u8 newBacklight;
-	const int16_t newVal = currentBacklight+amount;
-	if (amount < 0)
-		newBacklight = newVal >= 0 && newVal < currentBacklight && newVal >= backlightMin ? newVal : backlightMin;
-	else
-		newBacklight = newVal >= currentBacklight && newVal <= backlightMax ? newVal : backlightMax;
-
-	//checks prevent newBacklight from exceding u8 bounds, so we can safely cast it down
-	GFX_setBrightness(newBacklight, newBacklight);
-	currentBacklight = (u8)newBacklight;
-}
-
-void adjustBrightness(void) {
-	//check for special button combos
-	const int kHeld = hidKeysHeld();
-	const int kDown = hidKeysDown();
-	if (kDown && kHeld) {
-		//adjust screen brightness up
-		if(kHeld == (KEY_X | KEY_DUP))
-			changeBrightness(backChange);
-		//adjust screen brightness down
-		if(kHeld == (KEY_X | KEY_DDOWN))
-			changeBrightness(-backChange);
-
-		//turn off screen
-		if(displayOn && kHeld == (KEY_X | KEY_DLEFT)) {
-#ifdef NDEBUG
-			GFX_powerOffBacklights(GFX_BLIGHT_TOP);
-#else
-			GFX_powerOffBacklights(GFX_BLIGHT_BOTH);
-#endif
-			displayOn = false;
-		}
-		//turn on screen
-		if(!displayOn && kHeld == (KEY_X | KEY_DRIGHT)) {
-#ifdef NDEBUG
-			GFX_powerOnBacklights(GFX_BLIGHT_TOP);
-#else
-			GFX_powerOnBacklights(GFX_BLIGHT_BOTH);
-#endif
-			displayOn = true;
-		}
-	}
-}
 
 static u32 fixRomPadding(u32 romFileSize)
 {
@@ -585,8 +525,8 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 	{
 		if(strcmp(name, "backlight") == 0)
 			config->backlight = (u8)strtoul(value, NULL, 10);
-		else if(strcmp(name, "backlightAdjustment") == 0)
-			config->backlightAdjustment = (u8)strtoul(value, NULL, 10);
+		else if(strcmp(name, "backlightSteps") == 0)
+			config->backlightSteps = (u8)strtoul(value, NULL, 10);
 		else if(strcmp(name, "directBoot") == 0)
 			config->directBoot = (strcmp(value, "false") == 0 ? false : true);
 		else if(strcmp(name, "useGbaDb") == 0)
@@ -638,6 +578,67 @@ static Result parseOafConfig(const char *const path, const bool writeDefaultCfg)
 	free(iniBuf);
 
 	return res;
+}
+
+void changeBacklight(s16 amount)
+{
+	u8 min, max;
+	if(MCU_getSystemModel() >= 4)
+	{
+		min = 16;
+		max = 142;
+	}
+	else
+	{
+		min = 20;
+		max = 117;
+	}
+
+	s16 newVal = g_oafConfig.backlight + amount;
+	newVal = (newVal > max ? max : newVal);
+	newVal = (newVal < min ? min : newVal);
+	g_oafConfig.backlight = (u8)newVal;
+
+	GFX_setBrightness((u8)newVal, (u8)newVal);
+}
+
+static void updateBacklight(void)
+{
+	// Check for special button combos.
+	const u32 kHeld = hidKeysHeld();
+	static bool backlightOn = true;
+	if(hidKeysDown() && kHeld)
+	{
+		// Adjust LCD brightness up.
+		const s16 steps = g_oafConfig.backlightSteps;
+		if(kHeld == (KEY_X | KEY_DUP))
+			changeBacklight(steps);
+
+		// Adjust LCD brightness down.
+		if(kHeld == (KEY_X | KEY_DDOWN))
+			changeBacklight(-steps);
+
+		// Disable backlight switching in debug builds on 2DS.
+		const GfxBlight lcd = (MCU_getSystemModel() != 3 ? GFX_BLIGHT_TOP : GFX_BLIGHT_BOT);
+#ifndef NDEBUG
+		if(lcd != GFX_BLIGHT_BOT)
+#endif
+		{
+			// Turn off backlight.
+			if(backlightOn && kHeld == (KEY_X | KEY_DLEFT))
+			{
+				backlightOn = false;
+				GFX_powerOffBacklights(lcd);
+			}
+
+			// Turn on backlight.
+			if(!backlightOn && kHeld == (KEY_X | KEY_DRIGHT))
+			{
+				backlightOn = true;
+				GFX_powerOnBacklights(lcd);
+			}
+		}
+	}
 }
 
 static Result showFileBrowser(char romAndSavePath[512])
@@ -733,14 +734,6 @@ Result oafParseConfigEarly(void)
 	return res;
 }
 
-u8 oafGetBacklightConfig(void)
-{
-	return g_oafConfig.backlight;
-}
-u8 oafGetBacklightAdjustmentConfig(void) {
-	return g_oafConfig.backlightAdjustment;
-}
-
 Result oafInitAndRun(void)
 {
 	Result res;
@@ -749,8 +742,6 @@ Result oafInitAndRun(void)
 	{
 		do
 		{
-			currentBacklight = oafGetBacklightConfig();
-			backChange = oafGetBacklightAdjustmentConfig();
 			// Try to load the ROM path from autoboot.txt.
 			// If this file doesn't exist show the file browser.
 			if((res = fsLoadPathFromFile("autoboot.txt", filePath)) == RES_FR_NO_FILE)
@@ -810,6 +801,7 @@ Result oafInitAndRun(void)
 void oafUpdate(void)
 {
 	LGY_handleOverrides();
+	updateBacklight();
 	waitForEvent(g_frameReadyEvent);
 }
 
