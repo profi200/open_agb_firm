@@ -26,11 +26,11 @@ A/B/L/R/START/SELECT - GBA buttons, respectively
 SELECT+Y - Dump screen output to `/3ds/open_agb_firm/texture_dump.bmp`
 * If the screen output freezes, press HOME to fix it. This is a hard to track down bug that will be fixed.
 
-X+UP/DOWN - Adjust screen brightness up or down by `backlightAdjustment` units
+X+UP/DOWN - Adjust screen brightness up or down by `backlightSteps` units.
 
-X+LEFT - Turn off display
+X+LEFT - Turn off LCD backlight.
 
-X+RIGHT - Turn on display
+X+RIGHT - Turn on LCD backlight.
 
 Hold the power button to turn off the 3DS.
 
@@ -47,7 +47,7 @@ General settings.
   * New 3DS: `16`-`142`
 * Values ≤`64` are recommended.
 
-`u8 backlightAdjustment` - How much to adjust backlight brightness by
+`u8 backlightSteps` - How much to adjust backlight brightness by
 * Default: `5`
 
 `bool directBoot` - Skip GBA BIOS intro at game startup
