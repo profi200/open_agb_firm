@@ -156,7 +156,7 @@ To compile open_agb_firm, the following needs to be installed:
 
 Additionally, `p7zip` (or if available, `p7zip-full`) needs to be installed to make release builds. Also, make sure that the `dma330as` and `firm_builder`/`firmtool` binaries are in the PATH environment variable and accessible to the Makefile.
 
-Clone this repository using `git clone --recurse-submodules https://github.com/profi200/open_agb_firm`and update via `git submodule update --init && git pull`.
+Clone this repository using `git clone --recurse-submodules https://github.com/profi200/open_agb_firm`and update via `git pull && git submodule update --init --recursive`.
 
 Build open_agb_firm as a debug build via `make`, or as a release build via `make release`.
 
