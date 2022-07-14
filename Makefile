@@ -80,5 +80,5 @@ else
 endif
 	@7z a -mx -m0=ARM -m1=LZMA $(TARGET)$(VERS_STRING).7z $(TARGET).firm
 	@7z u -mx -m0=LZMA $(TARGET)$(VERS_STRING).7z resources/gba_db.bin
-	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z libn3ds/thirdparty/fatfs/LICENSE.txt thirdparty/inih/LICENSE.txt LICENSE.txt README.md
-	@7z rn $(TARGET)$(VERS_STRING).7z resources/gba_db.bin 3ds/open_agb_firm/gba_db.bin libn3ds/thirdparty/fatfs/LICENSE.txt LICENSE_fatfs.txt thirdparty/inih/LICENSE.txt LICENSE_inih.txt
+	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z libn3ds/libraries/fatfs/LICENSE.txt libraries/inih/LICENSE.txt LICENSE.txt README.md
+	@7z rn $(TARGET)$(VERS_STRING).7z resources/gba_db.bin 3ds/open_agb_firm/gba_db.bin libn3ds/libraries/fatfs/LICENSE.txt LICENSE_fatfs.txt libraries/inih/LICENSE.txt LICENSE_inih.txt
