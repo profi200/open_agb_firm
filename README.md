@@ -32,6 +32,8 @@ X+LEFT - Turn off LCD backlight.
 
 X+RIGHT - Turn on LCD backlight.
 
+Hold the X button while launching a game to skip applying patches (if present)
+
 Hold the power button to turn off the 3DS.
 
 ## Configuration
@@ -80,6 +82,9 @@ Game-specific settings. Only intended to be used in the per-game settings (romNa
 `u8 saveSlot` - Savegame slot (0-9)
 * Default: `0`
 
+`u8 saveType` - Override to use a specific save type, see values for `defaultSave` (0-15, 255)
+* Default: `255` (disabled)
+
 ### Advanced
 Options for advanced users. No pun intended.
 
@@ -97,6 +102,10 @@ Options for advanced users. No pun intended.
   * `11`, `13`: Flash 1m
   * `14`: SRAM 256k
   * `15`: None
+
+## Patches
+open_agb_firm supports automatically applying IPS and UPS patches. To use a patch, rename the patch file to match the ROM file name (without the extension).
+* If you wanted to apply an IPS patch to `example.gba`, rename the patch file to `example.ips`
 
 ## Known Issues
 This section is reserved for a listing of known issues. At present only this remains:

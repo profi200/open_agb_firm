@@ -36,6 +36,7 @@
 #include "arm11/drivers/lcd.h"
 #include "arm11/gpu_cmd_lists.h"
 #include "arm11/drivers/mcu.h"
+#include "arm11/patch.h"
 #include "kernel.h"
 #include "kevent.h"
 
@@ -58,7 +59,6 @@
                         "saveOverride=false\n"    \
                         "defaultSave=14"
 
-
 typedef struct
 {
 	// [general]
@@ -76,7 +76,7 @@ typedef struct
 
 	// [game]
 	u8 saveSlot;
-	// TODO: Per-game save type override.
+	u8 saveType;
 
 	// [advanced]
 	bool saveOverride;
@@ -110,14 +110,13 @@ static OafConfig g_oafConfig =
 
 	// [game]
 	0,     // saveSlot
+	0xFF,    // saveType
 
 	// [advanced]
 	false, // saveOverride
 	14     // defaultSave
 };
 static KHandle g_frameReadyEvent = 0;
-
-
 
 static u32 fixRomPadding(u32 romFileSize)
 {
@@ -126,7 +125,6 @@ static u32 fixRomPadding(u32 romFileSize)
 	u32 romSize = nextPow2(romFileSize);
 	if(romSize < 0x100000u) romSize = 0x100000u;
 	memset((void*)(ROM_LOC + romFileSize), 0xFFFFFFFFu, romSize - romFileSize);
-
 	if(romSize > 0x100000u) // >1 MiB.
 	{
 		// Fake "open bus" padding.
@@ -140,6 +138,7 @@ static u32 fixRomPadding(u32 romFileSize)
 	}
 	else
 	{
+
 		// ROM mirroring (Classic NES Series/possibly others with 8 Mbit ROM).
 		// Mirror ROM across the entire 32 MiB area.
 		for(uintptr_t i = ROM_LOC + romSize; i < ROM_LOC + MAX_ROM_SIZE; i += romSize)
@@ -167,9 +166,10 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 
 		u32 read;
 		res = fRead(f, (u8*)ROM_LOC, fileSize, &read);
-		if(read == fileSize) *romSizeOut = fixRomPadding(fileSize);
-
 		fClose(f);
+
+		if(read == fileSize) *romSizeOut = fixRomPadding(fileSize); //, path);
+
 	}
 
 	return res;
@@ -549,6 +549,8 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 	{
 		if(strcmp(name, "saveSlot") == 0)
 			config->saveSlot = (u8)strtoul(value, NULL, 10);
+		if(strcmp(name, "saveType") == 0)
+			config->saveType = (u8)strtoul(value, NULL, 10);
 	}
 	else if(strcmp(section, "advanced") == 0)
 	{
@@ -751,6 +753,11 @@ Result oafInitAndRun(void)
 			}
 			else if(res != RES_OK) break;
 
+			//make copy of rom path
+			char *const romFilePath = (char*)calloc(strlen(filePath)+1, 1);
+			if(romFilePath == NULL) { res = RES_OUT_OF_MEM; break; }
+			strcpy(romFilePath, filePath);
+
 			// Load the ROM file.
 			u32 romSize;
 			if((res = loadGbaRom(filePath, &romSize)) != RES_OK) break;
@@ -762,10 +769,15 @@ Result oafInitAndRun(void)
 			// Adjust the path for the save file and get save type.
 			gameCfg2SavePath(filePath, g_oafConfig.saveSlot);
 			u16 saveType;
-			if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
+			if(g_oafConfig.saveType != 0xFF)
+				saveType = g_oafConfig.saveType;
+			else if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
 				saveType = getSaveType(romSize, filePath);
 			else
 				saveType = detectSaveType(romSize);
+
+			patchRom(romFilePath, &romSize);
+			free(romFilePath);
 
 			// Prepare ARM9 for GBA mode + save loading.
 			if((res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath)) == RES_OK)
