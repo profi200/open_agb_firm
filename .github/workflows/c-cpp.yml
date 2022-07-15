@@ -1,0 +1,43 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install gcc
+      run: |
+        apt-get update
+        apt-get -y install gcc p7zip-full
+
+    - name: Build ctr_firm_builder
+      run: |
+        git clone --recurse-submodules https://github.com/derrekr/ctr_firm_builder.git
+        cd ctr_firm_builder
+        make
+        cd ..
+
+    - name: Build project
+      run: |
+        export PATH=$PWD/ctr_firm_builder:$PATH
+        git submodule update --init --recursive
+        make release
+        RELEASE_NAME=open_agb_firm_"$(git rev-parse --short HEAD)".7z
+        mv ./open_agb_firm.7z ./"$RELEASE_NAME"
+        echo "RELEASE_NAME="$RELEASE_NAME"" >> "$GITHUB_ENV"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3.1.0
+      with:
+        name: "${{ env.RELEASE_NAME }}"
+        path: "./${{ env.RELEASE_NAME }}"
+        if-no-files-found: error
