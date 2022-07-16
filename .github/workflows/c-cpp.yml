@@ -2,9 +2,11 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches:
+    - master
   pull_request:
-    branches: [ "master" ]
+    branches:
+    - master
   workflow_dispatch:
 
 jobs:
@@ -14,7 +16,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Install gcc
+    - name: Install dependencies
       run: |
         apt-get update
         apt-get -y install gcc p7zip-full
@@ -24,20 +26,18 @@ jobs:
         git clone --recurse-submodules https://github.com/derrekr/ctr_firm_builder.git
         cd ctr_firm_builder
         make
-        cd ..
 
     - name: Build project
       run: |
         export PATH=$PWD/ctr_firm_builder:$PATH
         git submodule update --init --recursive
         make release
-        RELEASE_NAME=open_agb_firm_"$(git rev-parse --short HEAD)".7z
-        mv ./open_agb_firm.7z ./"$RELEASE_NAME"
-        echo "RELEASE_NAME="$RELEASE_NAME"" >> "$GITHUB_ENV"
+        7z x ./open_agb_firm.7z -o./artifacts
+        echo ${{ github.sha }} >> ./artifacts/nightly_commit.txt
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3.1.0
       with:
-        name: "${{ env.RELEASE_NAME }}"
-        path: "./${{ env.RELEASE_NAME }}"
+        name: open_agb_firm_nightly
+        path: ./artifacts
         if-no-files-found: error
