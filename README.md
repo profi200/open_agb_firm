@@ -159,9 +159,13 @@ A: There's a good chance that the save you're having issues with is an EEPROM sa
 A: First, please ensure that the GBA ROM you are playing is not modified in any way, and matches its [No-Intro](https://datomatic.no-intro.org/) checksums. Second, make sure you aren't using an existing `.SAV` file, because some may have issues for various reasons. Third, make sure your [`gba_db.bin`](resources/gba_db.bin) is up-to-date. If everything seems to be in order but the game still doesn't save properly, please [open an issue](https://github.com/profi200/open_agb_firm/issues) so it can be fixed. In the meantime, the `useGbaDb` and `saveOverride` settings may be useful (see [Configuration](#configuration) for more information).
 
 ## Nightlies
-nightly.link is a thirdparty site to make builds available to everyone. I'm not affiliated with nightly.link or their developers and neither are they with GitHub. Use at your own risk.
+If you want to test the latest changes you have 2 download options. The first is recommended.
 
-If you want to test the latest changes download the nightly build here:
+**With GitHub account**\
+Log into your account, go to the Actions tab at the top, click on the first entry and download the file under `Artifacts` (`open_agb_firm_nightly`).
+
+**Without GitHub account**\
+nightly.link is a thirdparty site to make builds available to everyone. I'm not affiliated with nightly.link or their developers and neither are they with GitHub. Use at your own risk.\
 https://nightly.link/profi200/open_agb_firm/workflows/c-cpp/master/open_agb_firm_nightly.zip
 
 ## Compiling
