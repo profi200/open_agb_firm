@@ -158,6 +158,12 @@ A: There's a good chance that the save you're having issues with is an EEPROM sa
 **Q: My game doesn't save properly!**\
 A: First, please ensure that the GBA ROM you are playing is not modified in any way, and matches its [No-Intro](https://datomatic.no-intro.org/) checksums. Second, make sure you aren't using an existing `.SAV` file, because some may have issues for various reasons. Third, make sure your [`gba_db.bin`](resources/gba_db.bin) is up-to-date. If everything seems to be in order but the game still doesn't save properly, please [open an issue](https://github.com/profi200/open_agb_firm/issues) so it can be fixed. In the meantime, the `useGbaDb` and `saveOverride` settings may be useful (see [Configuration](#configuration) for more information).
 
+## Nightlies
+nightly.link is a thirdparty site to make builds available to everyone. I'm not affiliated with nightly.link or their developers and neither are they with GitHub. Use at your own risk.
+
+If you want to test the latest changes download the nightly build here:
+https://nightly.link/profi200/open_agb_firm/workflows/c-cpp/master/open_agb_firm_nightly.zip
+
 ## Compiling
 To compile open_agb_firm, the following needs to be installed:
 * [devkitARM](https://devkitpro.org/wiki/devkitPro_pacman)
@@ -188,6 +194,7 @@ You may use this under the terms of the GNU General Public License GPL v3 or the
 * **No-Intro**
 * **Wolfvak, Sono and all the other people in #GodMode9 on freenode/Discord**
 * **endrift, Extrems and all the other people in #mgba on freenode**
+* **Oleh Prypin (oprypin) for nightly.link**
 * ...everyone who contributed to **3dbrew.org**
 
 Copyright (C) 2021 derrek, profi200, d0k3
