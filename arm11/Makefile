@@ -19,7 +19,7 @@ include $(TOPDIR)/../libn3ds/libn3ds11.mk
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		+=	../source/arm11 ../libraries/inih
+SOURCES		+=	../source ../source/arm11 ../libraries/inih
 DATA		:=
 INCLUDES	+=	../include ../libraries
 DEFINES		:=	-DARM11 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \

@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "oaf_error_codes.h"
 #include "fs.h"
 #include "arm11/open_agb_firm.h"
 #include "drivers/gfx.h"

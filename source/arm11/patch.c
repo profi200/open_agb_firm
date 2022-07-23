@@ -19,25 +19,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
+#include "oaf_error_codes.h"
 #include "util.h"
 #include "arm11/drivers/hid.h"
 #include "drivers/lgy.h"
 #include "arm11/fmt.h"
 #include "fs.h"
-#include "arm11/drivers/lcd.h"
 #include "arm11/patch.h"
 #include "arm11/power.h"
 #include "drivers/sha.h"
 
 
-const Result RES_PATCH_INVALID = 202u; //should move to error_codes.h in libn3ds
-
-typedef struct {
+typedef struct
+{
     u8 *buffer;
     u16 cacheSize;
     u16 cacheOffset;
     u16 maxCacheSize;
 } Cache;
+
+
 
 static u8 readCache(const FHandle patchHandle, Cache *cache, Result *res) {
     u8 result = (cache->buffer)[(cache->cacheOffset)++];
@@ -67,7 +68,7 @@ static Result patchIPS(const FHandle patchHandle) {
 		if(memcmp("PATCH", buffer, 5) == 0) {
 			isValidPatch = true;
 		} else {
-			res = RES_PATCH_INVALID;
+			res = RES_INVALID_PATCH;
 		}
 	}
 
@@ -174,7 +175,7 @@ static Result patchUPS(const FHandle patchHandle, u32 *romSize) {
 		if(memcmp(&magic, "UPS1", 4) == 0) {
 			isValidPatch = true;
 		} else {
-			res = RES_PATCH_INVALID;
+			res = RES_INVALID_PATCH;
 		}
 	}
 
@@ -195,7 +196,7 @@ static Result patchUPS(const FHandle patchHandle, u32 *romSize) {
 			if(*romSize > MAX_ROM_SIZE) {
 				ee_puts("Patched ROM exceeds 32MB! Skipping patching...");
 				free(cache.buffer);
-				return RES_PATCH_INVALID; 
+				return RES_INVALID_PATCH; 
 			}
 
 			memset((char*)(ROM_LOC + baseRomSize), 0xFFu, *romSize - baseRomSize); //fill out extra rom space
@@ -257,7 +258,7 @@ Result patchRom(const char *const gamePath, u32 *romSize) {
 		{
 			res = patchIPS(f);
 
-			if(res != RES_OK && res != RES_PATCH_INVALID) {
+			if(res != RES_OK && res != RES_INVALID_PATCH) {
 				ee_puts("An error has occurred while patching.\nContinuing is NOT recommended!\n\nPress Y+UP to proceed");
 				while(1){
 					hidScanInput();
@@ -276,7 +277,7 @@ Result patchRom(const char *const gamePath, u32 *romSize) {
 		{
 			res = patchUPS(f, romSize);
 
-			if(res != RES_OK && res != RES_PATCH_INVALID) {
+			if(res != RES_OK && res != RES_INVALID_PATCH) {
 				ee_puts("An error has occurred while patching.\nContinuing is NOT recommended!\n\nPress Y+UP to proceed");
 				while(1){
 					hidScanInput();
@@ -298,7 +299,7 @@ cleanup:
 	free(patchPath);
 	free(patchPathBase);
 
-	if(res == RES_PATCH_INVALID) {
+	if(res == RES_INVALID_PATCH) {
 		ee_puts("Patch is not valid! Skipping...\n");
 	} 
 #ifndef NDEBUG	

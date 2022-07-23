@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
+#include "oaf_error_codes.h"
 #include "arm_intrinsic.h"
 #include "util.h"
 #include "drivers/sha.h"
@@ -692,13 +693,13 @@ static void rom2GameCfgPath(char romPath[512])
 {
 	// Extract the file name and change the extension.
 	// For cfg2SavePath() we need to reserve 2 extra bytes/chars.
-	char tmpSaveFileName[256];
-	safeStrcpy(tmpSaveFileName, strrchr(romPath, '/') + 1, 256 - 2);
-	strcpy(tmpSaveFileName + strlen(tmpSaveFileName) - 4, ".ini");
+	char tmpIniFileName[256];
+	safeStrcpy(tmpIniFileName, strrchr(romPath, '/') + 1, 256 - 2);
+	strcpy(tmpIniFileName + strlen(tmpIniFileName) - 4, ".ini");
 
 	// Construct the new path.
 	strcpy(romPath, OAF_SAVE_DIR "/");
-	strcat(romPath, tmpSaveFileName);
+	strcat(romPath, tmpIniFileName);
 }
 
 static void gameCfg2SavePath(char cfgPath[512], const u8 saveSlot)
