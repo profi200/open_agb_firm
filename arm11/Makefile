@@ -8,7 +8,7 @@ endif
 
 TOPDIR ?= $(CURDIR)
 include $(DEVKITARM)/base_rules
-include $(TOPDIR)/../libn3ds/libn3ds11.mk
+include $(TOPDIR)/../libraries/libn3ds/libn3ds11.mk
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output

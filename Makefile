@@ -82,8 +82,8 @@ else
 endif
 	@7z a -mx -m0=ARM -m1=LZMA $(TARGET)$(VERS_STRING).7z $(TARGET).firm
 	@7z u -mx -m0=LZMA $(TARGET)$(VERS_STRING).7z resources/gba_db.bin
-	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z libn3ds/libraries/fatfs/LICENSE.txt libraries/inih/LICENSE.txt LICENSE.txt README.md
-	@7z rn $(TARGET)$(VERS_STRING).7z resources/gba_db.bin 3ds/open_agb_firm/gba_db.bin libn3ds/libraries/fatfs/LICENSE.txt LICENSE_FatFs.txt libraries/inih/LICENSE.txt LICENSE_inih.txt
+	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z libraries/libn3ds/LICENSE.txt libraries/libn3ds/libraries/fatfs/LICENSE.txt libraries/inih/LICENSE.txt LICENSE.txt README.md
+	@7z rn $(TARGET)$(VERS_STRING).7z resources/gba_db.bin 3ds/open_agb_firm/gba_db.bin libraries/libn3ds/LICENSE.txt LICENSE_libn3ds.txt libraries/libn3ds/libraries/fatfs/LICENSE.txt LICENSE_FatFs.txt libraries/inih/LICENSE.txt LICENSE_inih.txt
 
 #---------------------------------------------------------------------------------
 nightly: clean
@@ -99,5 +99,6 @@ endif
 	@mkdir -p nightly/3ds/open_agb_firm
 	@cp -t nightly $(TARGET).firm LICENSE.txt README.md
 	@cp resources/gba_db.bin nightly/3ds/open_agb_firm
-	@cp libn3ds/libraries/fatfs/LICENSE.txt nightly/LICENSE_FatFs.txt
+	@cp libraries/libn3ds/LICENSE.txt nightly/LICENSE_libn3ds.txt
+	@cp libraries/libn3ds/libraries/fatfs/LICENSE.txt nightly/LICENSE_FatFs.txt
 	@cp libraries/inih/LICENSE.txt nightly/LICENSE_inih.txt
