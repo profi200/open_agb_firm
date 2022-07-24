@@ -1,3 +1,6 @@
 [submodule "libraries/libn3ds"]
 	path = libraries/libn3ds
 	url = https://github.com/profi200/libn3ds.git
+[submodule "tools/lgyFbScaler/lodepng"]
+	path = tools/lgyFbScaler/lodepng
+	url = https://github.com/lvandeve/lodepng.git
