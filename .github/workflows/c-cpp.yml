@@ -19,7 +19,7 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get update
-        apt-get -y install gcc p7zip-full
+        apt-get -y install gcc
 
     - name: Build ctr_firm_builder
       run: |
@@ -31,13 +31,12 @@ jobs:
       run: |
         export PATH=$PWD/ctr_firm_builder:$PATH
         git submodule update --init --depth 1 --recursive
-        make release
-        7z x ./open_agb_firm.7z -o./artifacts
-        echo ${{ github.sha }} >> ./artifacts/nightly_commit.txt
+        make nightly
+        echo ${{ github.sha }} >> ./nightly/nightly_commit.txt
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3.1.0
       with:
         name: open_agb_firm_nightly
-        path: ./artifacts
+        path: ./nightly
         if-no-files-found: error

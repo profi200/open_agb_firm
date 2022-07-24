@@ -67,8 +67,9 @@ arm11/$(TARGET)11.bin:
 clean:
 	@$(MAKE) --no-print-directory -C arm9 clean
 	@$(MAKE) --no-print-directory -C arm11 clean
-	rm -f $(TARGET).firm *.7z
+	rm -fr $(TARGET).firm *.7z nightly
 
+#---------------------------------------------------------------------------------
 release: clean
 	@$(MAKE) -j$(NPROC) --no-print-directory -C arm9 NO_DEBUG=1
 	@$(MAKE) -j$(NPROC) --no-print-directory -C arm11 NO_DEBUG=1
@@ -82,4 +83,21 @@ endif
 	@7z a -mx -m0=ARM -m1=LZMA $(TARGET)$(VERS_STRING).7z $(TARGET).firm
 	@7z u -mx -m0=LZMA $(TARGET)$(VERS_STRING).7z resources/gba_db.bin
 	@7z u -mx -m0=PPMD $(TARGET)$(VERS_STRING).7z libn3ds/libraries/fatfs/LICENSE.txt libraries/inih/LICENSE.txt LICENSE.txt README.md
-	@7z rn $(TARGET)$(VERS_STRING).7z resources/gba_db.bin 3ds/open_agb_firm/gba_db.bin libn3ds/libraries/fatfs/LICENSE.txt LICENSE_fatfs.txt libraries/inih/LICENSE.txt LICENSE_inih.txt
+	@7z rn $(TARGET)$(VERS_STRING).7z resources/gba_db.bin 3ds/open_agb_firm/gba_db.bin libn3ds/libraries/fatfs/LICENSE.txt LICENSE_FatFs.txt libraries/inih/LICENSE.txt LICENSE_inih.txt
+
+#---------------------------------------------------------------------------------
+nightly: clean
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm9 NO_DEBUG=1
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm11 NO_DEBUG=1
+ifeq ($(strip $(USE_FIRMTOOL)),1)
+	firmtool build $(TARGET).firm -n $(ENTRY9) -e $(ENTRY11) -A $(SECTION0_ADR) $(SECTION1_ADR) \
+		-D $(SECTION0_FILE) $(SECTION1_FILE) -C $(SECTION0_TYPE) $(SECTION1_TYPE)
+else
+	firm_builder $(TARGET).firm $(ENTRY9) $(ENTRY11) $(SECTION0_ADR) $(SECTION0_TYPE) \
+		$(SECTION0_FILE) $(SECTION1_ADR) $(SECTION1_TYPE) $(SECTION1_FILE)
+endif
+	@mkdir -p nightly/3ds/open_agb_firm
+	@cp -t nightly $(TARGET).firm LICENSE.txt README.md
+	@cp resources/gba_db.bin nightly/3ds/open_agb_firm
+	@cp libn3ds/libraries/fatfs/LICENSE.txt nightly/LICENSE_FatFs.txt
+	@cp libraries/inih/LICENSE.txt nightly/LICENSE_inih.txt
