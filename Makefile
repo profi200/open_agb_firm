@@ -27,6 +27,7 @@ SECTION1_FILE := arm11/$(TARGET)11.bin
 export VERS_STRING := $(shell git describe --tags --match v[0-9]* --abbrev=8 | sed 's/-[0-9]*-g/-/i')
 export VERS_MAJOR  := $(shell echo "$(VERS_STRING)" | sed 's/v\([0-9]*\)\..*/\1/i')
 export VERS_MINOR  := $(shell echo "$(VERS_STRING)" | sed 's/.*\.\([0-9]*\).*/\1/')
+NPROC := $(shell nproc)
 
 
 .PHONY: checkarm9 checkarm11 clean release
@@ -38,11 +39,11 @@ all: checkarm9 checkarm11 $(TARGET).firm
 
 #---------------------------------------------------------------------------------
 checkarm9:
-	@$(MAKE) -j4 --no-print-directory -C arm9
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm9
 
 #---------------------------------------------------------------------------------
 checkarm11:
-	@$(MAKE) -j4 --no-print-directory -C arm11
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm11
 
 #---------------------------------------------------------------------------------
 $(TARGET).firm: arm9/$(TARGET)9.bin arm11/$(TARGET)11.bin
@@ -56,11 +57,11 @@ endif
 
 #---------------------------------------------------------------------------------
 arm9/$(TARGET)9.bin:
-	@$(MAKE) -j4 --no-print-directory -C arm9
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm9
 
 #---------------------------------------------------------------------------------
 arm11/$(TARGET)11.bin:
-	@$(MAKE) -j4 --no-print-directory -C arm11
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm11
 
 #---------------------------------------------------------------------------------
 clean:
@@ -69,8 +70,8 @@ clean:
 	rm -f $(TARGET).firm *.7z
 
 release: clean
-	@$(MAKE) -j4 --no-print-directory -C arm9 NO_DEBUG=1
-	@$(MAKE) -j4 --no-print-directory -C arm11 NO_DEBUG=1
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm9 NO_DEBUG=1
+	@$(MAKE) -j$(NPROC) --no-print-directory -C arm11 NO_DEBUG=1
 ifeq ($(strip $(USE_FIRMTOOL)),1)
 	firmtool build $(TARGET).firm -n $(ENTRY9) -e $(ENTRY11) -A $(SECTION0_ADR) $(SECTION1_ADR) \
 		-D $(SECTION0_FILE) $(SECTION1_FILE) -C $(SECTION0_TYPE) $(SECTION1_TYPE)
