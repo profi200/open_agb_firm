@@ -23,14 +23,14 @@ jobs:
 
     - name: Build ctr_firm_builder
       run: |
-        git clone --recurse-submodules https://github.com/derrekr/ctr_firm_builder.git
+        git clone --depth 1 --recurse-submodules https://github.com/derrekr/ctr_firm_builder.git
         cd ctr_firm_builder
         make
 
     - name: Build project
       run: |
         export PATH=$PWD/ctr_firm_builder:$PATH
-        git submodule update --init --recursive
+        git submodule update --init --depth 1 --recursive
         make release
         7z x ./open_agb_firm.7z -o./artifacts
         echo ${{ github.sha }} >> ./artifacts/nightly_commit.txt
