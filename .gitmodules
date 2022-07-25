@@ -4,3 +4,6 @@
 [submodule "tools/lgyFbScaler/lodepng"]
 	path = tools/lgyFbScaler/lodepng
 	url = https://github.com/lvandeve/lodepng.git
+[submodule "libraries/inih"]
+	path = libraries/inih
+	url = https://github.com/benhoyt/inih.git
