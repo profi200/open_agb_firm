@@ -16,6 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+        submodules: recursive
     - name: Install dependencies
       run: |
         apt-get update
@@ -30,12 +33,11 @@ jobs:
     - name: Build project
       run: |
         export PATH=$PWD/ctr_firm_builder:$PATH
-        git submodule update --init --depth 1 --recursive
         make nightly
         echo ${{ github.sha }} >> ./nightly/nightly_commit.txt
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3.1.0
+      uses: actions/upload-artifact@v3
       with:
         name: open_agb_firm_nightly
         path: ./nightly
