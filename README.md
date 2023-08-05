@@ -76,6 +76,12 @@ Video-related settings.
 `float brightness` - Screen lift
 * Default: `0.0`
 
+### Audio
+Audio settings.
+
+`u8 audioOut` - Audio output. 0 = auto, 1 = speakers, 2 = headphones.
+* Default: `0`
+
 ### Game
 Game-specific settings. Only intended to be used in the per-game settings (romName.ini in `/3ds/open_agb_firm/saves`).
 

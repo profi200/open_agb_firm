@@ -36,6 +36,7 @@
 #include "arm11/filebrowser.h"
 #include "arm11/drivers/lcd.h"
 #include "arm11/gpu_cmd_lists.h"
+#include "arm11/drivers/codec.h"
 #include "arm11/drivers/mcu.h"
 #include "arm11/patch.h"
 #include "kernel.h"
@@ -56,6 +57,8 @@
                         "lcdGamma=1.54\n"         \
                         "contrast=1.0\n"          \
                         "brightness=0.0\n\n"      \
+                        "[audio]\n"               \
+                        "audioOut=0\n\n"          \
                         "[advanced]\n"            \
                         "saveOverride=false\n"    \
                         "defaultSave=14"
@@ -69,11 +72,14 @@ typedef struct
 	bool useGbaDb;
 
 	// [video]
-	u8 scaler;        // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
+	u8 scaler;         // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
 	float gbaGamma;
 	float lcdGamma;
 	float contrast;
 	float brightness;
+
+	// [audio]
+	u8 audioOut;       // 0 = auto, 1 = speakers, 2 = headphones.
 
 	// [game]
 	u8 saveSlot;
@@ -109,9 +115,12 @@ static OafConfig g_oafConfig =
 	1.f,   // contrast
 	0.f,   // brightness
 
+	// [audio]
+	0,     // Automatic audio output.
+
 	// [game]
 	0,     // saveSlot
-	0xFF,    // saveType
+	0xFF,  // saveType
 
 	// [advanced]
 	false, // saveOverride
@@ -507,6 +516,7 @@ static void gbaGfxHandler(void *args)
 		GFX_waitForP3D();
 		GX_displayTransfer((u32*)(0x18180000 + (16 * 240 * 3)), 368u<<16 | 240u,
 		                   GFX_getFramebuffer(SCREEN_TOP) + (16 * 240 * 3), 368u<<16 | 240u, 1u<<12 | 1u<<8);
+		CODEC_runHeadphoneDetection(); // Run headphone detection while PPF is busy.
 		GFX_waitForPPF();
 		GFX_swapFramebufs();
 
@@ -545,6 +555,11 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 			config->contrast = str2float(value);
 		else if(strcmp(name, "brightness") == 0)
 			config->brightness = str2float(value);
+	}
+	else if(strcmp(section, "audio") == 0)
+	{
+		if(strcmp(name, "audioOut") == 0)
+			config->audioOut = (u8)strtoul(value, NULL, 10);
 	}
 	else if(strcmp(section, "game") == 0)
 	{
@@ -745,6 +760,9 @@ Result oafInitAndRun(void)
 	{
 		do
 		{
+			// Set audio output.
+			CODEC_setAudioOutput(g_oafConfig.audioOut);
+
 			// Try to load the ROM path from autoboot.txt.
 			// If this file doesn't exist show the file browser.
 			if((res = fsLoadPathFromFile("autoboot.txt", filePath)) == RES_FR_NO_FILE)
