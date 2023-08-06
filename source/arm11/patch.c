@@ -22,7 +22,7 @@
 #include "oaf_error_codes.h"
 #include "util.h"
 #include "arm11/drivers/hid.h"
-#include "drivers/lgy.h"
+#include "drivers/lgy_common.h"
 #include "arm11/fmt.h"
 #include "fs.h"
 #include "arm11/patch.h"
@@ -93,7 +93,7 @@ static Result patchIPS(const FHandle patchHandle) {
 				if(res != RES_OK) break;
 
 				u16 tempLen = (buffer[0]<<8) + (buffer[1]);
-				memset((void*)(ROM_LOC + offset), buffer[2], tempLen*sizeof(char));
+				memset((void*)(LGY_ROM_LOC + offset), buffer[2], tempLen*sizeof(char));
 			}
 			//regular hunks
 			else {
@@ -102,7 +102,7 @@ static Result patchIPS(const FHandle patchHandle) {
 					res = fRead(patchHandle, buffer, bufferSize, NULL);
 					if(res != RES_OK) break;
 					for(u16 j=0; j<bufferSize; ++j) {
-						*(char*)(ROM_LOC+offset+(bufferSize*i)+j) = buffer[j];
+						*(char*)(LGY_ROM_LOC+offset+(bufferSize*i)+j) = buffer[j];
 					}
 				}
 
@@ -111,7 +111,7 @@ static Result patchIPS(const FHandle patchHandle) {
 					res = fRead(patchHandle, buffer, remaining, NULL);
 					if(res != RES_OK) break;
 					for(u16 j=0; j<remaining; ++j) {
-						*(char*)(ROM_LOC+offset+(fullCount*bufferSize)+j) = buffer[j];
+						*(char*)(LGY_ROM_LOC+offset+(fullCount*bufferSize)+j) = buffer[j];
 					}
 				}
 			}
@@ -193,21 +193,21 @@ static Result patchUPS(const FHandle patchHandle, u32 *romSize) {
 			//scale up rom
 			*romSize = nextPow2(patchedRomSize);
 			//check if upscaled rom is too big
-			if(*romSize > MAX_ROM_SIZE) {
+			if(*romSize > LGY_MAX_ROM_SIZE) {
 				ee_puts("Patched ROM exceeds 32MB! Skipping patching...");
 				free(cache.buffer);
 				return RES_INVALID_PATCH; 
 			}
 
-			memset((char*)(ROM_LOC + baseRomSize), 0xFFu, *romSize - baseRomSize); //fill out extra rom space
-			memset((char*)(ROM_LOC + baseRomSize), 0x00u, patchedRomSize - baseRomSize); //fill new patch area with 0's
+			memset((char*)(LGY_ROM_LOC + baseRomSize), 0xFFu, *romSize - baseRomSize); //fill out extra rom space
+			memset((char*)(LGY_ROM_LOC + baseRomSize), 0x00u, patchedRomSize - baseRomSize); //fill new patch area with 0's
 		}
 
         uintmax_t patchFileSize = fSize(patchHandle);
 
         uintmax_t offset = 0;
 		u8 readByte = 0;
-		u8 *romBytes = ((u8*)ROM_LOC);
+		u8 *romBytes = ((u8*)LGY_ROM_LOC);
 
         while(fTell(patchHandle) < (patchFileSize-12) && res==RES_OK) {
             offset += read_vuint(patchHandle, &res, &cache);
@@ -305,7 +305,7 @@ cleanup:
 #ifndef NDEBUG	
 	else {
 		u64 sha1[3];
-		sha((u32*)ROM_LOC, *romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
+		sha((u32*)LGY_ROM_LOC, *romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
 		debug_printf("New hash: '%016" PRIX64 "'\n", __builtin_bswap64(sha1[0]));
 	}
 #endif

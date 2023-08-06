@@ -82,6 +82,51 @@ Audio settings.
 `u8 audioOut` - Audio output. 0 = auto, 1 = speakers, 2 = headphones.
 * Default: `0`
 
+### Input
+Input settings. Each entry allows one or multiple buttons. Buttons are separated by a `,` without spaces.  
+Allowed buttons are `A B SELECT START RIGHT LEFT UP DOWN R L X Y TOUCH CP_RIGHT CP_LEFT CP_UP CP_DOWN`.  
+TOUCH reacts to all touchscreen presses. The CP in front is short for Circle-Pad.
+
+Note that button mappings can cause input lag of up to 1 frame depending on when the game reads inputs. For this reason the default mapping of the Circle-Pad to D-Pad is no longer provided.
+
+`A` - Button map for the A button.
+* Default: `none`
+
+`B` - Button map for the B button.
+* Default: `none`
+
+`SELECT` - Button map for the SELECT button.
+* Default: `none`
+
+`START` - Button map for the START button.
+* Default: `none`
+
+`RIGHT` - Button map for the RIGHT button.
+* Default: `none`
+
+`LEFT` - Button map for the LEFT button.
+* Default: `none`
+
+`UP` - Button map for the UP button.
+* Default: `none`
+
+`DOWN` - Button map for the DOWN button.
+* Default: `none`
+
+`R` - Button map for the R button.
+* Default: `none`
+
+`L` - Button map for the L button.
+* Default: `none`
+
+Example:
+```
+RIGHT=RIGHT,CP_RIGHT
+LEFT=LEFT,CP_LEFT
+UP=UP,CP_UP
+DOWN=DOWN,CP_DOWN
+```
+
 ### Game
 Game-specific settings. Only intended to be used in the per-game settings (romName.ini in `/3ds/open_agb_firm/saves`).
 

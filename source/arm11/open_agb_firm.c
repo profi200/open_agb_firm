@@ -25,7 +25,8 @@
 #include "util.h"
 #include "drivers/sha.h"
 #include "arm11/drivers/hid.h"
-#include "drivers/lgy.h"
+#include "arm11/drivers/lgy11.h"
+#include "drivers/lgy_common.h"
 #include "arm11/drivers/lgyfb.h"
 #include "arm11/console.h"
 #include "arm11/fmt.h"
@@ -63,23 +64,27 @@
                         "saveOverride=false\n"    \
                         "defaultSave=14"
 
+
 typedef struct
 {
 	// [general]
-	u8 backlight;      // Both LCDs.
+	u8 backlight;       // Both LCDs.
 	u8 backlightSteps;
 	bool directBoot;
 	bool useGbaDb;
 
 	// [video]
-	u8 scaler;         // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
+	u8 scaler;          // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
 	float gbaGamma;
 	float lcdGamma;
 	float contrast;
 	float brightness;
 
 	// [audio]
-	u8 audioOut;       // 0 = auto, 1 = speakers, 2 = headphones.
+	u8 audioOut;        // 0 = auto, 1 = speakers, 2 = headphones.
+
+	// [input]
+	u32 buttonMaps[10]; // A, B, Select, Start, Right, Left, Up, Down, R, L.
 
 	// [game]
 	u8 saveSlot;
@@ -118,6 +123,20 @@ static OafConfig g_oafConfig =
 	// [audio]
 	0,     // Automatic audio output.
 
+	// [input]
+	{      // buttonMaps
+		0, // A
+		0, // B
+		0, // Select
+		0, // Start
+		0, // Right
+		0, // Left
+		0, // Up
+		0, // Down
+		0, // R
+		0  // L
+	},
+
 	// [game]
 	0,     // saveSlot
 	0xFF,  // saveType
@@ -128,19 +147,21 @@ static OafConfig g_oafConfig =
 };
 static KHandle g_frameReadyEvent = 0;
 
+
+
 static u32 fixRomPadding(u32 romFileSize)
 {
 	// Pad unused ROM area with 0xFFs (trimmed ROMs).
 	// Smallest retail ROM chip is 8 Mbit (1 MiB).
 	u32 romSize = nextPow2(romFileSize);
 	if(romSize < 0x100000u) romSize = 0x100000u;
-	memset((void*)(ROM_LOC + romFileSize), 0xFFFFFFFFu, romSize - romFileSize);
+	memset((void*)(LGY_ROM_LOC + romFileSize), 0xFFFFFFFFu, romSize - romFileSize);
 	if(romSize > 0x100000u) // >1 MiB.
 	{
 		// Fake "open bus" padding.
-		u32 padding = (ROM_LOC + romSize) / 2;
+		u32 padding = (LGY_ROM_LOC + romSize) / 2;
 		padding = __pkhbt(padding, padding + 1, 16); // Copy lower half + 1 to upper half.
-		for(uintptr_t i = ROM_LOC + romSize; i < ROM_LOC + MAX_ROM_SIZE; i += 4)
+		for(uintptr_t i = LGY_ROM_LOC + romSize; i < LGY_ROM_LOC + LGY_MAX_ROM_SIZE; i += 4)
 		{
 			*(u32*)i = padding;
 			padding = __uadd16(padding, 0x00020002u); // Unsigned parallel halfword-wise addition.
@@ -151,10 +172,10 @@ static u32 fixRomPadding(u32 romFileSize)
 
 		// ROM mirroring (Classic NES Series/possibly others with 8 Mbit ROM).
 		// Mirror ROM across the entire 32 MiB area.
-		for(uintptr_t i = ROM_LOC + romSize; i < ROM_LOC + MAX_ROM_SIZE; i += romSize)
+		for(uintptr_t i = LGY_ROM_LOC + romSize; i < LGY_ROM_LOC + LGY_MAX_ROM_SIZE; i += romSize)
 		{
 			//memcpy((void*)i, (void*)(i - romSize), romSize); // 0x23A15DD
-			memcpy((void*)i, (void*)ROM_LOC, romSize); // 0x237109B
+			memcpy((void*)i, (void*)LGY_ROM_LOC, romSize); // 0x237109B
 		}
 	}
 
@@ -168,14 +189,14 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
 	{
 		u32 fileSize = fSize(f);
-		if(fileSize > MAX_ROM_SIZE)
+		if(fileSize > LGY_MAX_ROM_SIZE)
 		{
-			fileSize = MAX_ROM_SIZE;
+			fileSize = LGY_MAX_ROM_SIZE;
 			ee_puts("Warning: ROM file is too big. Expect crashes.");
 		}
 
 		u32 read;
-		res = fRead(f, (u8*)ROM_LOC, fileSize, &read);
+		res = fRead(f, (u8*)LGY_ROM_LOC, fileSize, &read);
 		fClose(f);
 
 		if(read == fileSize) *romSizeOut = fixRomPadding(fileSize); //, path);
@@ -202,7 +223,7 @@ static u16 checkSaveOverride(u32 gameCode) // Save type overrides for modern hom
 
 static u16 detectSaveType(u32 romSize)
 {
-	const u32 *romPtr = (u32*)ROM_LOC;
+	const u32 *romPtr = (u32*)LGY_ROM_LOC;
 	u16 saveType;
 	if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
 	{
@@ -219,7 +240,7 @@ static u16 detectSaveType(u32 romSize)
 	else
 		saveType = defaultSave;
 
-	for(; romPtr < (u32*)(ROM_LOC + romSize); romPtr++)
+	for(; romPtr < (u32*)(LGY_ROM_LOC + romSize); romPtr++)
 	{
 		u32 tmp = *romPtr;
 
@@ -341,7 +362,7 @@ static u16 getSaveType(u32 romSize, const char *const savePath)
 	const bool saveExists = fStat(savePath, &fi) == RES_OK;
 
 	u64 sha1[3];
-	sha((u32*)ROM_LOC, romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
+	sha((u32*)LGY_ROM_LOC, romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
 
 	Result res;
 	GameDbEntry dbEntry;
@@ -528,6 +549,42 @@ static void gbaGfxHandler(void *args)
 	taskExit();
 }
 
+static u32 parseButtons(const char *str)
+{
+	if(str == NULL || *str == '\0') return 0;
+
+	char buf[32]; // Should be enough for for all useful mappings.
+	buf[31] = '\0';
+	strncpy(buf, str, 31);
+
+	char *bufPtr = buf;
+	static const char *const buttonStrLut[32] =
+	{
+		"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN",
+		"R", "L", "X", "Y", "", "", "ZL", "ZR",
+		"", "", "", "", "TOUCH", "", "", "",
+		"CS_RIGHT", "CS_LEFT", "CS_UP", "CS_DOWN", "CP_RIGHT", "CP_LEFT", "CP_UP", "CP_DOWN"
+	};
+	u32 map = 0;
+	while(1)
+	{
+		char *const nextDelimiter = strchr(bufPtr, ',');
+		if(nextDelimiter != NULL) *nextDelimiter = '\0';
+
+		unsigned i = 0;
+		while(i < 32 && strcmp(buttonStrLut[i], bufPtr) != 0) ++i;
+		if(i == 32) break;
+		map |= 1u<<i;
+
+		if(nextDelimiter == NULL) break;
+
+		bufPtr = nextDelimiter + 1; // Skip delimiter.
+	}
+
+	// Empty strings will match the entry for bit 12.
+	return map & ~(1u<<12);
+}
+
 static int cfgIniCallback(void* user, const char* section, const char* name, const char* value)
 {
 	OafConfig *const config = (OafConfig*)user;
@@ -560,6 +617,17 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 	{
 		if(strcmp(name, "audioOut") == 0)
 			config->audioOut = (u8)strtoul(value, NULL, 10);
+	}
+	else if(strcmp(section, "input") == 0)
+	{
+		const u32 button = parseButtons(name) & 0x3FFu; // Only allow GBA buttons.
+		if(button != 0)
+		{
+			// If the config option happens to abuse parseButtons() we will only use the highest bit.
+			const u32 shift = 31u - __builtin_clzl(button);
+			const u32 map   = parseButtons(value);
+			config->buttonMaps[shift] = map;
+		}
 	}
 	else if(strcmp(section, "game") == 0)
 	{
@@ -815,10 +883,17 @@ Result oafInitAndRun(void)
 				createTask(0x800, 3, gbaGfxHandler, (void*)frameReadyEvent);
 				g_frameReadyEvent = frameReadyEvent;
 
-				// Adjust gamma table and sync LgyFb start with LCD VBlank.
+				// Adjust gamma table and setup button overrides.
 				adjustGammaTableForGba();
+				const u32 *const maps = g_oafConfig.buttonMaps;
+				u16 overrides = 0;
+				for(unsigned i = 0; i < 10; i++)
+					if(maps[i] != 0) overrides |= 1u<<i;
+				LGY11_selectInput(overrides);
+
+				// Sync LgyFb start with LCD VBlank.
 				GFX_waitForVBlank0();
-				LGY_switchMode();
+				LGY11_switchMode();
 			}
 		} while(0);
 	}
@@ -831,7 +906,16 @@ Result oafInitAndRun(void)
 
 void oafUpdate(void)
 {
-	LGY_handleOverrides();
+	const u32 *const maps = g_oafConfig.buttonMaps;
+	const u32 kHeld = hidKeysHeld();
+	u16 pressed = 0;
+	for(unsigned i = 0; i < 10; i++)
+	{
+		if((kHeld & maps[i]) != 0)
+			pressed |= 1u<<i;
+	}
+	LGY11_setInputState(pressed);
+
 	updateBacklight();
 	waitForEvent(g_frameReadyEvent);
 }
@@ -844,5 +928,5 @@ void oafFinish(void)
 		deleteEvent(g_frameReadyEvent); // gbaGfxHandler() will automatically terminate.
 		g_frameReadyEvent = 0;
 	}
-	LGY_deinit();
+	LGY11_deinit();
 }
