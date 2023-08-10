@@ -487,10 +487,7 @@ static Result dumpFrameTex(void)
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
 
-	/*GX_displayTransfer((u32*)0x18200000, 160u<<16 | 256u, (u32*)0x18400000, 160u<<16 | 256u, 1u<<12 | 1u<<8);
-	GFX_waitForPPF();
-	//fsQuickWrite("sdmc:/lgyfb_dbg_frame.bgr", (void*)0x18400000, 256 * 160 * 3);*/
-	GX_displayTransfer((u32*)0x18200000, 240u<<16 | 512u, (u32*)0x18400040, 240u<<16 | 512u, 1u<<12 | 1u<<8);
+	GX_displayTransfer((u32*)0x18200000, 240u<<16 | 512, (u32*)0x18400040, 240u<<16 | 512, 1u<<12 | 1u<<8);
 	GFX_waitForPPF();
 	memcpy((void*)0x18400000, bmpHeader, sizeof(bmpHeader));
 
@@ -516,8 +513,9 @@ static void gbaGfxHandler(void *args)
 		clearEvent(event);
 
 		// Rotate the frame using the GPU.
-		// 240x160: TODO.
-		// 360x240: about 0.623620315 ms.
+		// 240x160 no scaling:    184 µs
+		// 240x160 bilinear x1.5: 408 µs
+		// 360x240 no scaling:    437 µs
 		static bool inited = false;
 		u32 listSize;
 		const u32 *list;
@@ -535,9 +533,7 @@ static void gbaGfxHandler(void *args)
 		}
 		GX_processCommandList(listSize, list);
 		GFX_waitForP3D();
-		GX_displayTransfer((u32*)(0x18180000 + (16 * 240 * 3)), 368u<<16 | 240u,
-		                   GFX_getFramebuffer(SCREEN_TOP) + (16 * 240 * 3), 368u<<16 | 240u, 1u<<12 | 1u<<8);
-		CODEC_runHeadphoneDetection(); // Run headphone detection while PPF is busy.
+		GX_displayTransfer((u32*)0x18180000, 400u<<16 | 240, GFX_getFramebuffer(SCREEN_TOP), 400u<<16 | 240, 1u<<12 | 1u<<8);
 		GFX_waitForPPF();
 		GFX_swapFramebufs();
 
@@ -553,7 +549,7 @@ static u32 parseButtons(const char *str)
 {
 	if(str == NULL || *str == '\0') return 0;
 
-	char buf[32]; // Should be enough for for all useful mappings.
+	char buf[32]; // Should be enough for all useful mappings.
 	buf[31] = '\0';
 	strncpy(buf, str, 31);
 
@@ -828,9 +824,6 @@ Result oafInitAndRun(void)
 	{
 		do
 		{
-			// Set audio output.
-			CODEC_setAudioOutput(g_oafConfig.audioOut);
-
 			// Try to load the ROM path from autoboot.txt.
 			// If this file doesn't exist show the file browser.
 			if((res = fsLoadPathFromFile("autoboot.txt", filePath)) == RES_FR_NO_FILE)
@@ -866,6 +859,9 @@ Result oafInitAndRun(void)
 			patchRom(romFilePath, &romSize);
 			free(romFilePath);
 
+			// Set audio output.
+			CODEC_setAudioOutput(g_oafConfig.audioOut);
+
 			// Prepare ARM9 for GBA mode + save loading.
 			if((res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath)) == RES_OK)
 			{
@@ -890,6 +886,16 @@ Result oafInitAndRun(void)
 				for(unsigned i = 0; i < 10; i++)
 					if(maps[i] != 0) overrides |= 1u<<i;
 				LGY11_selectInput(overrides);
+
+				// Load border if any exists.
+				// Abuse currently invisible frame buffer as temporary buffer.
+				void *const borderBuf = GFX_getFramebuffer(SCREEN_TOP);
+				if(fsQuickRead("border.bgr", borderBuf, 400 * 240 * 3) == RES_OK)
+				{
+					// Copy border in swizzled form to GPU render buffer.
+					GX_displayTransfer(borderBuf, 400u<<16 | 240, (u32*)0x18180000, 400u<<16 | 240, 1u<<12 | 1u<<8 | 1u<<1);
+					GFX_waitForPPF();
+				}
 
 				// Sync LgyFb start with LCD VBlank.
 				GFX_waitForVBlank0();
@@ -916,6 +922,7 @@ void oafUpdate(void)
 	}
 	LGY11_setInputState(pressed);
 
+	CODEC_runHeadphoneDetection();
 	updateBacklight();
 	waitForEvent(g_frameReadyEvent);
 }

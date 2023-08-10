@@ -6,6 +6,8 @@ open_agb_firm is also a complete and better alternative to GBA VC injects (AGB_F
 * Writing save files directly to the SD card
 * Automatic save type configuration using an included database
 * User configuration, such as gamma settings
+* Button remapping
+* Border support for 1:1 scaling mode
 * And more to come!
 
 ## Disclaimer
