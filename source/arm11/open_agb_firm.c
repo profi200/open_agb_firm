@@ -59,7 +59,8 @@
                         "contrast=1.0\n"          \
                         "brightness=0.0\n\n"      \
                         "[audio]\n"               \
-                        "audioOut=0\n\n"          \
+                        "audioOut=0\n"            \
+                        "volume=127\n\n"          \
                         "[advanced]\n"            \
                         "saveOverride=false\n"    \
                         "defaultSave=14"
@@ -82,6 +83,8 @@ typedef struct
 
 	// [audio]
 	u8 audioOut;        // 0 = auto, 1 = speakers, 2 = headphones.
+	s8 volume;          // -128 = muted, -127 - 48 = -63.5 - +24 dB.
+	                    // Higher than 48 = volume control via slider.
 
 	// [input]
 	u32 buttonMaps[10]; // A, B, Select, Start, Right, Left, Up, Down, R, L.
@@ -122,6 +125,7 @@ static OafConfig g_oafConfig =
 
 	// [audio]
 	0,     // Automatic audio output.
+	127,   // Control via volume slider.
 
 	// [input]
 	{      // buttonMaps
@@ -613,6 +617,8 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 	{
 		if(strcmp(name, "audioOut") == 0)
 			config->audioOut = (u8)strtoul(value, NULL, 10);
+		else if(strcmp(name, "volume") == 0)
+			config->volume = (s8)strtol(value, NULL, 10);
 	}
 	else if(strcmp(section, "input") == 0)
 	{
@@ -859,8 +865,9 @@ Result oafInitAndRun(void)
 			patchRom(romFilePath, &romSize);
 			free(romFilePath);
 
-			// Set audio output.
+			// Set audio output and volume.
 			CODEC_setAudioOutput(g_oafConfig.audioOut);
+			CODEC_setVolumeOverride(g_oafConfig.volume);
 
 			// Prepare ARM9 for GBA mode + save loading.
 			if((res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath)) == RES_OK)

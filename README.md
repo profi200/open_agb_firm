@@ -84,6 +84,9 @@ Audio settings.
 `u8 audioOut` - Audio output. 0 = auto, 1 = speakers, 2 = headphones.
 * Default: `0`
 
+`s8 volume` - Audio volume. Values above 48 mean control via volume slider. Range -128 (muted) to -20 (100%). Avoid the range -19 to 48.
+* Default: `127`
+
 ### Input
 Input settings. Each entry allows one or multiple buttons. Buttons are separated by a `,` without spaces.  
 Allowed buttons are `A B SELECT START RIGHT LEFT UP DOWN R L X Y TOUCH CP_RIGHT CP_LEFT CP_UP CP_DOWN`.  
