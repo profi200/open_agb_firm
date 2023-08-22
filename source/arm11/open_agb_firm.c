@@ -100,11 +100,11 @@ typedef struct
 
 typedef struct
 {
-	char name[200];
-	char serial[4];
 	u8 sha1[20];
+	char serial[4];
 	u32 attr;
-} GameDbEntry;
+} GbaDbEntry;
+static_assert(sizeof(GbaDbEntry) == 28, "Error: GBA DB entry struct is not packed!");
 
 
 // Default config.
@@ -317,7 +317,7 @@ static u16 detectSaveType(u32 romSize)
 }
 
 // Search for entry with first u64 of the SHA1 = x using binary search.
-static Result searchGbaDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
+static Result searchGbaDb(u64 x, GbaDbEntry *const db, s32 *const entryPos)
 {
 	debug_printf("Database search: '%016" PRIX64 "'\n", __builtin_bswap64(x));
 
@@ -326,14 +326,14 @@ static Result searchGbaDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
 	if((res = fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
 	{
 		s32 l = 0;
-		s32 r = fSize(f) / sizeof(GameDbEntry) - 1; // TODO: Check for 0!
+		s32 r = fSize(f) / sizeof(GbaDbEntry) - 1; // TODO: Check for 0!
 		while(1)
 		{
 			const s32 mid = l + (r - l) / 2;
 			debug_printf("l: %ld r: %ld mid: %ld\n", l, r, mid);
 
-			if((res = fLseek(f, sizeof(GameDbEntry) * mid)) != RES_OK) break;
-			if((res = fRead(f, db, sizeof(GameDbEntry), NULL)) != RES_OK) break;
+			if((res = fLseek(f, sizeof(GbaDbEntry) * mid)) != RES_OK) break;
+			if((res = fRead(f, db, sizeof(GbaDbEntry), NULL)) != RES_OK) break;
 			const u64 tmp = *(u64*)db->sha1; // Unaligned access.
 			if(tmp == x)
 			{
@@ -343,7 +343,7 @@ static Result searchGbaDb(u64 x, GameDbEntry *const db, s32 *const entryPos)
 
 			if(r <= l)
 			{
-				debug_printf("Not found!");
+				debug_printf("Not found!\n");
 				res = RES_NOT_FOUND;
 				break;
 			}
@@ -369,7 +369,7 @@ static u16 getSaveType(u32 romSize, const char *const savePath)
 	sha((u32*)LGY_ROM_LOC, romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
 
 	Result res;
-	GameDbEntry dbEntry;
+	GbaDbEntry dbEntry;
 	s32 dbPos = -1;
 	u16 saveType = SAVE_TYPE_NONE;
 	res = searchGbaDb(*sha1, &dbEntry, &dbPos);
@@ -383,72 +383,71 @@ static u16 getSaveType(u32 romSize, const char *const savePath)
 	}
 	debug_printf("saveType: %u\n", saveType);
 
-	if(saveOverride)
+	if(!saveOverride) goto end;
+
+	consoleClear();
+	ee_printf("==Save Type Override Menu==\n"
+	          "Save file: %s\n"
+	          "Save type (autodetected): %u\n"
+			  "Save type (from gba_db.bin): ", (saveExists ? "Found" : "Not found"), autoSaveType);
+	if(res == RES_NOT_FOUND)
+		ee_puts("Not found");
+	else
+		ee_printf("%u\n", saveType);
+	ee_puts("\n"
+	        "=Save Types=\n"
+	        " EEPROM 8k (0, 1)\n"
+	        " EEPROM 64k (2, 3)\n"
+	        " Flash 512k RTC (4, 6, 8)\n"
+	        " Flash 512k (5, 7, 9)\n"
+	        " Flash 1m RTC (10, 12)\n"
+	        " Flash 1m (11, 13)\n"
+	        " SRAM 256k (14)\n"
+	        " None (15)\n\n"
+	        "=Controls=\n"
+	        "Up/Down: Navigate\n"
+	        "A: Select\n"
+	        "X: Delete save file");
+
+	static const u8 saveTypeCursorLut[16] = {0, 0, 1, 1, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7};
+	u8 oldCursor = 0;
+	u8 cursor;
+	if(!g_oafConfig.useGbaDb || res == RES_NOT_FOUND)
+		cursor = saveTypeCursorLut[autoSaveType];
+	else
+		cursor = saveTypeCursorLut[saveType];
+	while(1)
 	{
-		consoleClear();
-		ee_printf("==Save Type Override Menu==\n"
-		          "Save file: %s\n"
-		          "Save type (autodetected): %u\n"
-				  "Save type (from gba_db.bin): ", (saveExists ? "Found" : "Not found"), autoSaveType);
-		if(res == RES_NOT_FOUND)
-			ee_puts("Not found");
-		else
-			ee_printf("%u\n", saveType);
-		ee_puts("\n"
-		        "=Save Types=\n"
-		        " EEPROM 8k (0, 1)\n"
-		        " EEPROM 64k (2, 3)\n"
-		        " Flash 512k RTC (4, 6, 8)\n"
-		        " Flash 512k (5, 7, 9)\n"
-		        " Flash 1m RTC (10, 12)\n"
-		        " Flash 1m (11, 13)\n"
-		        " SRAM 256k (14)\n"
-		        " None (15)\n\n"
-		        "=Controls=\n"
-		        "Up/Down: Navigate\n"
-		        "A: Select\n"
-		        "X: Delete save file");
+		ee_printf("\x1b[%u;H ", oldCursor + 6);
+		ee_printf("\x1b[%u;H>", cursor + 6);
+		oldCursor = cursor;
 
-		static const u8 saveTypeCursorLut[16] = {0, 0, 1, 1, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7};
-		u8 oldCursor = 0;
-		u8 cursor;
-		if(!g_oafConfig.useGbaDb || res == RES_NOT_FOUND)
-			cursor = saveTypeCursorLut[autoSaveType];
-		else
-			cursor = saveTypeCursorLut[saveType];
-		while(1)
+		u32 kDown;
+		do
 		{
-			ee_printf("\x1b[%u;H ", oldCursor + 6);
-			ee_printf("\x1b[%u;H>", cursor + 6);
-			oldCursor = cursor;
+			GFX_waitForVBlank0();
 
-			u32 kDown;
-			do
-			{
-				GFX_waitForVBlank0();
+			hidScanInput();
+			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
+			kDown = hidKeysDown();
+		} while(kDown == 0);
 
-				hidScanInput();
-				if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
-				kDown = hidKeysDown();
-			} while(kDown == 0);
-
-			if((kDown & KEY_DUP) && cursor > 0)        cursor--;
-			else if((kDown & KEY_DDOWN) && cursor < 7) cursor++;
-			else if(kDown & KEY_X)
-			{
-				fUnlink(savePath);
-				ee_printf("\x1b[1;11HDeleted  ");
-			}
-			else if(kDown & KEY_A) break;
-		}
-
-		static const u8 cursorSaveTypeLut[8] = {0, 2, 8, 9, 10, 11, 14, 15};
-		saveType = cursorSaveTypeLut[cursor];
-		if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
+		if((kDown & KEY_DUP) && cursor > 0)        cursor--;
+		else if((kDown & KEY_DDOWN) && cursor < 7) cursor++;
+		else if(kDown & KEY_X)
 		{
-			// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
-			if(romSize > 0x1000000) saveType++;
+			fUnlink(savePath);
+			ee_printf("\x1b[1;11HDeleted  ");
 		}
+		else if(kDown & KEY_A) break;
+	}
+
+	static const u8 cursorSaveTypeLut[8] = {0, 2, 8, 9, 10, 11, 14, 15};
+	saveType = cursorSaveTypeLut[cursor];
+	if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
+	{
+		// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
+		if(romSize > 0x1000000) saveType++;
 	}
 
 end:
