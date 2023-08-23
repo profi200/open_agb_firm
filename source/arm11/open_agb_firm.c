@@ -821,6 +821,55 @@ Result oafParseConfigEarly(void)
 	return res;
 }
 
+KHandle setupFrameCapture(const u8 scaler)
+{
+	const bool is240x160 = scaler < 2;
+	static const s16 matrix[12 * 8] =
+	{
+		// Vertical.
+		      0,       0,       0,       0,       0,       0,       0,       0,
+		      0,       0,       0,       0,       0,       0,       0,       0,
+		      0,  0x24B0,  0x4000,       0,  0x24B0,  0x4000,       0,       0,
+		 0x4000,  0x2000,       0,  0x4000,  0x2000,       0,       0,       0,
+		      0,  -0x4B0,       0,       0,  -0x4B0,       0,       0,       0,
+		      0,       0,       0,       0,       0,       0,       0,       0,
+
+		// Horizontal.
+		      0,       0,       0,       0,       0,       0,       0,       0,
+		      0,       0,       0,       0,       0,       0,       0,       0,
+		      0,       0,  0x24B0,       0,       0,  0x24B0,       0,       0,
+		 0x4000,  0x4000,  0x2000,  0x4000,  0x4000,  0x2000,       0,       0,
+		      0,       0,  -0x4B0,       0,       0,  -0x4B0,       0,       0,
+		      0,       0,       0,       0,       0,       0,       0,       0
+	};
+
+	ScalerCfg gbaCfg;
+	gbaCfg.w     = (is240x160 ? 240 : 360);
+	gbaCfg.h     = (is240x160 ? 160 : 240);
+	gbaCfg.vLen  = 6;
+	gbaCfg.vPatt = 0b00011011;
+	memcpy(gbaCfg.vMatrix, matrix, 6 * 8 * 2);
+	gbaCfg.hLen  = 6;
+	gbaCfg.hPatt = (is240x160 ? 0b00111111 : 0b00011011);
+
+	if(is240x160)
+	{
+		memset(gbaCfg.hMatrix, 0, 6 * 8 * 2);
+		s16 *const identityRow = &gbaCfg.hMatrix[3 * 8];
+		for(unsigned i = 0; i < 6; i++)
+		{
+			// Set identity entries.
+			identityRow[i] = 0x4000;
+		}
+	}
+	else
+	{
+		memcpy(gbaCfg.hMatrix, &matrix[6 * 8], 6 * 8 * 2);
+	}
+
+	return LGYFB_init(&gbaCfg);
+}
+
 Result oafInitAndRun(void)
 {
 	Result res;
@@ -878,9 +927,8 @@ Result oafInitAndRun(void)
 				if(MCU_getSystemModel() != 3) GFX_powerOffBacklights(GFX_BLIGHT_BOT);
 #endif
 
-				// Initialize the legacy frame buffer and frame handler.
-				const KHandle frameReadyEvent = createEvent(false);
-				LGYFB_init(frameReadyEvent, g_oafConfig.scaler); // Setup Legacy Framebuffer.
+				// Initialize frame capture and frame handler.
+				const KHandle frameReadyEvent = setupFrameCapture(g_oafConfig.scaler);
 				patchGbaGpuCmdList(g_oafConfig.scaler);
 				createTask(0x800, 3, gbaGfxHandler, (void*)frameReadyEvent);
 				g_frameReadyEvent = frameReadyEvent;
