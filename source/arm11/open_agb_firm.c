@@ -942,7 +942,7 @@ Result oafInitAndRun(void)
 				LGY11_selectInput(overrides);
 
 				// Load border if any exists.
-				if(g_oafConfig.scaler > 0) // No borders for scaled modes.
+				if(g_oafConfig.scaler == 0) // No borders for scaled modes.
 				{
 					// Abuse currently invisible frame buffer as temporary buffer.
 					void *const borderBuf = GFX_getFramebuffer(SCREEN_TOP);
