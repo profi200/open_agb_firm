@@ -536,7 +536,7 @@ static void gbaGfxHandler(void *args)
 		}
 		GX_processCommandList(listSize, list);
 		GFX_waitForP3D();
-		GX_displayTransfer((u32*)0x18180000, 400u<<16 | 240, GFX_getFramebuffer(SCREEN_TOP), 400u<<16 | 240, 1u<<12 | 1u<<8);
+		GX_displayTransfer((u32*)GPU_RENDER_BUF_ADDR, 400u<<16 | 240, GFX_getFramebuffer(SCREEN_TOP), 400u<<16 | 240, 1u<<12 | 1u<<8);
 		GFX_waitForPPF();
 		GFX_swapFramebufs();
 
@@ -949,7 +949,7 @@ Result oafInitAndRun(void)
 					if(fsQuickRead("border.bgr", borderBuf, 400 * 240 * 3) == RES_OK)
 					{
 						// Copy border in swizzled form to GPU render buffer.
-						GX_displayTransfer(borderBuf, 400u<<16 | 240, (u32*)0x18180000, 400u<<16 | 240, 1u<<12 | 1u<<8 | 1u<<1);
+						GX_displayTransfer(borderBuf, 400u<<16 | 240, (u32*)GPU_RENDER_BUF_ADDR, 400u<<16 | 240, 1u<<12 | 1u<<8 | 1u<<1);
 						GFX_waitForPPF();
 					}
 				}

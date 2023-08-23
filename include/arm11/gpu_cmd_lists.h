@@ -21,6 +21,9 @@
 #include "types.h"
 
 
+#define GPU_RENDER_BUF_ADDR  (0x18180000)
+
+
 extern const u8 gbaGpuInitList[1136];
 extern const u8 gbaGpuList2[448];
 
