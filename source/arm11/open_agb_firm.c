@@ -942,13 +942,16 @@ Result oafInitAndRun(void)
 				LGY11_selectInput(overrides);
 
 				// Load border if any exists.
-				// Abuse currently invisible frame buffer as temporary buffer.
-				void *const borderBuf = GFX_getFramebuffer(SCREEN_TOP);
-				if(fsQuickRead("border.bgr", borderBuf, 400 * 240 * 3) == RES_OK)
+				if(g_oafConfig.scaler > 0) // No borders for scaled modes.
 				{
-					// Copy border in swizzled form to GPU render buffer.
-					GX_displayTransfer(borderBuf, 400u<<16 | 240, (u32*)0x18180000, 400u<<16 | 240, 1u<<12 | 1u<<8 | 1u<<1);
-					GFX_waitForPPF();
+					// Abuse currently invisible frame buffer as temporary buffer.
+					void *const borderBuf = GFX_getFramebuffer(SCREEN_TOP);
+					if(fsQuickRead("border.bgr", borderBuf, 400 * 240 * 3) == RES_OK)
+					{
+						// Copy border in swizzled form to GPU render buffer.
+						GX_displayTransfer(borderBuf, 400u<<16 | 240, (u32*)0x18180000, 400u<<16 | 240, 1u<<12 | 1u<<8 | 1u<<1);
+						GFX_waitForPPF();
+					}
 				}
 
 				// Sync LgyFb start with LCD VBlank.
