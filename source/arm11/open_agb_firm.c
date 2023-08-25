@@ -986,11 +986,9 @@ void oafUpdate(void)
 
 void oafFinish(void)
 {
+	// frameReadyEvent deleted by this function.
+	// gbaGfxHandler() will automatically terminate.
 	LGYFB_deinit();
-	if(g_frameReadyEvent != 0)
-	{
-		deleteEvent(g_frameReadyEvent); // gbaGfxHandler() will automatically terminate.
-		g_frameReadyEvent = 0;
-	}
+	g_frameReadyEvent = 0;
 	LGY11_deinit();
 }
