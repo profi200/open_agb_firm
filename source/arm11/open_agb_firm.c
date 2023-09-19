@@ -95,36 +95,40 @@ static KHandle g_frameReadyEvent = 0;
 
 
 
-static u32 fixRomPadding(u32 romFileSize)
+static u32 fixRomPadding(const u32 romFileSize)
 {
 	// Pad unused ROM area with 0xFFs (trimmed ROMs).
 	// Smallest retail ROM chip is 8 Mbit (1 MiB).
 	u32 romSize = nextPow2(romFileSize);
-	if(romSize < 0x100000u) romSize = 0x100000u;
-	memset((void*)(LGY_ROM_LOC + romFileSize), 0xFFFFFFFFu, romSize - romFileSize);
-	if(romSize > 0x100000u) // >1 MiB.
-	{
-		// Fake "open bus" padding.
-		u32 padding = (LGY_ROM_LOC + romSize) / 2;
-		padding = __pkhbt(padding, padding + 1, 16); // Copy lower half + 1 to upper half.
-		for(uintptr_t i = LGY_ROM_LOC + romSize; i < LGY_ROM_LOC + LGY_MAX_ROM_SIZE; i += 4)
-		{
-			*(u32*)i = padding;
-			padding = __uadd16(padding, 0x00020002u); // Unsigned parallel halfword-wise addition.
-		}
-	}
-	else
-	{
+	if(romSize < 0x100000) romSize = 0x100000;
+	const uintptr_t romLoc = LGY_ROM_LOC;
+	memset((void*)(romLoc + romFileSize), 0xFFFFFFFF, romSize - romFileSize);
 
-		// ROM mirroring (Classic NES Series/possibly others with 8 Mbit ROM).
-		// Mirror ROM across the entire 32 MiB area.
-		for(uintptr_t i = LGY_ROM_LOC + romSize; i < LGY_ROM_LOC + LGY_MAX_ROM_SIZE; i += romSize)
+	u32 mirroredSize = romSize;
+	if(romSize == 0x100000) // 1 MiB.
+	{
+		// ROM mirroring for Classic NES Series/others with 8 Mbit ROM.
+		// The ROM is mirrored exactly 4 times.
+		// Thanks to endrift for discovering this.
+		mirroredSize = 0x400000; // 4 MiB.
+		uintptr_t mirrorLoc = romLoc + romSize;
+		do
 		{
-			//memcpy((void*)i, (void*)(i - romSize), romSize); // 0x23A15DD
-			memcpy((void*)i, (void*)LGY_ROM_LOC, romSize); // 0x237109B
-		}
+			memcpy((void*)mirrorLoc, (void*)romLoc, romSize);
+			mirrorLoc += romSize;
+		} while(mirrorLoc < romLoc + mirroredSize);
 	}
 
+	// Fake "open bus" padding.
+	u32 padding = (romLoc + mirroredSize) / 2;
+	padding = __pkhbt(padding, padding + 1, 16); // Copy lower half + 1 to upper half.
+	for(uintptr_t i = romLoc + mirroredSize; i < romLoc + LGY_MAX_ROM_SIZE; i += 4)
+	{
+		*(u32*)i = padding;
+		padding = __uadd16(padding, 0x20002); // Unsigned parallel halfword-wise addition.
+	}
+
+	// We don't return the mirrored size because the db hashes are over unmirrored dumps.
 	return romSize;
 }
 
@@ -142,7 +146,7 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 		}
 
 		u32 read;
-		res = fRead(f, (u8*)LGY_ROM_LOC, fileSize, &read);
+		res = fRead(f, (void*)LGY_ROM_LOC, fileSize, &read);
 		fClose(f);
 
 		if(read == fileSize) *romSizeOut = fixRomPadding(fileSize);
