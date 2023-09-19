@@ -20,94 +20,36 @@
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
-#include "oaf_error_codes.h"
-#include "arm_intrinsic.h"
+#include "arm11/config.h"
 #include "util.h"
-#include "drivers/sha.h"
-#include "arm11/drivers/hid.h"
 #include "arm11/drivers/lgy11.h"
 #include "drivers/lgy_common.h"
-#include "arm11/drivers/lgyfb.h"
-#include "arm11/console.h"
-#include "arm11/fmt.h"
-#include "drivers/gfx.h"
+#include "arm_intrinsic.h"
+#include "oaf_error_codes.h"
 #include "fs.h"
 #include "fsutil.h"
-#include "inih/ini.h"
-#include "arm11/filebrowser.h"
+#include "arm11/fmt.h"
 #include "arm11/drivers/lcd.h"
-#include "arm11/gpu_cmd_lists.h"
-#include "arm11/drivers/codec.h"
+#include "arm11/drivers/lgyfb.h"
+#include "drivers/gfx.h"
 #include "arm11/drivers/mcu.h"
-#include "arm11/patch.h"
 #include "kernel.h"
 #include "kevent.h"
+#include "arm11/gpu_cmd_lists.h"
+#include "arm11/drivers/hid.h"
+#include "arm11/filebrowser.h"
+#include "arm11/drivers/codec.h"
+#include "arm11/save_type.h"
+#include "arm11/patch.h"
 
 
-#define OAF_WORK_DIR    "sdmc:/3ds/open_agb_firm"
-#define OAF_SAVE_DIR    "saves"                   // Relative to work dir.
-#define INI_BUF_SIZE    (1024u)
-#define DEFAULT_CONFIG  "[general]\n"             \
-                        "backlight=64\n"          \
-                        "backlightSteps=5\n"      \
-                        "directBoot=false\n"      \
-                        "useGbaDb=true\n\n"       \
-                        "[video]\n"               \
-                        "scaler=2\n"              \
-                        "gbaGamma=2.2\n"          \
-                        "lcdGamma=1.54\n"         \
-                        "contrast=1.0\n"          \
-                        "brightness=0.0\n\n"      \
-                        "[audio]\n"               \
-                        "audioOut=0\n"            \
-                        "volume=127\n\n"          \
-                        "[advanced]\n"            \
-                        "saveOverride=false\n"    \
-                        "defaultSave=14"
+#define OAF_WORK_DIR  "sdmc:/3ds/open_agb_firm"
+#define OAF_SAVE_DIR  "saves" // Relative to work dir.
 
-
-typedef struct
-{
-	// [general]
-	u8 backlight;       // Both LCDs.
-	u8 backlightSteps;
-	bool directBoot;
-	bool useGbaDb;
-
-	// [video]
-	u8 scaler;          // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
-	float gbaGamma;
-	float lcdGamma;
-	float contrast;
-	float brightness;
-
-	// [audio]
-	u8 audioOut;        // 0 = auto, 1 = speakers, 2 = headphones.
-	s8 volume;          // -128 = muted, -127 - 48 = -63.5 - +24 dB.
-	                    // Higher than 48 = volume control via slider.
-
-	// [input]
-	u32 buttonMaps[10]; // A, B, Select, Start, Right, Left, Up, Down, R, L.
-
-	// [game]
-	u8 saveSlot;
-	u8 saveType;
-
-	// [advanced]
-	bool saveOverride;
-	u16 defaultSave;
-} OafConfig;
-
-typedef struct
-{
-	u8 sha1[20];
-	char serial[4];
-	u32 attr;
-} GbaDbEntry;
-static_assert(sizeof(GbaDbEntry) == 28, "Error: GBA DB entry struct is not packed!");
 
 
 // Default config.
+// Note: Keep this synchronized with DEFAULT_CONFIG in config.c.
 static OafConfig g_oafConfig =
 {
 	// [general]
@@ -188,9 +130,9 @@ static u32 fixRomPadding(u32 romFileSize)
 
 static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 {
-	Result res;
 	FHandle f;
-	if((res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	Result res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ);
+	if(res == RES_OK)
 	{
 		u32 fileSize = fSize(f);
 		if(fileSize > LGY_MAX_ROM_SIZE)
@@ -203,255 +145,11 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 		res = fRead(f, (u8*)LGY_ROM_LOC, fileSize, &read);
 		fClose(f);
 
-		if(read == fileSize) *romSizeOut = fixRomPadding(fileSize); //, path);
+		if(read == fileSize) *romSizeOut = fixRomPadding(fileSize);
 
 	}
 
 	return res;
-}
-
-static u16 checkSaveOverride(u32 gameCode) // Save type overrides for modern homebrew.
-{
-	switch (gameCode & 0xFFu)
-	{
-		case '1': return SAVE_TYPE_EEPROM_64k;         // Homebrew using EEPROM.
-		case '2': return SAVE_TYPE_SRAM_256k;          // Homebrew using SRAM.
-		case '3': return SAVE_TYPE_FLASH_512k_PSC_RTC; // Homebrew using FLASH-64.
-		case '4': return SAVE_TYPE_FLASH_1m_MRX_RTC;   // Homebrew using FLASH-128.
-		case 'F': return SAVE_TYPE_EEPROM_8k;          // Classic NES Series.
-		case 'S': return SAVE_TYPE_SRAM_256k;          // Homebrew using SRAM (Butano games).
-	}
-
-	return 0xFF;
-}
-
-static u16 detectSaveType(u32 romSize)
-{
-	const u32 *romPtr = (u32*)LGY_ROM_LOC;
-	u16 saveType;
-	if((saveType = checkSaveOverride(romPtr[0xAC / 4])) != 0xFF)
-	{
-		debug_printf("Serial in override list.\n"
-		             "saveType: %u\n", saveType);
-		return saveType;
-	}
-
-	// Code based on: https://github.com/Gericom/GBARunner2/blob/master/arm9/source/save/Save.vram.cpp
-	romPtr += 0xE4 / 4; // Skip headers.
-	const u16 defaultSave = g_oafConfig.defaultSave;
-	if(defaultSave > SAVE_TYPE_NONE)
-		saveType = SAVE_TYPE_NONE;
-	else
-		saveType = defaultSave;
-
-	for(; romPtr < (u32*)(LGY_ROM_LOC + romSize); romPtr++)
-	{
-		u32 tmp = *romPtr;
-
-		// "EEPR" "FLAS" "SRAM"
-		if(tmp == 0x52504545u || tmp == 0x53414C46u || tmp == 0x4D415253u)
-		{
-			static const struct
-			{
-				const char *str;
-				u16 saveType;
-			} saveTypeLut[25] =
-			{
-				// EEPROM
-				// Assume common sizes for popular games to aid ROM hacks.
-				{"EEPROM_V111", SAVE_TYPE_EEPROM_8k},
-				{"EEPROM_V120", SAVE_TYPE_EEPROM_8k},
-				{"EEPROM_V121", SAVE_TYPE_EEPROM_64k},
-				{"EEPROM_V122", SAVE_TYPE_EEPROM_8k},
-				{"EEPROM_V124", SAVE_TYPE_EEPROM_64k},
-				{"EEPROM_V125", SAVE_TYPE_EEPROM_8k},
-				{"EEPROM_V126", SAVE_TYPE_EEPROM_8k},
-
-				// FLASH
-				// Assume they all have RTC.
-				{"FLASH_V120",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V121",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V123",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V124",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V125",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH_V126",    SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH512_V130", SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH512_V131", SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH512_V133", SAVE_TYPE_FLASH_512k_PSC_RTC},
-				{"FLASH1M_V102",  SAVE_TYPE_FLASH_1m_MRX_RTC},
-				{"FLASH1M_V103",  SAVE_TYPE_FLASH_1m_MRX_RTC},
-
-				// FRAM & SRAM
-				{"SRAM_F_V100", SAVE_TYPE_SRAM_256k},
-				{"SRAM_F_V102", SAVE_TYPE_SRAM_256k},
-				{"SRAM_F_V103", SAVE_TYPE_SRAM_256k},
-
-				{"SRAM_V110",   SAVE_TYPE_SRAM_256k},
-				{"SRAM_V111",   SAVE_TYPE_SRAM_256k},
-				{"SRAM_V112",   SAVE_TYPE_SRAM_256k},
-				{"SRAM_V113",   SAVE_TYPE_SRAM_256k}
-			};
-
-			for(u32 i = 0; i < 25; i++)
-			{
-				const char *const str = saveTypeLut[i].str;
-				u16 tmpSaveType = saveTypeLut[i].saveType;
-
-				if(memcmp(romPtr, str, strlen(str)) == 0)
-				{
-					if(tmpSaveType == SAVE_TYPE_EEPROM_8k || tmpSaveType == SAVE_TYPE_EEPROM_64k)
-					{
-						// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
-						if(romSize > 0x1000000) tmpSaveType++;
-					}
-					debug_printf("SDK save string: %s\n"
-					             "saveType: %u\n", str, tmpSaveType);
-					return tmpSaveType;
-				}
-			}
-		}
-	}
-
-	debug_printf("saveType: %u\n", saveType);
-	return saveType;
-}
-
-// Search for entry with first u64 of the SHA1 = x using binary search.
-static Result searchGbaDb(u64 x, GbaDbEntry *const db, s32 *const entryPos)
-{
-	debug_printf("Database search: '%016" PRIX64 "'\n", __builtin_bswap64(x));
-
-	Result res;
-	FHandle f;
-	if((res = fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
-	{
-		s32 l = 0;
-		s32 r = fSize(f) / sizeof(GbaDbEntry) - 1; // TODO: Check for 0!
-		while(1)
-		{
-			const s32 mid = l + (r - l) / 2;
-			debug_printf("l: %ld r: %ld mid: %ld\n", l, r, mid);
-
-			if((res = fLseek(f, sizeof(GbaDbEntry) * mid)) != RES_OK) break;
-			if((res = fRead(f, db, sizeof(GbaDbEntry), NULL)) != RES_OK) break;
-			const u64 tmp = *(u64*)db->sha1; // Unaligned access.
-			if(tmp == x)
-			{
-				*entryPos = mid; // TODO: Remove.
-				break;
-			}
-
-			if(r <= l)
-			{
-				debug_printf("Not found!\n");
-				res = RES_NOT_FOUND;
-				break;
-			}
-
-			if(tmp > x) r = mid - 1;
-			else        l = mid + 1;
-		}
-
-		fClose(f);
-	}
-
-	return res;
-}
-
-static u16 getSaveType(u32 romSize, const char *const savePath)
-{
-	FILINFO fi;
-	const bool saveOverride = g_oafConfig.saveOverride;
-	const u16 autoSaveType = detectSaveType(romSize);
-	const bool saveExists = fStat(savePath, &fi) == RES_OK;
-
-	u64 sha1[3];
-	sha((u32*)LGY_ROM_LOC, romSize, (u32*)sha1, SHA_IN_BIG | SHA_1_MODE, SHA_OUT_BIG);
-
-	Result res;
-	GbaDbEntry dbEntry;
-	s32 dbPos = -1;
-	u16 saveType = SAVE_TYPE_NONE;
-	res = searchGbaDb(*sha1, &dbEntry, &dbPos);
-	if(res == RES_OK) saveType = dbEntry.attr & 0xFu;
-	else if(!saveOverride && res == RES_NOT_FOUND) return autoSaveType;
-	else if(res != RES_NOT_FOUND)
-	{
-		ee_puts("Could not access gba_db.bin! Press any button to continue.");
-		printErrorWaitInput(res, 0);
-		return autoSaveType;
-	}
-	debug_printf("saveType: %u\n", saveType);
-
-	if(!saveOverride) goto end;
-
-	consoleClear();
-	ee_printf("==Save Type Override Menu==\n"
-	          "Save file: %s\n"
-	          "Save type (autodetected): %u\n"
-			  "Save type (from gba_db.bin): ", (saveExists ? "Found" : "Not found"), autoSaveType);
-	if(res == RES_NOT_FOUND)
-		ee_puts("Not found");
-	else
-		ee_printf("%u\n", saveType);
-	ee_puts("\n"
-	        "=Save Types=\n"
-	        " EEPROM 8k (0, 1)\n"
-	        " EEPROM 64k (2, 3)\n"
-	        " Flash 512k RTC (4, 6, 8)\n"
-	        " Flash 512k (5, 7, 9)\n"
-	        " Flash 1m RTC (10, 12)\n"
-	        " Flash 1m (11, 13)\n"
-	        " SRAM 256k (14)\n"
-	        " None (15)\n\n"
-	        "=Controls=\n"
-	        "Up/Down: Navigate\n"
-	        "A: Select\n"
-	        "X: Delete save file");
-
-	static const u8 saveTypeCursorLut[16] = {0, 0, 1, 1, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7};
-	u8 oldCursor = 0;
-	u8 cursor;
-	if(!g_oafConfig.useGbaDb || res == RES_NOT_FOUND)
-		cursor = saveTypeCursorLut[autoSaveType];
-	else
-		cursor = saveTypeCursorLut[saveType];
-	while(1)
-	{
-		ee_printf("\x1b[%u;H ", oldCursor + 6);
-		ee_printf("\x1b[%u;H>", cursor + 6);
-		oldCursor = cursor;
-
-		u32 kDown;
-		do
-		{
-			GFX_waitForVBlank0();
-
-			hidScanInput();
-			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
-			kDown = hidKeysDown();
-		} while(kDown == 0);
-
-		if((kDown & KEY_DUP) && cursor > 0)        cursor--;
-		else if((kDown & KEY_DDOWN) && cursor < 7) cursor++;
-		else if(kDown & KEY_X)
-		{
-			fUnlink(savePath);
-			ee_printf("\x1b[1;11HDeleted  ");
-		}
-		else if(kDown & KEY_A) break;
-	}
-
-	static const u8 cursorSaveTypeLut[8] = {0, 2, 8, 9, 10, 11, 14, 15};
-	saveType = cursorSaveTypeLut[cursor];
-	if(saveType == SAVE_TYPE_EEPROM_8k || saveType == SAVE_TYPE_EEPROM_64k)
-	{
-		// If ROM bigger than 16 MiB --> SAVE_TYPE_EEPROM_8k_2 or SAVE_TYPE_EEPROM_64k_2.
-		if(romSize > 0x1000000) saveType++;
-	}
-
-end:
-	return saveType;
 }
 
 static void adjustGammaTableForGba(void)
@@ -548,125 +246,6 @@ static void gbaGfxHandler(void *args)
 	taskExit();
 }
 
-static u32 parseButtons(const char *str)
-{
-	if(str == NULL || *str == '\0') return 0;
-
-	char buf[32]; // Should be enough for all useful mappings.
-	buf[31] = '\0';
-	strncpy(buf, str, 31);
-
-	char *bufPtr = buf;
-	static const char *const buttonStrLut[32] =
-	{
-		"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN",
-		"R", "L", "X", "Y", "", "", "ZL", "ZR",
-		"", "", "", "", "TOUCH", "", "", "",
-		"CS_RIGHT", "CS_LEFT", "CS_UP", "CS_DOWN", "CP_RIGHT", "CP_LEFT", "CP_UP", "CP_DOWN"
-	};
-	u32 map = 0;
-	while(1)
-	{
-		char *const nextDelimiter = strchr(bufPtr, ',');
-		if(nextDelimiter != NULL) *nextDelimiter = '\0';
-
-		unsigned i = 0;
-		while(i < 32 && strcmp(buttonStrLut[i], bufPtr) != 0) ++i;
-		if(i == 32) break;
-		map |= 1u<<i;
-
-		if(nextDelimiter == NULL) break;
-
-		bufPtr = nextDelimiter + 1; // Skip delimiter.
-	}
-
-	// Empty strings will match the entry for bit 12.
-	return map & ~(1u<<12);
-}
-
-static int cfgIniCallback(void* user, const char* section, const char* name, const char* value)
-{
-	OafConfig *const config = (OafConfig*)user;
-
-	if(strcmp(section, "general") == 0)
-	{
-		if(strcmp(name, "backlight") == 0)
-			config->backlight = (u8)strtoul(value, NULL, 10);
-		else if(strcmp(name, "backlightSteps") == 0)
-			config->backlightSteps = (u8)strtoul(value, NULL, 10);
-		else if(strcmp(name, "directBoot") == 0)
-			config->directBoot = (strcmp(value, "false") == 0 ? false : true);
-		else if(strcmp(name, "useGbaDb") == 0)
-			config->useGbaDb = (strcmp(value, "true") == 0 ? true : false);
-	}
-	else if(strcmp(section, "video") == 0)
-	{
-		if(strcmp(name, "scaler") == 0)
-			config->scaler = (u8)strtoul(value, NULL, 10);
-		else if(strcmp(name, "gbaGamma") == 0)
-			config->gbaGamma = str2float(value);
-		else if(strcmp(name, "lcdGamma") == 0)
-			config->lcdGamma = str2float(value);
-		else if(strcmp(name, "contrast") == 0)
-			config->contrast = str2float(value);
-		else if(strcmp(name, "brightness") == 0)
-			config->brightness = str2float(value);
-	}
-	else if(strcmp(section, "audio") == 0)
-	{
-		if(strcmp(name, "audioOut") == 0)
-			config->audioOut = (u8)strtoul(value, NULL, 10);
-		else if(strcmp(name, "volume") == 0)
-			config->volume = (s8)strtol(value, NULL, 10);
-	}
-	else if(strcmp(section, "input") == 0)
-	{
-		const u32 button = parseButtons(name) & 0x3FFu; // Only allow GBA buttons.
-		if(button != 0)
-		{
-			// If the config option happens to abuse parseButtons() we will only use the highest bit.
-			const u32 shift = 31u - __builtin_clzl(button);
-			const u32 map   = parseButtons(value);
-			config->buttonMaps[shift] = map;
-		}
-	}
-	else if(strcmp(section, "game") == 0)
-	{
-		if(strcmp(name, "saveSlot") == 0)
-			config->saveSlot = (u8)strtoul(value, NULL, 10);
-		if(strcmp(name, "saveType") == 0)
-			config->saveType = (u8)strtoul(value, NULL, 10);
-	}
-	else if(strcmp(section, "advanced") == 0)
-	{
-		if(strcmp(name, "saveOverride") == 0)
-			config->saveOverride = (strcmp(value, "false") == 0 ? false : true);
-		if(strcmp(name, "defaultSave") == 0)
-			config->defaultSave = (u16)strtoul(value, NULL, 10);
-	}
-	else return 0; // Error.
-
-	return 1; // 1 is no error? Really?
-}
-
-static Result parseOafConfig(const char *const path, const bool writeDefaultCfg)
-{
-	char *iniBuf = (char*)calloc(INI_BUF_SIZE, 1);
-	if(iniBuf == NULL) return RES_OUT_OF_MEM;
-
-	Result res = fsQuickRead(path, iniBuf, INI_BUF_SIZE - 1);
-	if(res == RES_OK) ini_parse_string(iniBuf, cfgIniCallback, &g_oafConfig);
-	else if(writeDefaultCfg)
-	{
-		const char *const defaultConfig = DEFAULT_CONFIG;
-		res = fsQuickWrite(path, defaultConfig, strlen(defaultConfig));
-	}
-
-	free(iniBuf);
-
-	return res;
-}
-
 void changeBacklight(s16 amount)
 {
 	u8 min, max;
@@ -737,7 +316,8 @@ static Result showFileBrowser(char romAndSavePath[512])
 		do
 		{
 			// Get last ROM launch path.
-			if((res = fsLoadPathFromFile("lastdir.txt", lastDir)) != RES_OK)
+			res = fsLoadPathFromFile("lastdir.txt", lastDir);
+			if(res != RES_OK)
 			{
 				if(res == RES_FR_NO_FILE) strcpy(lastDir, "sdmc:/");
 				else                      break;
@@ -745,11 +325,13 @@ static Result showFileBrowser(char romAndSavePath[512])
 
 			// Show file browser.
 			*romAndSavePath = '\0';
-			if((res = browseFiles(lastDir, romAndSavePath)) == RES_FR_NO_PATH)
+			res = browseFiles(lastDir, romAndSavePath);
+			if(res == RES_FR_NO_PATH)
 			{
 				// Second chance in case the last dir has been deleted.
 				strcpy(lastDir, "sdmc:/");
-				if((res = browseFiles(lastDir, romAndSavePath)) != RES_OK) break;
+				res = browseFiles(lastDir, romAndSavePath);
+				if(res != RES_OK) break;
 			}
 			else if(res != RES_OK) break;
 
@@ -808,14 +390,18 @@ Result oafParseConfigEarly(void)
 	do
 	{
 		// Create the work dir and switch to it.
-		if((res = fsMakePath(OAF_WORK_DIR)) != RES_OK && res != RES_FR_EXIST) break;
-		if((res = fChdir(OAF_WORK_DIR)) != RES_OK) break;
+		res = fsMakePath(OAF_WORK_DIR);
+		if(res != RES_OK && res != RES_FR_EXIST) break;
+
+		res = fChdir(OAF_WORK_DIR);
+		if(res != RES_OK) break;
 
 		// Create the saves folder.
-		if((res = fMkdir(OAF_SAVE_DIR)) != RES_OK && res != RES_FR_EXIST) break;
+		res = fMkdir(OAF_SAVE_DIR);
+		if(res != RES_OK && res != RES_FR_EXIST) break;
 
 		// Parse the config.
-		res = parseOafConfig("config.ini", true);
+		res = parseOafConfig("config.ini", &g_oafConfig, true);
 	} while(0);
 
 	return res;
@@ -880,9 +466,11 @@ Result oafInitAndRun(void)
 		{
 			// Try to load the ROM path from autoboot.txt.
 			// If this file doesn't exist show the file browser.
-			if((res = fsLoadPathFromFile("autoboot.txt", filePath)) == RES_FR_NO_FILE)
+			res = fsLoadPathFromFile("autoboot.txt", filePath);
+			if(res == RES_FR_NO_FILE)
 			{
-				if((res = showFileBrowser(filePath)) != RES_OK || *filePath == '\0') break;
+				res = showFileBrowser(filePath);
+				if(res != RES_OK || *filePath == '\0') break;
 				ee_puts("Loading...");
 			}
 			else if(res != RES_OK) break;
@@ -894,11 +482,13 @@ Result oafInitAndRun(void)
 
 			// Load the ROM file.
 			u32 romSize;
-			if((res = loadGbaRom(filePath, &romSize)) != RES_OK) break;
+			res = loadGbaRom(filePath, &romSize);
+			if(res != RES_OK) break;
 
 			// Load the per-game config.
 			rom2GameCfgPath(filePath);
-			if((res = parseOafConfig(filePath, false)) != RES_OK && res != RES_FR_NO_FILE) break;
+			res = parseOafConfig(filePath, &g_oafConfig, false);
+			if(res != RES_OK && res != RES_FR_NO_FILE) break;
 
 			// Adjust the path for the save file and get save type.
 			gameCfg2SavePath(filePath, g_oafConfig.saveSlot);
@@ -906,9 +496,9 @@ Result oafInitAndRun(void)
 			if(g_oafConfig.saveType != 0xFF)
 				saveType = g_oafConfig.saveType;
 			else if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
-				saveType = getSaveType(romSize, filePath);
+				saveType = getSaveType(&g_oafConfig, romSize, filePath);
 			else
-				saveType = detectSaveType(romSize);
+				saveType = detectSaveType(romSize, g_oafConfig.defaultSave);
 
 			patchRom(romFilePath, &romSize);
 			free(romFilePath);
@@ -918,7 +508,8 @@ Result oafInitAndRun(void)
 			CODEC_setVolumeOverride(g_oafConfig.volume);
 
 			// Prepare ARM9 for GBA mode + save loading.
-			if((res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath)) == RES_OK)
+			res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath);
+			if(res == RES_OK)
 			{
 #ifdef NDEBUG
 				// Force black and turn the backlight off on the bottom screen.
