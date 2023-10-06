@@ -158,16 +158,19 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 
 static void adjustGammaTableForGba(void)
 {
-	const float gbaGamma = g_oafConfig.gbaGamma;
-	const float lcdGamma = g_oafConfig.lcdGamma;
-	const float contrast = g_oafConfig.contrast;
-	const float brightness = g_oafConfig.brightness;
+	// Credits for this algo go to Extrems.
+	const float targetGamma = g_oafConfig.gbaGamma;
+	const float lcdGamma    = 1.f / g_oafConfig.lcdGamma;
+	const float contrast    = g_oafConfig.contrast;
+	const float brightness  = g_oafConfig.brightness / contrast;
+	const float contrastInTargetGamma = powf(contrast, targetGamma);
 	for(u32 i = 0; i < 256; i++)
 	{
-		// Credits for this algo go to Extrems.
-		// Originally from Game Boy Interface Standard Edition for the GameCube.
-		u32 res = powf(powf(contrast, gbaGamma) * powf((float)i / 255.0f + brightness / contrast, gbaGamma),
-		               1.0f / lcdGamma) * 255.0f;
+		// Adjust i with brightness and convert to target gamma.
+		const float adjusted = powf((float)i / 255 + brightness, targetGamma);
+
+		// Apply contrast, convert to LCD gamma and clamp.
+		const u32 res = clamp_s32(powf(contrastInTargetGamma * adjusted, lcdGamma) * 255, 0, 255);
 
 		// Same adjustment for red/green/blue.
 		REG_LCD_PDC0_GTBL_FIFO = res<<16 | res<<8 | res;
