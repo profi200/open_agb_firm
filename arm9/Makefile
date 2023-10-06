@@ -22,7 +22,7 @@ BUILD		:=	build
 SOURCES		+=	../source/arm9
 DATA		:=
 INCLUDES	+=	../include ../thirdparty
-DEFINES		:=	-DARM9 -D_3DS -DVERS_STRING=\"$(VERS_STRING)\" \
+DEFINES		:=	-DARM9 -D__3DS__ -DLIBN3DS_LEGACY=1 -DVERS_STRING=\"$(VERS_STRING)\" \
 				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
 
 ifneq ($(strip $(NO_DEBUG)),)
