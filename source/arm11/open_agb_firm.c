@@ -169,8 +169,8 @@ static void adjustGammaTableForGba(void)
 		// Adjust i with brightness and convert to target gamma.
 		const float adjusted = powf((float)i / 255 + brightness, targetGamma);
 
-		// Apply contrast, convert to LCD gamma and clamp.
-		const u32 res = clamp_s32(powf(contrastInTargetGamma * adjusted, lcdGamma) * 255, 0, 255);
+		// Apply contrast, convert to LCD gamma, round to nearest and clamp.
+		const u32 res = clamp_s32(lroundf(powf(contrastInTargetGamma * adjusted, lcdGamma) * 255), 0, 255);
 
 		// Same adjustment for red/green/blue.
 		REG_LCD_PDC0_GTBL_FIFO = res<<16 | res<<8 | res;
