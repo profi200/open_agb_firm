@@ -32,23 +32,23 @@
 
 typedef struct
 {
-    u8 *buffer;
-    u16 cacheSize;
-    u16 cacheOffset;
-    u16 maxCacheSize;
+	u8 *buffer;
+	u16 cacheSize;
+	u16 cacheOffset;
+	u16 maxCacheSize;
 } Cache;
 
 
 
 static u8 readCache(const FHandle patchHandle, Cache *cache, Result *res) {
-    u8 result = (cache->buffer)[(cache->cacheOffset)++];
-    if((cache->cacheOffset) >= (cache->cacheSize)) {
-        (cache->cacheSize) = min((cache->maxCacheSize), ((fSize(patchHandle)-12) - fTell(patchHandle)));
-        *res = fRead(patchHandle, (cache->buffer), (cache->cacheSize), NULL);
-        (cache->cacheOffset) = 0;
-    }
+	u8 result = (cache->buffer)[(cache->cacheOffset)++];
+	if((cache->cacheOffset) >= (cache->cacheSize)) {
+		(cache->cacheSize) = min((cache->maxCacheSize), ((fSize(patchHandle)-12) - fTell(patchHandle)));
+		*res = fRead(patchHandle, (cache->buffer), (cache->cacheSize), NULL);
+		(cache->cacheOffset) = 0;
+	}
 
-    return result;
+	return result;
 }
 
 static Result patchIPS(const FHandle patchHandle) {
@@ -130,7 +130,7 @@ static uintmax_t read_vuint(const FHandle patchFile, Result *res, Cache *cache) 
 	uint8_t octet = 0;
 	for (;;) {
 		//*res = fRead(patchFile, &octet, 1, NULL);
-        octet = readCache(patchFile, cache, res);
+		octet = readCache(patchFile, cache, res);
 		if(*res != RES_OK) break;
 		if(octet & 0x80) {
 			result += (octet & 0x7f) << shift;
@@ -170,7 +170,7 @@ static Result patchUPS(const FHandle patchHandle, u32 *romSize) {
 		magic[i] = readCache(patchHandle, &cache, &res);
 		if(res != RES_OK) break;
 	}
-	
+
 	if(res == RES_OK) {
 		if(memcmp(&magic, "UPS1", 4) == 0) {
 			isValidPatch = true;
@@ -180,16 +180,16 @@ static Result patchUPS(const FHandle patchHandle, u32 *romSize) {
 	}
 
 	if(isValidPatch) {
-        //get rom size
+		//get rom size
 		u32 baseRomSize = (u32)read_vuint(patchHandle, &res, &cache);
 		if(res != RES_OK) { free(cache.buffer); return res; }
 		//get patched rom size
 		u32 patchedRomSize = (u32)read_vuint(patchHandle, &res, &cache);
 		if(res != RES_OK) { free(cache.buffer); return res; }
 
-        debug_printf("Base size:    0x%lx\nPatched size: 0x%lx\n", baseRomSize, patchedRomSize);
+		debug_printf("Base size:    0x%lx\nPatched size: 0x%lx\n", baseRomSize, patchedRomSize);
 
-        if(patchedRomSize > baseRomSize) {
+		if(patchedRomSize > baseRomSize) {
 			//scale up rom
 			*romSize = nextPow2(patchedRomSize);
 			//check if upscaled rom is too big
@@ -203,19 +203,19 @@ static Result patchUPS(const FHandle patchHandle, u32 *romSize) {
 			memset((char*)(LGY_ROM_LOC + baseRomSize), 0x00u, patchedRomSize - baseRomSize); //fill new patch area with 0's
 		}
 
-        uintmax_t patchFileSize = fSize(patchHandle);
+		uintmax_t patchFileSize = fSize(patchHandle);
 
-        uintmax_t offset = 0;
+		uintmax_t offset = 0;
 		u8 readByte = 0;
 		u8 *romBytes = ((u8*)LGY_ROM_LOC);
 
-        while(fTell(patchHandle) < (patchFileSize-12) && res==RES_OK) {
-            offset += read_vuint(patchHandle, &res, &cache);
-            if(res != RES_OK) break;
+		while(fTell(patchHandle) < (patchFileSize-12) && res==RES_OK) {
+			offset += read_vuint(patchHandle, &res, &cache);
+			if(res != RES_OK) break;
 
 			while(offset<*romSize) {
 				readByte = readCache(patchHandle, &cache, &res);
-                if(res != RES_OK) break;
+				if(res != RES_OK) break;
 
 				if(readByte == 0x00) {
 					offset++;
@@ -225,8 +225,8 @@ static Result patchUPS(const FHandle patchHandle, u32 *romSize) {
 				offset++;
 			}
 		}
-        
-    }
+
+	}
 
 	free(cache.buffer);
 
@@ -251,7 +251,7 @@ Result patchRom(const char *const gamePath, u32 *romSize) {
 	if(patchPathBase != NULL && patchPath != NULL) {
 		strcpy(patchPathBase, gamePath);
 		memset(patchPathBase+extensionOffset, '\0', 3); //replace 'gba' with '\0' characters
-		
+
 		FHandle f;
 		//check if patch file is present. If so, call appropriate patching function
 		if((res = fOpen(&f, strcat(patchPathBase, "ips"), FA_OPEN_EXISTING | FA_READ)) == RES_OK)
@@ -272,7 +272,7 @@ Result patchRom(const char *const gamePath, u32 *romSize) {
 		}
 		//reset patchPathBase
 		memset(patchPathBase+extensionOffset, '\0', 3);
-		
+
 		if ((res = fOpen(&f, strcat(patchPathBase, "ups"), FA_OPEN_EXISTING | FA_READ)) == RES_OK) 
 		{
 			res = patchUPS(f, romSize);
