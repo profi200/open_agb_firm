@@ -52,69 +52,68 @@ static u8 readCache(const FHandle patchHandle, Cache *cache, Result *res) {
 }
 
 static Result patchIPS(const FHandle patchHandle) {
-	Result res = RES_OK;
 	ee_puts("IPS patch found! Patching...");
 
 	const u16 bufferSize = 512;
 	char *buffer = (char*)calloc(bufferSize, 1);
-	if(buffer == NULL) {
-		return RES_OUT_OF_MEM;
+	if(buffer == NULL) return RES_OUT_OF_MEM;
+
+	// Verify patch is IPS (magic number "PATCH").
+	Result res = fRead(patchHandle, buffer, 5, NULL);
+	if(res != RES_OK || memcmp("PATCH", buffer, 5) != 0)
+	{
+		free(buffer);
+		return RES_INVALID_PATCH;
 	}
 
-	//verify patch is IPS patch (magic number "PATCH")
-	bool isValidPatch = false;
-	res = fRead(patchHandle, buffer, 5, NULL);
-	if(res == RES_OK) {
-		if(memcmp("PATCH", buffer, 5) == 0) {
-			isValidPatch = true;
-		} else {
-			res = RES_INVALID_PATCH;
-		}
-	}
+	u32 offset = 0;
+	u16 length = 0;
+	while(res == RES_OK)
+	{
+		// Read offset.
+		res = fRead(patchHandle, buffer, 3, NULL);
+		if(res != RES_OK || memcmp("EOF", buffer, 3) == 0) break;
+		offset = (buffer[0] << 16) + (buffer[1] << 8) + buffer[2];
 
-	if(isValidPatch) {
-		u32 offset = 0;
-		u16 length = 0;
+		// Read length.
+		res = fRead(patchHandle, buffer, 2, NULL);
+		if(res != RES_OK) break;
+		length = (buffer[0] << 8) + buffer[1];
 
-		while(res == RES_OK) {
-			//read offset
+		// RLE hunk.
+		if(length == 0)
+		{
 			res = fRead(patchHandle, buffer, 3, NULL);
-			if (res != RES_OK || memcmp("EOF", buffer, 3)==0) break;
-			offset = (buffer[0]<<16) + (buffer[1]<<8) + (buffer[2]);
-
-			//read length
-			res = fRead(patchHandle, buffer, 2, NULL);
 			if(res != RES_OK) break;
-			length = (buffer[0]<<8) + (buffer[1]);
 
-			//RLE hunk
-			if(length == 0) {
-				res = fRead(patchHandle, buffer, 3, NULL);
-				if(res != RES_OK) break;
+			length = (buffer[0] << 8) + buffer[1];
+			memset((void*)(LGY_ROM_LOC + offset), buffer[2], length * sizeof(char));
 
-				u16 tempLen = (buffer[0]<<8) + (buffer[1]);
-				memset((void*)(LGY_ROM_LOC + offset), buffer[2], tempLen*sizeof(char));
+			continue;
+		}
+
+		// Regular hunks.
+		u16 fullCount = length / bufferSize;
+		for(u16 i = 0; i < fullCount; ++i)
+		{
+			res = fRead(patchHandle, buffer, bufferSize, NULL);
+			if(res != RES_OK) break;
+
+			for(u16 j = 0; j < bufferSize; ++j)
+			{
+				*(char*)(LGY_ROM_LOC + offset + (bufferSize * i) + j) = buffer[j];
 			}
-			//regular hunks
-			else {
-				u16 fullCount = length/bufferSize;
-				for(u16 i=0; i<fullCount; ++i) {
-					res = fRead(patchHandle, buffer, bufferSize, NULL);
-					if(res != RES_OK) break;
-					for(u16 j=0; j<bufferSize; ++j) {
-						*(char*)(LGY_ROM_LOC+offset+(bufferSize*i)+j) = buffer[j];
-					}
-				}
+		}
 
-				u16 remaining = length%bufferSize;
-				if(remaining != 0) {
-					res = fRead(patchHandle, buffer, remaining, NULL);
-					if(res != RES_OK) break;
-					for(u16 j=0; j<remaining; ++j) {
-						*(char*)(LGY_ROM_LOC+offset+(fullCount*bufferSize)+j) = buffer[j];
-					}
-				}
-			}
+		u16 remaining = length % bufferSize;
+		if(remaining == 0) continue;
+
+		res = fRead(patchHandle, buffer, remaining, NULL);
+		if(res != RES_OK) break;
+
+		for(u16 j = 0; j < remaining; ++j)
+		{
+			*(char*)(LGY_ROM_LOC + offset + (bufferSize * fullCount) + j) = buffer[j];
 		}
 	}
 
