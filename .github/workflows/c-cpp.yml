@@ -15,7 +15,7 @@ jobs:
     container: devkitpro/devkitarm
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 1
         submodules: recursive
@@ -25,7 +25,7 @@ jobs:
 
     - name: Cache ctr_firm_builder
       id: cache-firm-builder
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ctr_firm_builder
         key: ${{ runner.os }}-${{ env.FIRM_BUILDER_COMMIT }}
@@ -50,7 +50,7 @@ jobs:
         echo ${{ github.sha }} >> ./nightly/nightly_commit.txt
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: open_agb_firm_nightly
         path: ./nightly
