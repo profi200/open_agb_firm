@@ -21,6 +21,11 @@
 #include "types.h"
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define GPU_RENDER_BUF_ADDR  (0x18180000)
 #define GBA_INIT_LIST_SIZE   (1136)
 #define GBA_LIST2_SIZE       (448)
@@ -32,3 +37,7 @@ extern u8 gbaGpuList2[GBA_LIST2_SIZE];
 
 
 void patchGbaGpuCmdList(u8 scaleType);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

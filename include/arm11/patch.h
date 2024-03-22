@@ -18,4 +18,15 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 Result patchRom(const char *const gamePath, u32 *romSize);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

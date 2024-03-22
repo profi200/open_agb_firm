@@ -30,11 +30,10 @@
 
 int main(void)
 {
-	Result res = fMount(FS_DRIVE_SDMC);
-	if(res == RES_OK) res = oafParseConfigEarly();
-	GFX_init(GFX_BGR8, GFX_RGB565);
+	Result res = oafParseConfigEarly();
+	GFX_init(GFX_BGR8, GFX_R5G6B5, GFX_TOP_2D);
 	changeBacklight(0); // Apply backlight config.
-	consoleInit(SCREEN_BOT, NULL);
+	consoleInit(GFX_LCD_BOT, NULL);
 	//CODEC_init();
 
 	if(res == RES_OK && (res = oafInitAndRun()) == RES_OK)
@@ -53,7 +52,7 @@ int main(void)
 
 	CODEC_deinit();
 	GFX_deinit();
-	fUnmount(FS_DRIVE_SDMC);
+	fUnmount(FS_DRIVE_SDMC); // TODO: Move elsewhere. __systemDeinit() already calls it.
 
 	power_off();
 
