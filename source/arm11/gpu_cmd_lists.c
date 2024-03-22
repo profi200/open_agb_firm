@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <string.h>
 #include "types.h"
 #include "arm11/gpu_cmd_lists.h"
 #include "drivers/cache.h"
@@ -170,44 +171,49 @@ void patchGbaGpuCmdList(u8 scaleType)
 {
 	if(scaleType == 0)
 	{
-		*((u16*)&gbaGpuInitList[952]) = 0x4440;
+		u32 tmp = 0x4440;
+		memcpy(&gbaGpuInitList[952], &tmp, 2);
 		gbaGpuInitList[958] = 0x45;
 		gbaGpuInitList[968] = 0x60;
-		*((u16*)&gbaGpuInitList[984]) = 0x4440;
+		memcpy(&gbaGpuInitList[984], &tmp, 2);
 		gbaGpuInitList[989] = 0x40;
 		gbaGpuInitList[1000] = 0x60;
-		*((u32*)&gbaGpuInitList[1004]) = 0x3DE000;
+		tmp = 0x3DE000;
+		memcpy(&gbaGpuInitList[1004], &tmp, 4);
 		gbaGpuInitList[1016] = 0x90;
 		gbaGpuInitList[1022] = 0x45;
 		gbaGpuInitList[1048] = 0x90;
 		gbaGpuInitList[1053] = 0x40;
-		*((u32*)&gbaGpuInitList[1068]) = 0x3DE000;
+		memcpy(&gbaGpuInitList[1068], &tmp, 4);
 
-		*((u16*)&gbaGpuList2[264]) = 0x4440;
+		tmp = 0x4440;
+		memcpy(&gbaGpuList2[264], &tmp, 2);
 		gbaGpuList2[270] = 0x45;
 		gbaGpuList2[280] = 0x60;
-		*((u16*)&gbaGpuList2[296]) = 0x4440;
+		memcpy(&gbaGpuList2[296], &tmp, 2);
 		gbaGpuList2[301] = 0x40;
 		gbaGpuList2[312] = 0x60;
-		*((u32*)&gbaGpuList2[316]) = 0x3DE000;
+		tmp = 0x3DE000;
+		memcpy(&gbaGpuList2[316], &tmp, 4);
 		gbaGpuList2[328] = 0x90;
 		gbaGpuList2[334] = 0x45;
 		gbaGpuList2[360] = 0x90;
 		gbaGpuList2[365] = 0x40;
-		*((u32*)&gbaGpuList2[380]) = 0x3DE000;
+		memcpy(&gbaGpuList2[380], &tmp, 4);
 	}
 	else if(scaleType == 1)
 	{
 		gbaGpuInitList[572] = 2;
 		gbaGpuInitList[968] = 0x60;
 		gbaGpuInitList[1000] = 0x60;
-		*((u32*)&gbaGpuInitList[1004]) = 0x3DE000;
-		*((u32*)&gbaGpuInitList[1068]) = 0x3DE000;
+		u32 tmp = 0x3DE000;
+		memcpy(&gbaGpuInitList[1004], &tmp, 4);
+		memcpy(&gbaGpuInitList[1068], &tmp, 4);
 
 		gbaGpuList2[280] = 0x60;
 		gbaGpuList2[312] = 0x60;
-		*((u32*)&gbaGpuList2[316]) = 0x3DE000;
-		*((u32*)&gbaGpuList2[380]) = 0x3DE000;
+		memcpy(&gbaGpuList2[316], &tmp, 4);
+		memcpy(&gbaGpuList2[380], &tmp, 4);
 	}
 	else return; // Nothing to do.
 
