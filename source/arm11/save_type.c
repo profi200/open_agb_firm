@@ -153,7 +153,8 @@ static Result searchGbaDb(const u64 x, GbaDbEntry *const db, s32 *const entryPos
 
 			if((res = fLseek(f, sizeof(GbaDbEntry) * mid)) != RES_OK) break;
 			if((res = fRead(f, db, sizeof(GbaDbEntry), NULL)) != RES_OK) break;
-			const u64 tmp = *(u64*)db->sha1; // Unaligned access.
+			u64 tmp;
+			memcpy(&tmp, db->sha1, 8);
 			if(tmp == x)
 			{
 				*entryPos = mid; // TODO: Remove.
