@@ -30,6 +30,9 @@
 #include "drivers/sha.h"
 
 
+#define min(a, b)  ((size_t) (a) <= (size_t) (b) ? (size_t) (a) : (size_t) (b))
+
+
 typedef struct
 {
 	u8 *buffer;
