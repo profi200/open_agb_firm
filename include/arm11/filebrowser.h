@@ -22,4 +22,13 @@
 
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 Result browseFiles(const char *const basePath, char selected[512]);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

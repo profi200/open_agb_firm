@@ -23,6 +23,11 @@
 #include "arm11/config.h"
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct
 {
 	u8 sha1[20];
@@ -35,3 +40,7 @@ static_assert(sizeof(GbaDbEntry) == 28, "Error: GBA DB entry struct is not packe
 
 u16 detectSaveType(const u32 romSize, const u16 defaultSave);
 u16 getSaveType(const OafConfig *const cfg, const u32 romSize, const char *const savePath);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

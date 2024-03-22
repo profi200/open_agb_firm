@@ -22,7 +22,7 @@ BUILD		:=	build
 SOURCES		+=	../source ../source/arm11 ../libraries/inih
 DATA		:=
 INCLUDES	+=	../include ../libraries
-DEFINES		:=	-DARM11 -D__3DS__ -DLIBN3DS_LEGACY=1 -DVERS_STRING=\"$(VERS_STRING)\" \
+DEFINES		:=	-D__ARM11__ -D__3DS__ -DLIBN3DS_LEGACY=1 -DVERS_STRING=\"$(VERS_STRING)\" \
 				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
 ASSETS		:=
 
@@ -35,11 +35,11 @@ endif
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv6k+vfpv2 -mtune=mpcore -mfloat-abi=hard -mtp=soft -marm -mthumb-interwork -masm-syntax-unified
 
-CFLAGS	:=	$(ARCH) -std=c17 -O2 -gdwarf-4 -flto -mword-relocations \
+CFLAGS	:=	$(ARCH) -std=c2x -O2 -gdwarf-4 -flto -mword-relocations \
 			-ffunction-sections -fno-math-errno -Wall -Wextra
 CFLAGS	+=	$(INCLUDE) $(DEFINES)
 
-CXXFLAGS	:=	$(ARCH) -std=c++17 -O2 -gdwarf-4 -flto -fno-rtti -fno-exceptions \
+CXXFLAGS	:=	$(ARCH) -std=c++23 -O2 -gdwarf-4 -flto -fno-rtti -fno-exceptions \
 				-mword-relocations -ffunction-sections -fno-math-errno -Wall -Wextra
 CXXFLAGS	+=	$(INCLUDE) $(DEFINES)
 

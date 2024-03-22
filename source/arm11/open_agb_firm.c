@@ -29,8 +29,8 @@
 #include "fs.h"
 #include "fsutil.h"
 #include "arm11/fmt.h"
-#include "arm11/drivers/lcd.h"
-#include "arm11/drivers/lgyfb.h"
+#include "arm11/drivers/gx.h"
+#include "arm11/drivers/lgycap.h"
 #include "drivers/gfx.h"
 #include "arm11/drivers/mcu.h"
 #include "kernel.h"
@@ -41,10 +41,12 @@
 #include "arm11/drivers/codec.h"
 #include "arm11/save_type.h"
 #include "arm11/patch.h"
+#include "arm11/bitmap.h"
 
 
-#define OAF_WORK_DIR  "sdmc:/3ds/open_agb_firm"
-#define OAF_SAVE_DIR  "saves" // Relative to work dir.
+#define OAF_WORK_DIR        "sdmc:/3ds/open_agb_firm"
+#define OAF_SAVE_DIR        "saves"       // Relative to work dir.
+#define OAF_SCREENSHOT_DIR  "screenshots" // Relative to work dir.
 
 
 
@@ -164,6 +166,7 @@ static void adjustGammaTableForGba(void)
 	const float contrast    = g_oafConfig.contrast;
 	const float brightness  = g_oafConfig.brightness / contrast;
 	const float contrastInTargetGamma = powf(contrast, targetGamma);
+	vu32 *const color_lut_data = &getGxRegs()->pdc0.color_lut_data;
 	for(u32 i = 0; i < 256; i++)
 	{
 		// Adjust i with brightness and convert to target gamma.
@@ -173,40 +176,79 @@ static void adjustGammaTableForGba(void)
 		const u32 res = clamp_s32(lroundf(powf(contrastInTargetGamma * adjusted, lcdGamma) * 255), 0, 255);
 
 		// Same adjustment for red/green/blue.
-		REG_LCD_PDC0_GTBL_FIFO = res<<16 | res<<8 | res;
+		*color_lut_data = res<<16 | res<<8 | res;
 	}
 }
 
 static Result dumpFrameTex(void)
 {
-	// Stop LgyFb before dumping the frame to prevent glitches.
-	LGYFB_stop();
+	// Stop LgyCap before dumping the frame to prevent glitches.
+	LGYCAP_stop(LGYCAP_DEV_TOP);
 
-	// 512x-512 (hight negative to flip vertically).
-	// Pixels at offset 0x40.
-	alignas(4) static const u8 bmpHeader[54] =
+	// A1BGR5 format (alpha ignored).
+	constexpr u32 alignment = 0x80; // Make PPF happy.
+	alignas(4) static BmpV1WithMasks bmpHeaders =
 	{
-		0x42, 0x4D, 0x40, 0x00, 0x0C, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x28, 0x00,
-		0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0xFE,
-		0xFF, 0xFF, 0x01, 0x00, 0x18, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x13, 0x0B,
-		0x00, 0x00, 0x13, 0x0B, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+		{
+			.magic       = 0x4D42,
+			.fileSize    = alignment + 240 * 160 * 2,
+			.reserved    = 0,
+			.reserved2   = 0,
+			.pixelOffset = alignment
+		},
+		{
+			.headerSize      = sizeof(Bitmapinfoheader),
+			.width           = 240,
+			.height          = -160,
+			.colorPlanes     = 1,
+			.bitsPerPixel    = 16,
+			.compression     = 3, // Bitfields.
+			.imageSize       = 240 * 160 * 2,
+			.xPixelsPerMeter = 0,
+			.yPixelsPerMeter = 0,
+			.colorsUsed      = 0,
+			.colorsImportant = 0
+		},
+		.rMask = 0xF800,
+		.gMask = 0x07C0,
+		.bMask = 0x003E
 	};
 
-	GX_displayTransfer((u32*)0x18200000, 240u<<16 | 512, (u32*)0x18400040, 240u<<16 | 512, 1u<<12 | 1u<<8);
+	u32 outDim   = PPF_DIM(240, 160);
+	u32 fileSize = alignment + 240 * 160 * 2;
+	if(g_oafConfig.scaler > 1)
+	{
+		outDim   = PPF_DIM(360, 240);
+		fileSize = alignment + 360 * 240 * 2;
+
+		bmpHeaders.header.fileSize = fileSize;
+		bmpHeaders.dib.width     = 360;
+		bmpHeaders.dib.height    = -240;
+		bmpHeaders.dib.imageSize = 360 * 240 * 2;
+	}
+
+	// Transfer frame data out of the 512x512 texture.
+	// We will use the currently hidden frame buffer as temporary buffer.
+	// Note: This is a race with the currently displaying frame buffer
+	//       because we just swapped buffers in the gfx handler function.
+	u32 *const tmpBuf = GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT);
+	GX_displayTransfer((u32*)0x18200000, PPF_DIM(512, 240), tmpBuf + (alignment / 4), outDim,
+	                   PPF_O_FMT(GX_RGB5A1) | PPF_I_FMT(GX_RGB5A1) | PPF_CROP_EN);
+	memcpy(tmpBuf, &bmpHeaders, sizeof(bmpHeaders));
 	GFX_waitForPPF();
-	memcpy((void*)0x18400000, bmpHeader, sizeof(bmpHeader));
 
+	// Get current date & time.
 	RtcTimeDate td;
-	char fn[32];
 	MCU_getRtcTimeDate(&td);
-	ee_sprintf(fn, "texture_dump_%04X%02X%02X%02X%02X%02X.bmp", td.y + 0x2000, td.mon, td.d, td.h, td.min, td.s);
-	const Result res = fsQuickWrite(fn, (void*)0x18400000, 0x40 + 512 * 512 * 3);
 
-	// Restart LgyFb.
-	LGYFB_start();
+	// Construct file path from date & time. Then write the file.
+	char fn[36];
+	ee_sprintf(fn, OAF_SCREENSHOT_DIR "/%04X_%02X_%02X_%02X_%02X_%02X.bmp",
+	           td.y + 0x2000, td.mon, td.d, td.h, td.min, td.s);
+	const Result res = fsQuickWrite(fn, tmpBuf, fileSize);
+
+	// Restart LgyCap.
+	LGYCAP_start(LGYCAP_DEV_TOP);
 
 	return res;
 }
@@ -220,10 +262,17 @@ static void gbaGfxHandler(void *args)
 		if(waitForEvent(event) != KRES_OK) break;
 		clearEvent(event);
 
-		// Rotate the frame using the GPU.
-		// 240x160 no scaling:    184 µs
-		// 240x160 bilinear x1.5: 408 µs
-		// 360x240 no scaling:    437 µs
+		// All measurements are the worst timings in ~30 seconds of runtime.
+		// Measured with timer prescaler 1.
+		// BGR8:
+		// 240x160 no scaling:    ~184 µs
+		// 240x160 bilinear x1.5: ~408 µs
+		// 360x240 no scaling:    ~437 µs
+		//
+		// A1BGR5:
+		// 240x160 no scaling:    ~188 µs (25300 ticks)
+		// 240x160 bilinear x1.5: ~407 µs (54619 ticks)
+		// 360x240 no scaling:    ~400 µs (53725 ticks)
 		static bool inited = false;
 		u32 listSize;
 		const u32 *list;
@@ -241,9 +290,10 @@ static void gbaGfxHandler(void *args)
 		}
 		GX_processCommandList(listSize, list);
 		GFX_waitForP3D();
-		GX_displayTransfer((u32*)GPU_RENDER_BUF_ADDR, 400u<<16 | 240, GFX_getFramebuffer(SCREEN_TOP), 400u<<16 | 240, 1u<<12 | 1u<<8);
+		GX_displayTransfer((u32*)GPU_RENDER_BUF_ADDR, PPF_DIM(240, 400), GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT),
+		                   PPF_DIM(240, 400), PPF_O_FMT(GX_BGR8) | PPF_I_FMT(GX_BGR8));
 		GFX_waitForPPF();
-		GFX_swapFramebufs();
+		GFX_swapBuffers();
 
 		// Trigger only if both are held and at least one is detected as newly pressed down.
 		if(hidKeysHeld() == (KEY_Y | KEY_SELECT) && hidKeysDown() != 0)
@@ -272,7 +322,7 @@ void changeBacklight(s16 amount)
 	newVal = (newVal < min ? min : newVal);
 	g_oafConfig.backlight = (u8)newVal;
 
-	GFX_setBrightness((u8)newVal, (u8)newVal);
+	GFX_setLcdLuminance(newVal);
 }
 
 static void updateBacklight(void)
@@ -292,23 +342,23 @@ static void updateBacklight(void)
 			changeBacklight(-steps);
 
 		// Disable backlight switching in debug builds on 2DS.
-		const GfxBlight lcd = (MCU_getSystemModel() != 3 ? GFX_BLIGHT_TOP : GFX_BLIGHT_BOT);
+		const GfxBl lcd = (MCU_getSystemModel() != SYS_MODEL_2DS ? GFX_BL_TOP : GFX_BL_BOT);
 #ifndef NDEBUG
-		if(lcd != GFX_BLIGHT_BOT)
+		if(lcd != GFX_BL_BOT)
 #endif
 		{
 			// Turn off backlight.
 			if(backlightOn && kHeld == (KEY_X | KEY_DLEFT))
 			{
 				backlightOn = false;
-				GFX_powerOffBacklights(lcd);
+				GFX_powerOffBacklight(lcd);
 			}
 
 			// Turn on backlight.
 			if(!backlightOn && kHeld == (KEY_X | KEY_DRIGHT))
 			{
 				backlightOn = true;
-				GFX_powerOnBacklights(lcd);
+				GFX_powerOnBacklight(lcd);
 			}
 		}
 	}
@@ -407,6 +457,10 @@ Result oafParseConfigEarly(void)
 		res = fMkdir(OAF_SAVE_DIR);
 		if(res != RES_OK && res != RES_FR_EXIST) break;
 
+		// Create screenshots folder.
+		res = fMkdir(OAF_SCREENSHOT_DIR);
+		if(res != RES_OK && res != RES_FR_EXIST) break;
+
 		// Parse the config.
 		res = parseOafConfig("config.ini", &g_oafConfig, true);
 	} while(0);
@@ -436,31 +490,18 @@ KHandle setupFrameCapture(const u8 scaler)
 		      0,       0,       0,       0,       0,       0,       0,       0
 	};
 
-	ScalerCfg gbaCfg;
+	LgyCapCfg gbaCfg;
+	gbaCfg.cnt   = LGYCAP_OUT_SWIZZLE | LGYCAP_ROT_NONE | LGYCAP_OUT_FMT_A1BGR5 | (is240x160 ? 0 : LGYCAP_HSCALE_EN | LGYCAP_VSCALE_EN);
 	gbaCfg.w     = (is240x160 ? 240 : 360);
 	gbaCfg.h     = (is240x160 ? 160 : 240);
 	gbaCfg.vLen  = 6;
 	gbaCfg.vPatt = 0b00011011;
 	memcpy(gbaCfg.vMatrix, matrix, 6 * 8 * 2);
 	gbaCfg.hLen  = 6;
-	gbaCfg.hPatt = (is240x160 ? 0b00111111 : 0b00011011);
+	gbaCfg.hPatt = 0b00011011;
+	memcpy(gbaCfg.hMatrix, &matrix[6 * 8], 6 * 8 * 2);
 
-	if(is240x160)
-	{
-		memset(gbaCfg.hMatrix, 0, 6 * 8 * 2);
-		s16 *const identityRow = &gbaCfg.hMatrix[3 * 8];
-		for(unsigned i = 0; i < 6; i++)
-		{
-			// Set identity entries.
-			identityRow[i] = 0x4000;
-		}
-	}
-	else
-	{
-		memcpy(gbaCfg.hMatrix, &matrix[6 * 8], 6 * 8 * 2);
-	}
-
-	return LGYFB_init(&gbaCfg);
+	return LGYCAP_init(LGYCAP_DEV_TOP, &gbaCfg);
 }
 
 Result oafInitAndRun(void)
@@ -522,7 +563,8 @@ Result oafInitAndRun(void)
 				// Force black and turn the backlight off on the bottom screen.
 				// Don't turn the backlight off on 2DS (1 panel).
 				GFX_setForceBlack(false, true);
-				if(MCU_getSystemModel() != 3) GFX_powerOffBacklights(GFX_BLIGHT_BOT);
+				if(MCU_getSystemModel() != SYS_MODEL_2DS)
+					GFX_powerOffBacklight(GFX_BL_BOT);
 #endif
 
 				// Initialize frame capture and frame handler.
@@ -543,16 +585,17 @@ Result oafInitAndRun(void)
 				if(g_oafConfig.scaler == 0) // No borders for scaled modes.
 				{
 					// Abuse currently invisible frame buffer as temporary buffer.
-					void *const borderBuf = GFX_getFramebuffer(SCREEN_TOP);
+					void *const borderBuf = GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT);
 					if(fsQuickRead("border.bgr", borderBuf, 400 * 240 * 3) == RES_OK)
 					{
 						// Copy border in swizzled form to GPU render buffer.
-						GX_displayTransfer(borderBuf, 400u<<16 | 240, (u32*)GPU_RENDER_BUF_ADDR, 400u<<16 | 240, 1u<<12 | 1u<<8 | 1u<<1);
+						GX_displayTransfer(borderBuf, PPF_DIM(240, 400), (u32*)GPU_RENDER_BUF_ADDR,
+						                   PPF_DIM(240, 400), PPF_O_FMT(GX_BGR8) | PPF_I_FMT(GX_BGR8) | PPF_OUT_TILED);
 						GFX_waitForPPF();
 					}
 				}
 
-				// Sync LgyFb start with LCD VBlank.
+				// Sync LgyCap start with LCD VBlank.
 				GFX_waitForVBlank0();
 				LGY11_switchMode();
 			}
@@ -586,7 +629,7 @@ void oafFinish(void)
 {
 	// frameReadyEvent deleted by this function.
 	// gbaGfxHandler() will automatically terminate.
-	LGYFB_deinit();
+	LGYCAP_deinit(LGYCAP_DEV_TOP);
 	g_frameReadyEvent = 0;
 	LGY11_deinit();
 }

@@ -21,8 +21,8 @@ include $(TOPDIR)/../libraries/libn3ds/libn3ds9.mk
 BUILD		:=	build
 SOURCES		+=	../source/arm9
 DATA		:=
-INCLUDES	+=	../include ../thirdparty
-DEFINES		:=	-DARM9 -D__3DS__ -DLIBN3DS_LEGACY=1 -DVERS_STRING=\"$(VERS_STRING)\" \
+INCLUDES	+=	../include
+DEFINES		:=	-D__ARM9__ -D__3DS__ -DLIBN3DS_LEGACY=1 -DVERS_STRING=\"$(VERS_STRING)\" \
 				-DVERS_MAJOR=$(VERS_MAJOR) -DVERS_MINOR=$(VERS_MINOR)
 
 ifneq ($(strip $(NO_DEBUG)),)
@@ -34,11 +34,11 @@ endif
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv5te -mtune=arm946e-s -mfloat-abi=soft -mtp=soft -marm -mthumb-interwork -masm-syntax-unified
 
-CFLAGS	:=	$(ARCH) -std=c17 -O2 -gdwarf-4 -flto -mword-relocations \
+CFLAGS	:=	$(ARCH) -std=c2x -O2 -gdwarf-4 -flto -mword-relocations \
 			-ffunction-sections -Wall -Wextra
 CFLAGS	+=	$(INCLUDE) $(DEFINES)
 
-CXXFLAGS	:=	$(ARCH) -std=c++17 -O2 -gdwarf-4 -flto -fno-rtti -fno-exceptions \
+CXXFLAGS	:=	$(ARCH) -std=c++23 -O2 -gdwarf-4 -flto -fno-rtti -fno-exceptions \
 				-mword-relocations -ffunction-sections -Wall -Wextra
 CXXFLAGS	+=	$(INCLUDE) $(DEFINES)
 

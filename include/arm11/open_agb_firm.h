@@ -22,8 +22,17 @@
 
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 Result oafParseConfigEarly(void);
 void changeBacklight(s16 amount);
 Result oafInitAndRun(void);
 void oafUpdate(void);
 void oafFinish(void);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

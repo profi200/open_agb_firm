@@ -21,6 +21,11 @@
 #include "error_codes.h"
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define MAKE_CUSTOM_ERR(e) (CUSTOM_ERR_OFFSET + (e))
 
 // Keep errors in the range of 0-CUSTOM_ERR_OFFSET - 1.
@@ -38,7 +43,11 @@ enum
 
 
 const char* oafResult2String(Result res);
-#ifdef ARM11
+#ifdef __ARM11__
 void printError(Result res);
 void printErrorWaitInput(Result res, u32 waitKeys);
-#endif // ifdef ARM11
+#endif // ifdef __ARM11__
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

@@ -22,6 +22,11 @@
 #include "oaf_error_codes.h"
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct
 {
 	// [general]
@@ -58,3 +63,7 @@ typedef struct
 
 
 Result parseOafConfig(const char *const path, OafConfig *const cfg, const bool newCfgOnError);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

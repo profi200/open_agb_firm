@@ -18,10 +18,10 @@
 
 #include "oaf_error_codes.h"
 #include "drivers/gfx.h"
-#ifdef ARM11
-	#include "arm11/fmt.h"
-	#include "arm11/drivers/hid.h"
-#endif
+#ifdef __ARM11__
+#include "arm11/fmt.h"
+#include "arm11/drivers/hid.h"
+#endif // #ifdef __ARM11__
 
 
 
@@ -36,7 +36,7 @@ const char* oafResult2String(Result res)
 	return (res < CUSTOM_ERR_OFFSET ? result2String(res) : oafResultStrings[res - CUSTOM_ERR_OFFSET]);
 }
 
-#ifdef ARM11
+#ifdef __ARM11__
 void printError(Result res)
 {
 	ee_printf("Error: %s.\n", oafResult2String(res));
@@ -63,4 +63,4 @@ void printErrorWaitInput(Result res, u32 waitKeys)
 		if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
 	}
 }
-#endif // ifdef ARM11
+#endif // ifdef __ARM11__

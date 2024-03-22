@@ -44,12 +44,13 @@ Settings are stored in `/3ds/open_agb_firm/config.ini`.
 ### General
 General settings.
 
-`u8 backlight` - Backlight brightness
+`u8 backlight` - Backlight brightness in luminance (cd/m²)
 * Default: `64`
 * Possible values:
   * Old 3DS: `20`-`117`
   * New 3DS: `16`-`142`
 * Values ≤`64` are recommended.
+* Hardware calibration from your CTRNAND is required to get the correct brightness for both LCDs.
 
 `u8 backlightSteps` - How much to adjust backlight brightness by
 * Default: `5`
