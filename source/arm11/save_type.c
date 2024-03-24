@@ -135,47 +135,52 @@ u16 detectSaveType(const u32 romSize, const u16 defaultSave)
 	return saveType;
 }
 
-// Search for entry with first u64 of the SHA1 = x using binary search.
-static Result searchGbaDb(const u64 x, GbaDbEntry *const db, s32 *const entryPos)
+// Search for the entry with first u64 of the SHA1 = x using binary search.
+// Note: Loading the whole db to memory first is still slower.
+static Result searchGbaDb(const u64 x, GbaDbEntry *const db)
 {
-	debug_printf("Database search: '%016" PRIX64 "'\n", __builtin_bswap64(x));
-
-	Result res;
 	FHandle f;
-	if((res = fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_READ)) == RES_OK)
+	Result res = fOpen(&f, "gba_db.bin", FA_OPEN_EXISTING | FA_READ);
+	if(res != RES_OK) return res;
+
+	u32 l = 0;
+	u32 r = fSize(f) / sizeof(GbaDbEntry);
+	while(l < r)
 	{
-		s32 l = 0;
-		s32 r = fSize(f) / sizeof(GbaDbEntry) - 1; // TODO: Check for 0!
-		while(1)
+		const u32 m = l + (r - l) / 2;
+		//debug_printf("l: %" PRIu32 " m: %" PRIu32 " r: %" PRIu32 "\n", l, m, r);
+
+		res = fLseek(f, sizeof(GbaDbEntry) * m);
+		if(res != RES_OK)
 		{
-			const s32 mid = l + (r - l) / 2;
-			debug_printf("l: %ld r: %ld mid: %ld\n", l, r, mid);
-
-			if((res = fLseek(f, sizeof(GbaDbEntry) * mid)) != RES_OK) break;
-			if((res = fRead(f, db, sizeof(GbaDbEntry), NULL)) != RES_OK) break;
-			u64 tmp;
-			memcpy(&tmp, db->sha1, 8);
-			if(tmp == x)
-			{
-				*entryPos = mid; // TODO: Remove.
-				break;
-			}
-
-			if(r <= l)
-			{
-				debug_printf("Not found!\n");
-				res = RES_NOT_FOUND;
-				break;
-			}
-
-			if(tmp > x) r = mid - 1;
-			else        l = mid + 1;
+			fClose(f);
+			return res;
+		}
+		res = fRead(f, db, sizeof(GbaDbEntry), NULL);
+		if(res != RES_OK)
+		{
+			fClose(f);
+			return res;
 		}
 
-		fClose(f);
+		u64 tmp;
+		memcpy(&tmp, db->sha1, 8);
+		if(x > tmp)
+		{
+			l = m + 1;
+		}
+		else if(x < tmp)
+		{
+			r = m;
+		}
+		else
+		{
+			fClose(f);
+			return RES_OK;
+		}
 	}
 
-	return res;
+	return RES_NOT_FOUND;
 }
 
 u16 getSaveType(const OafConfig *const cfg, const u32 romSize, const char *const savePath)
@@ -190,9 +195,8 @@ u16 getSaveType(const OafConfig *const cfg, const u32 romSize, const char *const
 
 	Result res;
 	GbaDbEntry dbEntry;
-	s32 dbPos = -1;
 	u16 saveType = SAVE_TYPE_NONE;
-	res = searchGbaDb(*sha1, &dbEntry, &dbPos);
+	res = searchGbaDb(*sha1, &dbEntry);
 	if(res == RES_OK) saveType = dbEntry.attr & 0xFu;
 	else if(!saveOverride && res == RES_NOT_FOUND) return autoSaveType;
 	else if(res != RES_NOT_FOUND)
