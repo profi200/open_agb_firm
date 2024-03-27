@@ -468,10 +468,10 @@ Result oafParseConfigEarly(void)
 	return res;
 }
 
-KHandle setupFrameCapture(const u8 scaler)
+static KHandle setupFrameCapture(const u8 scaler)
 {
 	const bool is240x160 = scaler < 2;
-	static const s16 matrix[12 * 8] =
+	static s16 matrix[12 * 8] =
 	{
 		// Vertical.
 		      0,       0,       0,       0,       0,       0,       0,       0,
@@ -489,6 +489,12 @@ KHandle setupFrameCapture(const u8 scaler)
 		      0,       0,  -0x4B0,       0,       0,  -0x4B0,       0,       0,
 		      0,       0,       0,       0,       0,       0,       0,       0
 	};
+
+	const Result res = fsQuickRead("gba_scaler_matrix.bin", matrix, sizeof(matrix));
+	if(res != RES_OK && res != RES_FR_NO_FILE)
+	{
+		ee_printf("Failed to load hardware scaling matrix: %s\n", result2String(res));
+	}
 
 	LgyCapCfg gbaCfg;
 	gbaCfg.cnt   = LGYCAP_OUT_SWIZZLE | LGYCAP_ROT_NONE | LGYCAP_OUT_FMT_A1BGR5 | (is240x160 ? 0 : LGYCAP_HSCALE_EN | LGYCAP_VSCALE_EN);
