@@ -180,6 +180,8 @@ static Result searchGbaDb(const u64 x, GbaDbEntry *const db)
 		}
 	}
 
+	fClose(f);
+
 	return RES_NOT_FOUND;
 }
 
