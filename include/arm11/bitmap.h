@@ -36,18 +36,18 @@ typedef struct
 } PACKED BmpHeader;
 static_assert(sizeof(BmpHeader) == 14);
 
-/*typedef enum
+typedef enum
 {
-	BI_RGB = 0x0000,
-	BI_RLE8 = 0x0001,
-	BI_RLE4 = 0x0002,
-	BI_BITFIELDS = 0x0003,
-	BI_JPEG = 0x0004,
-	BI_PNG = 0x0005,
-	BI_CMYK = 0x000B,
-	BI_CMYKRLE8 = 0x000C,
-	BI_CMYKRLE4 = 0x000D
-} Compression;*/
+	BI_RGB       =  0u,
+	BI_RLE8      =  1u, // 8 bit per pixel only.
+	BI_RLE4      =  2u, // 4 bit per pixel only.
+	BI_BITFIELDS =  3u, // BitmapV2Infoheader RGB masks, BitmapV3Infoheader+ RGBA masks.
+	BI_JPEG      =  4u, // BitmapV4Infoheader+.
+	BI_PNG       =  5u, // BitmapV4Infoheader+.
+	BI_CMYK      = 11u, // Only Windows Metafile (WMF) CMYK.
+	BI_CMYKRLE8  = 12u, // Only Windows Metafile (WMF) CMYK.
+	BI_CMYKRLE4  = 13u  // Only Windows Metafile (WMF) CMYK.
+} BitmapCompr;
 
 typedef struct
 {
@@ -56,8 +56,8 @@ typedef struct
 	s32 height;          // If >=0, pixel lines are in order bottom to top. Otherwise top to bottom.
 	u16 colorPlanes;     // Must be 1.
 	u16 bitsPerPixel;    // 1, 4, 8, 16, 24, 32.
-	u32 compression;
-	u32 imageSize;       // Can be 0 if compression is 0.
+	u32 compression;     // See BitmapCompr enum.
+	u32 imageSize;       // Can be 0 if compression is BI_RGB.
 	s32 xPixelsPerMeter;
 	s32 yPixelsPerMeter;
 	u32 colorsUsed;
@@ -69,18 +69,20 @@ typedef struct
 {
 	BmpHeader header;
 	Bitmapinfoheader dib;
-	u32 rMask;            // Optional.
-	u32 gMask;            // Optional.
-	u32 bMask;            // Optional.
-} PACKED BmpV1WithMasks;
-static_assert(sizeof(BmpV1WithMasks) == 0x42);
+} PACKED BmpV1;
+static_assert(sizeof(BmpV1) == 0x36);
 
+// Note: Technically this is BMP V2 but we use the shorter Bitmapinfoheader (V1).
+//       The color masks are only needed for compression BI_BITFIELDS.
 typedef struct
 {
 	BmpHeader header;
 	Bitmapinfoheader dib;
-} PACKED BmpV1;
-static_assert(sizeof(BmpV1) == 0x36);
+	u32 rMask;
+	u32 gMask;
+	u32 bMask;
+} PACKED BmpV1WithMasks;
+static_assert(sizeof(BmpV1WithMasks) == 0x42);
 
 #ifdef __cplusplus
 } // extern "C"

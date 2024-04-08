@@ -202,7 +202,7 @@ static Result dumpFrameTex(void)
 			.height          = -160,
 			.colorPlanes     = 1,
 			.bitsPerPixel    = 16,
-			.compression     = 3, // Bitfields.
+			.compression     = BI_BITFIELDS,
 			.imageSize       = 240 * 160 * 2,
 			.xPixelsPerMeter = 0,
 			.yPixelsPerMeter = 0,
