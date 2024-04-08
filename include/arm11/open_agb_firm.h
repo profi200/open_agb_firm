@@ -24,6 +24,7 @@
 
 Result oafParseConfigEarly(void);
 void changeBacklight(s16 amount);
+void oafInit(void);
 Result oafInitAndRun(void);
 void oafUpdate(void);
 void oafFinish(void);

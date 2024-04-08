@@ -35,12 +35,15 @@
 #include "arm11/drivers/mcu.h"
 #include "kernel.h"
 #include "kevent.h"
+#include "arm11/drivers/interrupt.h"
 #include "arm11/gpu_cmd_lists.h"
 #include "arm11/drivers/hid.h"
 #include "arm11/filebrowser.h"
 #include "arm11/drivers/codec.h"
 #include "arm11/save_type.h"
 #include "arm11/patch.h"
+#include "arm11/drivers/pdn.h"
+
 
 
 #define OAF_WORK_DIR  "sdmc:/3ds/open_agb_firm"
@@ -565,6 +568,28 @@ Result oafInitAndRun(void)
 	return res;
 }
 
+void handleEvents(void)
+{
+	
+	const GfxBlight lcd = (MCU_getSystemModel() != 3 ? GFX_BLIGHT_TOP : GFX_BLIGHT_BOT);
+	if (hidGetExtraKeys(0) & KEY_SHELL) {
+		GFX_powerOffBacklights(lcd);
+		LGYFB_stop();
+		IRQ_disable(IRQ_CDMA_EVENT0);
+		clearEvent(g_frameReadyEvent);
+		
+		CODEC_setVolumeOverride(-128);
+		GFX_enterLowPowerState();
+		GFX_powerOnBacklights(lcd);
+		GFX_returnFromLowPowerState();
+		IRQ_enable(IRQ_CDMA_EVENT0);
+		LGYFB_start();
+		CODEC_setVolumeOverride(127);
+		
+	}
+
+}
+
 void oafUpdate(void)
 {
 	const u32 *const maps = g_oafConfig.buttonMaps;
@@ -576,6 +601,7 @@ void oafUpdate(void)
 			pressed |= 1u<<i;
 	}
 	LGY11_setInputState(pressed);
+	handleEvents();
 
 	CODEC_runHeadphoneDetection();
 	updateBacklight();
