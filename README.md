@@ -126,6 +126,7 @@ Note that button mappings can cause input lag of up to 1 frame depending on when
 
 Example:
 ```
+[input]
 RIGHT=RIGHT,CP_RIGHT
 LEFT=LEFT,CP_LEFT
 UP=UP,CP_UP
