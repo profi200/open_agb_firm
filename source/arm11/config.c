@@ -44,7 +44,7 @@
                         "[advanced]\n"            \
                         "saveOverride=false\n"    \
                         "defaultSave=14\n"        \
-						"mgbaSaveCompat=false"
+                        "mgbaSaveCompat=false"
 
 
 

@@ -160,7 +160,7 @@ Options for advanced users. No pun intended.
   * `14`: SRAM 256k
   * `15`: None
   
-`bool mgbaSaveCompat` - Look for and place romName.sav and romName.ini in the ROM directory for compatibility with mbga save behavior.
+`bool mgbaSaveCompat` - Look for and place romName.sav and romName.ini in the ROM directory for compatibility with mGBA save behavior.
 * Default: `false`
 
 ## Patches
