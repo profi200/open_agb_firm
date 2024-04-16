@@ -89,7 +89,8 @@ static OafConfig g_oafConfig =
 
 	// [advanced]
 	false, // saveOverride
-	14     // defaultSave
+	14,    // defaultSave
+	false,  // mgbaSaveCompat
 };
 static KHandle g_frameReadyEvent = 0;
 
@@ -362,6 +363,27 @@ static Result showFileBrowser(char romAndSavePath[512])
 	return res;
 }
 
+static int getBasePathEnd(char path[512])
+{
+	// Returns the index of the final "/"
+	// Returns -1 on error or not found.
+	int retval = -1;
+	for (int i = 0; i < 512; i++)
+	{
+		char curChar = path[i];
+		if (curChar == '\0')
+		{
+			break;
+		}
+
+		if (curChar == '/')
+		{
+			retval = i;
+		}
+	}
+	return retval;
+}
+
 static void rom2GameCfgPath(char romPath[512])
 {
 	// Extract the file name and change the extension.
@@ -370,10 +392,30 @@ static void rom2GameCfgPath(char romPath[512])
 	safeStrcpy(tmpIniFileName, strrchr(romPath, '/') + 1, 256 - 2);
 	strcpy(tmpIniFileName + strlen(tmpIniFileName) - 4, ".ini");
 
+	// Support swapping ini/save to be in rom directory
+	char newSaveDir[512];
+	strcpy(newSaveDir, OAF_SAVE_DIR "/");
+
+	if (g_oafConfig.mgbaSaveCompat)
+	{
+		// Get rom basepath end
+		int baseEndIdx = getBasePathEnd(romPath);
+
+		// Safety check, baseEndIdx < 511 and > 0
+		// On error or OoB, it will revert to original behavior
+		if (baseEndIdx < 511 && baseEndIdx > 0)
+		{
+			// Replace the character after the trailing slash with null term
+			safeStrcpy(newSaveDir, romPath, 512);
+			newSaveDir[baseEndIdx + 1] = '\0';
+		}
+	}
+
 	// Construct the new path.
-	strcpy(romPath, OAF_SAVE_DIR "/");
+	strcpy(romPath, newSaveDir);
 	strcat(romPath, tmpIniFileName);
 }
+
 
 static void gameCfg2SavePath(char cfgPath[512], const u8 saveSlot)
 {

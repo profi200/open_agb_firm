@@ -159,6 +159,9 @@ Options for advanced users. No pun intended.
   * `11`, `13`: Flash 1m
   * `14`: SRAM 256k
   * `15`: None
+  
+`bool mgbaSaveCompat` - Look for and place romName.sav and romName.ini in the ROM directory for compatibility with mbga save behavior.
+* Default: `false`
 
 ## Patches
 open_agb_firm supports automatically applying IPS and UPS patches. To use a patch, rename the patch file to match the ROM file name (without the extension).

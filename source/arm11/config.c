@@ -43,7 +43,8 @@
                         "volume=127\n\n"          \
                         "[advanced]\n"            \
                         "saveOverride=false\n"    \
-                        "defaultSave=14"
+                        "defaultSave=14\n"        \
+						"mgbaSaveCompat=false"
 
 
 
@@ -142,6 +143,8 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 			config->saveOverride = (strcmp(value, "false") == 0 ? false : true);
 		if(strcmp(name, "defaultSave") == 0)
 			config->defaultSave = (u16)strtoul(value, NULL, 10);
+		if(strcmp(name, "mgbaSaveCompat") == 0)
+			config->mgbaSaveCompat = (strcmp(value, "false") == 0 ? false : true);
 	}
 	else return 0; // Error.
 
