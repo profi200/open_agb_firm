@@ -96,7 +96,15 @@ static OafConfig g_oafConfig =
 	14     // defaultSave
 };
 static KHandle g_frameReadyEvent = 0;
-static bool g_isSleeping = false;
+
+typedef enum
+{
+	RUNNING,
+	SLEEP,
+	WAKE,
+} State;
+
+static State g_isSleeping = RUNNING;
 
 
 
@@ -515,6 +523,7 @@ static KHandle setupFrameCapture(const u8 scaler)
 
 Result oafInitAndRun(void)
 {
+	g_isSleeping = RUNNING;
 	Result res;
 	char *const filePath = (char*)calloc(512, 1);
 	if(filePath != NULL)
@@ -619,7 +628,7 @@ Result oafInitAndRun(void)
 
 void oafUpdate(void)
 {
-	if (g_isSleeping) return;
+	if (g_isSleeping != RUNNING) return;
 	const u32 *const maps = g_oafConfig.buttonMaps;
 	const u32 kHeld = hidKeysHeld();
 	u16 pressed = 0;
@@ -646,25 +655,26 @@ void oafFinish(void)
 
 void oafSleep(void)
 {
-	if(g_isSleeping) return;	
+	if(g_isSleeping == SLEEP) return;	
+	MCU_setPowerLedPattern(MCU_PWR_LED_SLEEP);
     LGYCAP_stop(LGYCAP_DEV_TOP);
     IRQ_disable(IRQ_CDMA_EVENT0);
     clearEvent(g_frameReadyEvent);
 
     CODEC_setVolumeOverride(-128);
     GFX_sleep();
-	PDN_sleep();
-	g_isSleeping = true;
+	PDN_sleep();	
+	g_isSleeping = SLEEP;
 }
 
 void oafWakeup(void)
 {
-	if (!g_isSleeping) return;
+	if (g_isSleeping != SLEEP) return;
 	PDN_wakeup();
 	GFX_sleepAwake();    
     LGYCAP_start(LGYCAP_DEV_TOP);
 	IRQ_enable(IRQ_CDMA_EVENT0);
     CODEC_setVolumeOverride(127);
-	g_isSleeping = false;
-
+	MCU_setPowerLedPattern(MCU_PWR_LED_AUTO);
+	g_isSleeping = RUNNING;
 }
