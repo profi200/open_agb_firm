@@ -42,7 +42,9 @@
 #include "arm11/save_type.h"
 #include "arm11/patch.h"
 #include "arm11/bitmap.h"
+#include "arm11/drivers/pdn.h"
 
+#include "arm11/drivers/interrupt.h"
 
 #define OAF_WORK_DIR        "sdmc:/3ds/open_agb_firm"
 #define OAF_SAVE_DIR        "saves"       // Relative to work dir.
@@ -94,6 +96,14 @@ static OafConfig g_oafConfig =
 	14     // defaultSave
 };
 static KHandle g_frameReadyEvent = 0;
+
+typedef enum
+{
+	RUNNING,
+	SLEEP,
+} State;
+
+static State g_runState = RUNNING;
 
 
 
@@ -512,6 +522,7 @@ static KHandle setupFrameCapture(const u8 scaler)
 
 Result oafInitAndRun(void)
 {
+	g_runState = RUNNING;
 	Result res;
 	char *const filePath = (char*)calloc(512, 1);
 	if(filePath != NULL)
@@ -616,6 +627,7 @@ Result oafInitAndRun(void)
 
 void oafUpdate(void)
 {
+	if (g_runState != RUNNING) return;
 	const u32 *const maps = g_oafConfig.buttonMaps;
 	const u32 kHeld = hidKeysHeld();
 	u16 pressed = 0;
@@ -638,4 +650,32 @@ void oafFinish(void)
 	LGYCAP_deinit(LGYCAP_DEV_TOP);
 	g_frameReadyEvent = 0;
 	LGY11_deinit();
+}
+
+void oafSleep(void)
+{
+	if(g_runState == SLEEP) return;	
+	MCU_setPowerLedPattern(MCU_PWR_LED_SLEEP);
+    LGYCAP_stop(LGYCAP_DEV_TOP);
+    IRQ_disable(IRQ_CDMA_EVENT0);
+    clearEvent(g_frameReadyEvent);
+
+    CODEC_setVolumeOverride(-128);
+	CODEC_deinit();
+    GFX_sleep();
+	PDN_sleep();
+	g_runState = SLEEP;
+}
+
+void oafWakeup(void)
+{
+	if (g_runState != SLEEP) return;
+	PDN_wakeup();
+	GFX_sleepAwake();    
+    LGYCAP_start(LGYCAP_DEV_TOP);
+	IRQ_enable(IRQ_CDMA_EVENT0);
+	CODEC_wakeup();
+    CODEC_setVolumeOverride(127);
+	MCU_setPowerLedPattern(MCU_PWR_LED_AUTO);
+	g_runState = RUNNING;
 }
