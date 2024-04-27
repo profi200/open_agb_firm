@@ -664,7 +664,7 @@ void oafSleep(void)
     CODEC_setVolumeOverride(-128);
 	CODEC_deinit();
     GFX_sleep();
-	PDN_sleep();	
+	PDN_sleep();
 	g_runState = SLEEP;
 }
 
