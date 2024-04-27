@@ -101,7 +101,6 @@ typedef enum
 {
 	RUNNING,
 	SLEEP,
-	WAKE,
 } State;
 
 static State g_runState = RUNNING;
