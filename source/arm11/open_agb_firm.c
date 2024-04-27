@@ -662,6 +662,7 @@ void oafSleep(void)
     clearEvent(g_frameReadyEvent);
 
     CODEC_setVolumeOverride(-128);
+	CODEC_deinit();
     GFX_sleep();
 	PDN_sleep();	
 	g_isSleeping = SLEEP;
@@ -674,6 +675,7 @@ void oafWakeup(void)
 	GFX_sleepAwake();    
     LGYCAP_start(LGYCAP_DEV_TOP);
 	IRQ_enable(IRQ_CDMA_EVENT0);
+	CODEC_wakeup();
     CODEC_setVolumeOverride(127);
 	MCU_setPowerLedPattern(MCU_PWR_LED_AUTO);
 	g_isSleeping = RUNNING;
