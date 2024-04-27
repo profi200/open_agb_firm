@@ -42,6 +42,7 @@
 #include "arm11/save_type.h"
 #include "arm11/patch.h"
 #include "arm11/bitmap.h"
+#include "arm11/drivers/pdn.h"
 
 #include "arm11/drivers/interrupt.h"
 
@@ -652,17 +653,15 @@ void oafSleep(void)
 
     CODEC_setVolumeOverride(-128);
     GFX_sleep();
+	PDN_sleep();
 	g_isSleeping = true;
 }
 
 void oafWakeup(void)
 {
 	if (!g_isSleeping) return;
-	GFX_sleepAwake();
-	// VRAM is cleared upon waking up
-	// need to readjust screen after waking up
-	adjustGammaTableForGba();
-    
+	PDN_wakeup();
+	GFX_sleepAwake();    
     LGYCAP_start(LGYCAP_DEV_TOP);
 	IRQ_enable(IRQ_CDMA_EVENT0);
     CODEC_setVolumeOverride(127);
