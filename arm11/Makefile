@@ -35,7 +35,7 @@ endif
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv6k+vfpv2 -mtune=mpcore -mfloat-abi=hard -mtp=soft -marm -mthumb-interwork -masm-syntax-unified
 
-CFLAGS	:=	$(ARCH) -std=c2x -O2 -gdwarf-4 -flto -mword-relocations \
+CFLAGS	:=	$(ARCH) -std=c23 -O2 -gdwarf-4 -flto -mword-relocations \
 			-ffunction-sections -fno-math-errno -Wall -Wextra
 CFLAGS	+=	$(INCLUDE) $(DEFINES)
 
