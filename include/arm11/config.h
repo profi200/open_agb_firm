@@ -52,6 +52,7 @@ typedef struct
 	// [advanced]
 	bool saveOverride;
 	u16 defaultSave;
+	bool mgbaSaveCompat;
 } OafConfig;
 //static_assert(sizeof(OafConfig) == 76, "nope");
 
