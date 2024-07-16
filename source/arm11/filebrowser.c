@@ -129,9 +129,9 @@ static void showDirList(const DirList *const dList, u32 start)
 	for(u32 i = start; i < listLength; i++)
 	{
 		const char *const printStr =
-			(*dList->ptrs[i] == ENT_TYPE_FILE ? "\x1b[%lu;H\x1b[37m %.51s" : "\x1b[%lu;H\x1b[33m %.51s");
+			(*dList->ptrs[i] == ENT_TYPE_FILE ? "\x1b[%lu;H\x1b[37;1m %.52s" : "\x1b[%lu;H\x1b[33;1m %.52s");
 
-		ee_printf(printStr, i - start, &dList->ptrs[i][1]);
+		ee_printf(printStr, i - start + 1, &dList->ptrs[i][1]);
 	}
 }
 
@@ -156,8 +156,9 @@ Result browseFiles(const char *const basePath, char selected[512])
 	s32 oldCursorPos = 0;
 	while(1)
 	{
-		ee_printf("\x1b[%lu;H ", oldCursorPos - windowPos);      // Clear old cursor.
-		ee_printf("\x1b[%lu;H\x1b[37m>", cursorPos - windowPos); // Draw cursor.
+		ee_printf("\x1b[%lu;H ", oldCursorPos - windowPos + 1);      // Clear old cursor.
+		ee_printf("\x1b[%lu;H\x1b[37m>", cursorPos - windowPos + 1); // Draw cursor.
+		GFX_flushBuffers();
 
 		u32 kDown;
 		do
