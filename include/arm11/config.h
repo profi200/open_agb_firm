@@ -2,7 +2,7 @@
 
 /*
  *   This file is part of open_agb_firm
- *   Copyright (C) 2023 profi200
+ *   Copyright (C) 2024 profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -26,6 +26,11 @@
 extern "C"
 {
 #endif
+
+#define OAF_WORK_DIR        "sdmc:/3ds/open_agb_firm"
+#define OAF_SAVE_DIR        "saves"       // Relative to work dir.
+#define OAF_SCREENSHOT_DIR  "screenshots" // Relative to work dir.
+
 
 typedef struct
 {
@@ -60,9 +65,11 @@ typedef struct
 } OafConfig;
 //static_assert(sizeof(OafConfig) == 76, "nope");
 
+extern OafConfig g_oafConfig;
 
 
-Result parseOafConfig(const char *const path, OafConfig *const cfg, const bool newCfgOnError);
+
+Result parseOafConfig(const char *const path, OafConfig *cfg, const bool newCfgOnError);
 
 #ifdef __cplusplus
 } // extern "C"

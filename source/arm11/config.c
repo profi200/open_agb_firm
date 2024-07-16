@@ -1,6 +1,6 @@
 /*
  *   This file is part of open_agb_firm
- *   Copyright (C) 2023 profi200
+ *   Copyright (C) 2024 profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -26,7 +26,6 @@
 
 
 #define INI_BUF_SIZE    (1024u)
-// Note: Keep this synchronized with g_oafConfig in open_agb_firm.c.
 #define DEFAULT_CONFIG  "[general]\n"             \
                         "backlight=64\n"          \
                         "backlightSteps=5\n"      \
@@ -44,6 +43,51 @@
                         "[advanced]\n"            \
                         "saveOverride=false\n"    \
                         "defaultSave=14"
+
+
+
+// Default config.
+OafConfig g_oafConfig =
+{
+	// [general]
+	64,    // backlight
+	5,     // backlightSteps
+	false, // directBoot
+	true,  // useGbaDb
+
+	// [video]
+	2,     // scaler
+	2.2f,  // gbaGamma
+	1.54f, // lcdGamma
+	1.f,   // contrast
+	0.f,   // brightness
+
+	// [audio]
+	0,     // Automatic audio output.
+	127,   // Control via volume slider.
+
+	// [input]
+	{      // buttonMaps
+		0, // A
+		0, // B
+		0, // Select
+		0, // Start
+		0, // Right
+		0, // Left
+		0, // Up
+		0, // Down
+		0, // R
+		0  // L
+	},
+
+	// [game]
+	0,     // saveSlot
+	0xFF,  // saveType
+
+	// [advanced]
+	false, // saveOverride
+	14     // defaultSave
+};
 
 
 
@@ -149,11 +193,12 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 }
 
 // TODO: Instead of writing a hardcoded string turn default config into a string.
-Result parseOafConfig(const char *const path, OafConfig *const cfg, const bool newCfgOnError)
+Result parseOafConfig(const char *const path, OafConfig *cfg, const bool newCfgOnError)
 {
 	char *iniBuf = (char*)calloc(INI_BUF_SIZE, 1);
 	if(iniBuf == NULL) return RES_OUT_OF_MEM;
 
+	cfg = (cfg != NULL ? cfg : &g_oafConfig);
 	Result res = fsQuickRead(path, iniBuf, INI_BUF_SIZE - 1);
 	if(res == RES_OK) ini_parse_string(iniBuf, cfgIniCallback, cfg);
 	else if(newCfgOnError)

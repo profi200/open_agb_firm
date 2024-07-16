@@ -1,6 +1,6 @@
 /*
  *   This file is part of open_agb_firm
- *   Copyright (C) 2021 derrek, profi200
+ *   Copyright (C) 2024 derrek, profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -16,83 +16,30 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
-#include "arm11/config.h"
 #include "util.h"
-#include "arm11/drivers/lgy11.h"
-#include "drivers/lgy_common.h"
 #include "arm_intrinsic.h"
 #include "oaf_error_codes.h"
 #include "fs.h"
-#include "fsutil.h"
 #include "arm11/fmt.h"
-#include "arm11/drivers/gx.h"
-#include "arm11/drivers/lgycap.h"
-#include "drivers/gfx.h"
 #include "arm11/drivers/mcu.h"
-#include "kernel.h"
-#include "kevent.h"
-#include "arm11/gpu_cmd_lists.h"
+#include "drivers/gfx.h"
 #include "arm11/drivers/hid.h"
+#include "fsutil.h"
 #include "arm11/filebrowser.h"
-#include "arm11/drivers/codec.h"
+#include "arm11/config.h"
 #include "arm11/save_type.h"
 #include "arm11/patch.h"
-#include "arm11/bitmap.h"
+#include "arm11/drivers/codec.h"
+#include "drivers/lgy_common.h"
+#include "arm11/oaf_video.h"
+#include "arm11/drivers/lgy11.h"
+#include "kernel.h"
+#include "kevent.h"
 
 
-#define OAF_WORK_DIR        "sdmc:/3ds/open_agb_firm"
-#define OAF_SAVE_DIR        "saves"       // Relative to work dir.
-#define OAF_SCREENSHOT_DIR  "screenshots" // Relative to work dir.
-
-
-
-// Default config.
-// Note: Keep this synchronized with DEFAULT_CONFIG in config.c.
-static OafConfig g_oafConfig =
-{
-	// [general]
-	64,    // backlight
-	5,     // backlightSteps
-	false, // directBoot
-	true,  // useGbaDb
-
-	// [video]
-	2,     // scaler
-	2.2f,  // gbaGamma
-	1.54f, // lcdGamma
-	1.f,   // contrast
-	0.f,   // brightness
-
-	// [audio]
-	0,     // Automatic audio output.
-	127,   // Control via volume slider.
-
-	// [input]
-	{      // buttonMaps
-		0, // A
-		0, // B
-		0, // Select
-		0, // Start
-		0, // Right
-		0, // Left
-		0, // Up
-		0, // Down
-		0, // R
-		0  // L
-	},
-
-	// [game]
-	0,     // saveSlot
-	0xFF,  // saveType
-
-	// [advanced]
-	false, // saveOverride
-	14     // defaultSave
-};
 static KHandle g_frameReadyEvent = 0;
 
 
@@ -156,151 +103,6 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	}
 
 	return res;
-}
-
-static void adjustGammaTableForGba(void)
-{
-	// Credits for this algo go to Extrems.
-	const float targetGamma = g_oafConfig.gbaGamma;
-	const float lcdGamma    = 1.f / g_oafConfig.lcdGamma;
-	const float contrast    = g_oafConfig.contrast;
-	const float brightness  = g_oafConfig.brightness / contrast;
-	const float contrastInTargetGamma = powf(contrast, targetGamma);
-	vu32 *const color_lut_data = &getGxRegs()->pdc0.color_lut_data;
-	for(u32 i = 0; i < 256; i++)
-	{
-		// Adjust i with brightness and convert to target gamma.
-		const float adjusted = powf((float)i / 255 + brightness, targetGamma);
-
-		// Apply contrast, convert to LCD gamma, round to nearest and clamp.
-		const u32 res = clamp_s32(lroundf(powf(contrastInTargetGamma * adjusted, lcdGamma) * 255), 0, 255);
-
-		// Same adjustment for red/green/blue.
-		*color_lut_data = res<<16 | res<<8 | res;
-	}
-}
-
-static Result dumpFrameTex(void)
-{
-	// Stop LgyCap before dumping the frame to prevent glitches.
-	LGYCAP_stop(LGYCAP_DEV_TOP);
-
-	// A1BGR5 format (alpha ignored).
-	constexpr u32 alignment = 0x80; // Make PPF happy.
-	alignas(4) static BmpV1WithMasks bmpHeaders =
-	{
-		{
-			.magic       = 0x4D42,
-			.fileSize    = alignment + 240 * 160 * 2,
-			.reserved    = 0,
-			.reserved2   = 0,
-			.pixelOffset = alignment
-		},
-		{
-			.headerSize      = sizeof(Bitmapinfoheader),
-			.width           = 240,
-			.height          = -160,
-			.colorPlanes     = 1,
-			.bitsPerPixel    = 16,
-			.compression     = BI_BITFIELDS,
-			.imageSize       = 240 * 160 * 2,
-			.xPixelsPerMeter = 0,
-			.yPixelsPerMeter = 0,
-			.colorsUsed      = 0,
-			.colorsImportant = 0
-		},
-		.rMask = 0xF800,
-		.gMask = 0x07C0,
-		.bMask = 0x003E
-	};
-
-	u32 outDim   = PPF_DIM(240, 160);
-	u32 fileSize = alignment + 240 * 160 * 2;
-	if(g_oafConfig.scaler > 1)
-	{
-		outDim   = PPF_DIM(360, 240);
-		fileSize = alignment + 360 * 240 * 2;
-
-		bmpHeaders.header.fileSize = fileSize;
-		bmpHeaders.dib.width     = 360;
-		bmpHeaders.dib.height    = -240;
-		bmpHeaders.dib.imageSize = 360 * 240 * 2;
-	}
-
-	// Transfer frame data out of the 512x512 texture.
-	// We will use the currently hidden frame buffer as temporary buffer.
-	// Note: This is a race with the currently displaying frame buffer
-	//       because we just swapped buffers in the gfx handler function.
-	u32 *const tmpBuf = GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT);
-	GX_displayTransfer((u32*)0x18200000, PPF_DIM(512, 240), tmpBuf + (alignment / 4), outDim,
-	                   PPF_O_FMT(GX_RGB5A1) | PPF_I_FMT(GX_RGB5A1) | PPF_CROP_EN);
-	memcpy(tmpBuf, &bmpHeaders, sizeof(bmpHeaders));
-	GFX_waitForPPF();
-
-	// Get current date & time.
-	RtcTimeDate td;
-	MCU_getRtcTimeDate(&td);
-
-	// Construct file path from date & time. Then write the file.
-	char fn[36];
-	ee_sprintf(fn, OAF_SCREENSHOT_DIR "/%04X_%02X_%02X_%02X_%02X_%02X.bmp",
-	           td.y + 0x2000, td.mon, td.d, td.h, td.min, td.s);
-	const Result res = fsQuickWrite(fn, tmpBuf, fileSize);
-
-	// Restart LgyCap.
-	LGYCAP_start(LGYCAP_DEV_TOP);
-
-	return res;
-}
-
-static void gbaGfxHandler(void *args)
-{
-	const KHandle event = (KHandle)args;
-
-	while(1)
-	{
-		if(waitForEvent(event) != KRES_OK) break;
-		clearEvent(event);
-
-		// All measurements are the worst timings in ~30 seconds of runtime.
-		// Measured with timer prescaler 1.
-		// BGR8:
-		// 240x160 no scaling:    ~184 µs
-		// 240x160 bilinear x1.5: ~408 µs
-		// 360x240 no scaling:    ~437 µs
-		//
-		// A1BGR5:
-		// 240x160 no scaling:    ~188 µs (25300 ticks)
-		// 240x160 bilinear x1.5: ~407 µs (54619 ticks)
-		// 360x240 no scaling:    ~400 µs (53725 ticks)
-		static bool inited = false;
-		u32 listSize;
-		const u32 *list;
-		if(inited == false)
-		{
-			inited = true;
-
-			listSize = sizeof(gbaGpuInitList);
-			list = (u32*)gbaGpuInitList;
-		}
-		else
-		{
-			listSize = sizeof(gbaGpuList2);
-			list = (u32*)gbaGpuList2;
-		}
-		GX_processCommandList(listSize, list);
-		GFX_waitForP3D();
-		GX_displayTransfer((u32*)GPU_RENDER_BUF_ADDR, PPF_DIM(240, 400), GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT),
-		                   PPF_DIM(240, 400), PPF_O_FMT(GX_BGR8) | PPF_I_FMT(GX_BGR8));
-		GFX_waitForPPF();
-		GFX_swapBuffers();
-
-		// Trigger only if both are held and at least one is detected as newly pressed down.
-		if(hidKeysHeld() == (KEY_Y | KEY_SELECT) && hidKeysDown() != 0)
-			dumpFrameTex();
-	}
-
-	taskExit();
 }
 
 void changeBacklight(s16 amount)
@@ -468,48 +270,6 @@ Result oafParseConfigEarly(void)
 	return res;
 }
 
-static KHandle setupFrameCapture(const u8 scaler)
-{
-	const bool is240x160 = scaler < 2;
-	static s16 matrix[12 * 8] =
-	{
-		// Vertical.
-		      0,       0,       0,       0,       0,       0,       0,       0,
-		      0,       0,       0,       0,       0,       0,       0,       0,
-		      0,  0x24B0,  0x4000,       0,  0x24B0,  0x4000,       0,       0,
-		 0x4000,  0x2000,       0,  0x4000,  0x2000,       0,       0,       0,
-		      0,  -0x4B0,       0,       0,  -0x4B0,       0,       0,       0,
-		      0,       0,       0,       0,       0,       0,       0,       0,
-
-		// Horizontal.
-		      0,       0,       0,       0,       0,       0,       0,       0,
-		      0,       0,       0,       0,       0,       0,       0,       0,
-		      0,       0,  0x24B0,       0,       0,  0x24B0,       0,       0,
-		 0x4000,  0x4000,  0x2000,  0x4000,  0x4000,  0x2000,       0,       0,
-		      0,       0,  -0x4B0,       0,       0,  -0x4B0,       0,       0,
-		      0,       0,       0,       0,       0,       0,       0,       0
-	};
-
-	const Result res = fsQuickRead("gba_scaler_matrix.bin", matrix, sizeof(matrix));
-	if(res != RES_OK && res != RES_FR_NO_FILE)
-	{
-		ee_printf("Failed to load hardware scaling matrix: %s\n", result2String(res));
-	}
-
-	LgyCapCfg gbaCfg;
-	gbaCfg.cnt   = LGYCAP_OUT_SWIZZLE | LGYCAP_ROT_NONE | LGYCAP_OUT_FMT_A1BGR5 | (is240x160 ? 0 : LGYCAP_HSCALE_EN | LGYCAP_VSCALE_EN);
-	gbaCfg.w     = (is240x160 ? 240 : 360);
-	gbaCfg.h     = (is240x160 ? 160 : 240);
-	gbaCfg.vLen  = 6;
-	gbaCfg.vPatt = 0b00011011;
-	memcpy(gbaCfg.vMatrix, matrix, 6 * 8 * 2);
-	gbaCfg.hLen  = 6;
-	gbaCfg.hPatt = 0b00011011;
-	memcpy(gbaCfg.hMatrix, &matrix[6 * 8], 6 * 8 * 2);
-
-	return LGYCAP_init(LGYCAP_DEV_TOP, &gbaCfg);
-}
-
 Result oafInitAndRun(void)
 {
 	Result res;
@@ -565,41 +325,15 @@ Result oafInitAndRun(void)
 			res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath);
 			if(res == RES_OK)
 			{
-#ifdef NDEBUG
-				// Force black and turn the backlight off on the bottom screen.
-				// Don't turn the backlight off on 2DS (1 panel).
-				GFX_setForceBlack(false, true);
-				if(MCU_getSystemModel() != SYS_MODEL_2DS)
-					GFX_powerOffBacklight(GFX_BL_BOT);
-#endif
+				// Initialize video output (frame capture, post processing ect.).
+				g_frameReadyEvent = OAF_videoInit();
 
-				// Initialize frame capture and frame handler.
-				const KHandle frameReadyEvent = setupFrameCapture(g_oafConfig.scaler);
-				patchGbaGpuCmdList(g_oafConfig.scaler);
-				createTask(0x800, 3, gbaGfxHandler, (void*)frameReadyEvent);
-				g_frameReadyEvent = frameReadyEvent;
-
-				// Adjust gamma table and setup button overrides.
-				adjustGammaTableForGba();
+				// Setup button overrides.
 				const u32 *const maps = g_oafConfig.buttonMaps;
 				u16 overrides = 0;
 				for(unsigned i = 0; i < 10; i++)
 					if(maps[i] != 0) overrides |= 1u<<i;
 				LGY11_selectInput(overrides);
-
-				// Load border if any exists.
-				if(g_oafConfig.scaler == 0) // No borders for scaled modes.
-				{
-					// Abuse currently invisible frame buffer as temporary buffer.
-					void *const borderBuf = GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT);
-					if(fsQuickRead("border.bgr", borderBuf, 400 * 240 * 3) == RES_OK)
-					{
-						// Copy border in swizzled form to GPU render buffer.
-						GX_displayTransfer(borderBuf, PPF_DIM(240, 400), (u32*)GPU_RENDER_BUF_ADDR,
-						                   PPF_DIM(240, 400), PPF_O_FMT(GX_BGR8) | PPF_I_FMT(GX_BGR8) | PPF_OUT_TILED);
-						GFX_waitForPPF();
-					}
-				}
 
 				// Sync LgyCap start with LCD VBlank.
 				GFX_waitForVBlank0();
@@ -634,8 +368,7 @@ void oafUpdate(void)
 void oafFinish(void)
 {
 	// frameReadyEvent deleted by this function.
-	// gbaGfxHandler() will automatically terminate.
-	LGYCAP_deinit(LGYCAP_DEV_TOP);
+	OAF_videoExit();
 	g_frameReadyEvent = 0;
 	LGY11_deinit();
 }
