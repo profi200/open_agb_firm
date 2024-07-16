@@ -244,9 +244,10 @@ u16 getSaveType(const OafConfig *const cfg, const u32 romSize, const char *const
 		cursor = saveTypeCursorLut[saveType];
 	while(1)
 	{
-		ee_printf("\x1b[%u;H ", oldCursor + 6);
-		ee_printf("\x1b[%u;H>", cursor + 6);
+		ee_printf("\x1b[%u;H ", oldCursor + 7);
+		ee_printf("\x1b[%u;H>", cursor + 7);
 		oldCursor = cursor;
+		GFX_flushBuffers();
 
 		u32 kDown;
 		do
