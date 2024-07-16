@@ -31,7 +31,7 @@
 int main(void)
 {
 	Result res = oafParseConfigEarly();
-	GFX_init(GFX_BGR8, GFX_R5G6B5, GFX_TOP_2D);
+	GFX_init(GFX_BGR8, GFX_BGR565, GFX_TOP_2D);
 	changeBacklight(0); // Apply backlight config.
 	consoleInit(GFX_LCD_BOT, NULL);
 	//CODEC_init();
