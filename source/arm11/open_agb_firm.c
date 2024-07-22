@@ -363,6 +363,7 @@ void oafUpdate(void)
 	CODEC_runHeadphoneDetection();
 	updateBacklight();
 	waitForEvent(g_frameReadyEvent);
+	clearEvent(g_frameReadyEvent);
 }
 
 void oafFinish(void)

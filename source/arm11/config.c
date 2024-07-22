@@ -36,7 +36,8 @@
                         "gbaGamma=2.2\n"          \
                         "lcdGamma=1.54\n"         \
                         "contrast=1.0\n"          \
-                        "brightness=0.0\n\n"      \
+                        "brightness=0.0\n"        \
+                        "colorProfile=none\n\n"   \
                         "[audio]\n"               \
                         "audioOut=0\n"            \
                         "volume=127\n\n"          \
@@ -61,6 +62,7 @@ OafConfig g_oafConfig =
 	1.54f, // lcdGamma
 	1.f,   // contrast
 	0.f,   // brightness
+	0,     // colorProfile
 
 	// [audio]
 	0,     // Automatic audio output.
@@ -154,6 +156,19 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 			config->contrast = str2float(value);
 		else if(strcmp(name, "brightness") == 0)
 			config->brightness = str2float(value);
+		else if(strcmp(name, "colorProfile") == 0)
+		{
+			if(strcmp(value, "none") == 0)
+				config->colorProfile = 0;
+			else if(strcmp(value, "gba") == 0)
+				config->colorProfile = 1;
+			else if(strcmp(value, "nds") == 0)
+				config->colorProfile = 2;
+			else if(strcmp(value, "nds_white") == 0)
+				config->colorProfile = 3;
+			//else if(strcmp(value, "custom") == 0) // TODO: Implement user provided profile.
+			//	config->colorProfile = 4;
+		}
 	}
 	else if(strcmp(section, "audio") == 0)
 	{

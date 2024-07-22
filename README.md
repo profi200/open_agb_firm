@@ -79,6 +79,9 @@ Video-related settings.
 `float brightness` - Screen lift
 * Default: `0.0`
 
+`string colorProfile` - Color correction profile. `none`, `gba`, `nds` or `nds_white`.
+* Default: `none`
+
 ### Audio
 Audio settings.
 
@@ -255,8 +258,9 @@ You may use this under the terms of the GNU General Public License GPL v3 or the
 * **MAME**
 * **No-Intro**
 * **Wolfvak, Sono and all the other people in #GodMode9 on freenode/Discord**
-* **endrift, Extrems and all the other people in #mgba on freenode**
+* **endrift, Extrems and all the other people in #mgba on Libera.Chat**
 * **Oleh Prypin (oprypin) for nightly.link**
+* **hunterk and Pokefan531 for their amazing libretro shaders**
 * ...everyone who contributed to **3dbrew.org**
 
-Copyright (C) 2021 derrek, profi200, d0k3
+Copyright (C) 2024 derrek, profi200, d0k3

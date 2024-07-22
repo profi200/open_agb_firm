@@ -167,8 +167,16 @@ alignas(16) u8 gbaGpuList2[GBA_LIST2_SIZE] =
 
 
 
-void patchGbaGpuCmdList(u8 scaleType)
+void patchGbaGpuCmdList(const u8 scaleType, const bool useSecondTexture)
 {
+	if(useSecondTexture)
+	{
+		u32 tmp = GPU_TEXTURE2_ADDR>>3;
+		memcpy(&gbaGpuInitList[580], &tmp, 4);
+		tmp = 0;
+		memcpy(&gbaGpuInitList[584], &tmp, 4);
+	}
+
 	if(scaleType == 0)
 	{
 		u32 tmp = 0x4440;
@@ -215,7 +223,7 @@ void patchGbaGpuCmdList(u8 scaleType)
 		memcpy(&gbaGpuList2[316], &tmp, 4);
 		memcpy(&gbaGpuList2[380], &tmp, 4);
 	}
-	else return; // Nothing to do.
+	// else nothing to do.
 
 	flushDCacheRange(gbaGpuInitList, sizeof(gbaGpuInitList));
 	flushDCacheRange(gbaGpuList2, sizeof(gbaGpuList2));

@@ -21,6 +21,7 @@
 #include "types.h"
 #include "arm11/config.h"
 #include "arm11/drivers/gx.h"
+#include "drivers/cache.h"
 #include "util.h"
 #include "oaf_error_codes.h"
 #include "arm11/drivers/lgycap.h"
@@ -31,8 +32,17 @@
 #include "fsutil.h"
 #include "kernel.h"
 #include "kevent.h"
-#include "arm11/gpu_cmd_lists.h"
 #include "arm11/drivers/hid.h"
+#include "arm11/drivers/interrupt.h"
+#include "arm11/gpu_cmd_lists.h"
+#include "system.h"
+#include "arm11/fast_frame_convert.h"
+
+
+#define COLOR_LUT_ADDR (0x1FF00000u)
+
+
+static KHandle g_convFinishedEvent = 0;
 
 
 
@@ -56,6 +66,108 @@ static void adjustGammaTableForGba(void)
 		// Same adjustment for red/green/blue.
 		*color_lut_data = res<<16 | res<<8 | res;
 	}
+}
+
+typedef struct
+{
+	float targetGamma;
+	float lum;
+	float  r, gr, br;
+	float rg,  g, bg;
+	float rb, gb,  b;
+	float displayGamma;
+} ColorProfile;
+
+static const ColorProfile g_colorProfiles[3] =
+{
+	{ // libretro GBA color (sRGB). Credits: hunterk and Pokefan531.
+		2.f + 0.5f,
+		0.93f,
+		0.8f,   0.275f, -0.075f,
+		0.135f, 0.64f,   0.225f,
+		0.195f, 0.155f,  0.65f,
+		1.f / 2.f
+	},
+	{ // libretro DS phat (sRGB). Credits: hunterk and Pokefan531.
+		2.f,
+		1.f,
+		0.705f,  0.235f,  -0.075f,
+		0.09f,   0.585f,   0.24f,
+		0.1075f, 0.1725f,  0.72f,
+		1.f / 2.f
+	},
+	{ // libretro DS phat white (sRGB). Credits: hunterk and Pokefan531.
+		2.f,
+		0.915f,
+		0.815f,  0.275f,  -0.09f,
+		0.1f,    0.64f,    0.26f,
+		0.1075f, 0.1725f,  0.72f,
+		1.f / 2.f
+	}
+};
+
+ALWAYS_INLINE float clamp_float(const float x, const float min, const float max)
+{
+	return (x < min ? min : (x > max ? max : x));
+}
+
+static void makeColorLut(const ColorProfile *const p)
+{
+	u32 *colorLut = (u32*)COLOR_LUT_ADDR;
+	for(u32 i = 0; i < 32768; i++)
+	{
+		// Convert to 8-bit and normalize.
+		float b = (float)rgbFive2Eight(i & 31u) / 255;
+		float g = (float)rgbFive2Eight((i>>5) & 31u) / 255;
+		float r = (float)rgbFive2Eight(i>>10) / 255;
+
+		// Convert to linear gamma.
+		const float targetGamma = p->targetGamma;
+		b = powf(b, targetGamma);
+		g = powf(g, targetGamma);
+		r = powf(r, targetGamma);
+
+		// Apply luminance.
+		const float lum = p->lum;
+		b = clamp_float(b * lum, 0.f, 1.f);
+		g = clamp_float(g * lum, 0.f, 1.f);
+		r = clamp_float(r * lum, 0.f, 1.f);
+
+		/*
+		 *               Input
+		 *                [r]
+		 *                [g]
+		 *                [b]
+		 *
+		 * Correction    Output
+		 * [ r][gr][br]   [r]
+		 * [rg][ g][bg]   [g]
+		 * [rb][gb][ b]   [b]
+		*/
+		// Assuming no alpha channel in original calculation.
+		float newB = p->rb * r + p->gb * g + p->b * b;
+		float newG = p->rg * r + p->g * g + p->bg * b;
+		float newR = p->r * r + p->gr * g + p->br * b;
+
+		newB = (newB < 0.f ? 0.f : newB);
+		newG = (newG < 0.f ? 0.f : newG);
+		newR = (newR < 0.f ? 0.f : newR);
+
+		// Convert to display gamma.
+		const float displayGamma = p->displayGamma;
+		newB = powf(newB, displayGamma);
+		newG = powf(newG, displayGamma);
+		newR = powf(newR, displayGamma);
+
+		// Denormalize, clamp, convert to ABGR8 and write lut.
+		u32 tmp = 0xFF; // Alpha.
+		tmp |= clamp_s32(lroundf(newB * 255), 0, 255)<<8;
+		tmp |= clamp_s32(lroundf(newG * 255), 0, 255)<<16;
+		tmp |= clamp_s32(lroundf(newR * 255), 0, 255)<<24;
+		*colorLut++ = tmp;
+	}
+
+	flushDCacheRange((void*)COLOR_LUT_ADDR, 1024u * 128);
 }
 
 static Result dumpFrameTex(void)
@@ -110,7 +222,7 @@ static Result dumpFrameTex(void)
 	// Note: This is a race with the currently displaying frame buffer
 	//       because we just swapped buffers in the gfx handler function.
 	u32 *const tmpBuf = GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT);
-	GX_displayTransfer((u32*)0x18200000, PPF_DIM(512, 240), tmpBuf + (alignment / 4), outDim,
+	GX_displayTransfer((u32*)GPU_TEXTURE_ADDR, PPF_DIM(512, 240), tmpBuf + (alignment / 4), outDim,
 	                   PPF_O_FMT(GX_A1BGR5) | PPF_I_FMT(GX_A1BGR5) | PPF_CROP_EN);
 	memcpy(tmpBuf, &bmpHeaders, sizeof(bmpHeaders));
 	GFX_waitForPPF();
@@ -129,6 +241,11 @@ static Result dumpFrameTex(void)
 	LGYCAP_start(LGYCAP_DEV_TOP);
 
 	return res;
+}
+
+static void convFinishedHandler(UNUSED const u32 intSource)
+{
+	signalEvent(g_convFinishedEvent, false);
 }
 
 static void gbaGfxHandler(void *args)
@@ -181,7 +298,7 @@ static void gbaGfxHandler(void *args)
 	taskExit();
 }
 
-static KHandle setupFrameCapture(const u8 scaler)
+static KHandle setupFrameCapture(const u8 scaler, const bool colorCorrectionEnabled)
 {
 	const bool is240x160 = scaler < 2;
 	static s16 matrix[12 * 8] =
@@ -213,7 +330,7 @@ static KHandle setupFrameCapture(const u8 scaler)
 	gbaCfg.cnt   = LGYCAP_SWIZZLE | LGYCAP_ROT_NONE | LGYCAP_FMT_A1BGR5 | (is240x160 ? 0 : LGYCAP_HSCALE_EN | LGYCAP_VSCALE_EN);
 	gbaCfg.w     = (is240x160 ? 240 : 360);
 	gbaCfg.h     = (is240x160 ? 160 : 240);
-	gbaCfg.irq   = 0;
+	gbaCfg.irq   = (colorCorrectionEnabled ? LGYCAP_IRQ_DMA_REQ : 0); // We need the DMA request IRQ for core 1.
 	gbaCfg.vLen  = 6;
 	gbaCfg.vPatt = 0b00011011;
 	memcpy(gbaCfg.vMatrix, matrix, 6 * 8 * 2);
@@ -234,13 +351,41 @@ KHandle OAF_videoInit(void)
 		GFX_powerOffBacklight(GFX_BL_BOT);
 #endif
 
-	// Initialize frame capture and frame handler.
+	// Initialize frame capture.
 	const u8 scaler = g_oafConfig.scaler;
-	const KHandle frameReadyEvent = setupFrameCapture(scaler);
-	patchGbaGpuCmdList(scaler);
-	createTask(0x800, 3, gbaGfxHandler, (void*)frameReadyEvent);
+	const u8 colorProfile = g_oafConfig.colorProfile;
+	KHandle frameReadyEvent;
+	KHandle convFinishedEvent;
+	if(colorProfile > 0)
+	{
+		// Start capture hardware and create event handles.
+		frameReadyEvent = setupFrameCapture(scaler, true);
+		convFinishedEvent = createEvent(false);
+		g_convFinishedEvent = convFinishedEvent;
 
-	// Adjust gamma table and setup button overrides.
+		// Patch GPU cmd list with texture location 2.
+		patchGbaGpuCmdList(scaler, true);
+
+		// Compute the (linear) 3D lookup table.
+		makeColorLut(&g_colorProfiles[colorProfile - 1]);
+
+		// Register IPI handler and start core 1 for color conversion.
+		IRQ_registerIsr(IRQ_IPI15, 13, 0, convFinishedHandler);
+		__systemBootCore1((scaler < 2 ? convert160pFrameFast : convert240pFrameFast));
+	}
+	else
+	{
+		// Start capture hardware.
+		frameReadyEvent = setupFrameCapture(scaler, false);
+
+		// Patch GPU cmd list with texture location 1.
+		patchGbaGpuCmdList(scaler, false);
+	}
+
+	// Start frame handler.
+	createTask(0x800, 3, gbaGfxHandler, (void*)(colorProfile > 0 ? convFinishedEvent : frameReadyEvent));
+
+	// Adjust hardware gamma table.
 	adjustGammaTableForGba();
 
 	// Load border if any exists.
@@ -265,4 +410,9 @@ void OAF_videoExit(void)
 	// frameReadyEvent deleted by this function.
 	// gbaGfxHandler() will automatically terminate.
 	LGYCAP_deinit(LGYCAP_DEV_TOP);
+	if(g_convFinishedEvent != 0)
+	{
+		deleteEvent(g_convFinishedEvent);
+		g_convFinishedEvent = 0;
+	}
 }
