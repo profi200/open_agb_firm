@@ -46,6 +46,7 @@ typedef struct
 	float lcdGamma;
 	float contrast;
 	float brightness;
+	u8 colorProfile;    // 0 = none, 1 = GBA, 2 = DS phat, 3 = DS phat white.
 
 	// [audio]
 	u8 audioOut;        // 0 = auto, 1 = speakers, 2 = headphones.

@@ -2,7 +2,7 @@
 
 /*
  *   This file is part of open_agb_firm
- *   Copyright (C) 2021 derrek, profi200
+ *   Copyright (C) 2024 profi200
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "types.h"
 
 
 #ifdef __cplusplus
@@ -26,19 +25,8 @@ extern "C"
 {
 #endif
 
-#define GPU_RENDER_BUF_ADDR  (0x18180000)
-#define GPU_TEXTURE_ADDR     (0x18200000)
-#define GPU_TEXTURE2_ADDR    (0x18300000)
-#define GBA_INIT_LIST_SIZE   (1136)
-#define GBA_LIST2_SIZE       (448)
-
-
-extern u8 gbaGpuInitList[GBA_INIT_LIST_SIZE];
-extern u8 gbaGpuList2[GBA_LIST2_SIZE];
-
-
-
-void patchGbaGpuCmdList(const u8 scaleType, const bool useSecondTexture);
+void convert160pFrameFast(void);
+void convert240pFrameFast(void);
 
 #ifdef __cplusplus
 } // extern "C"
