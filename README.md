@@ -25,7 +25,8 @@ Additionally, we are not responsible for any damage that may occur to your syste
 ## Controls
 A/B/L/R/START/SELECT - GBA buttons, respectively
 
-SELECT+Y - Dump screen output to `/3ds/open_agb_firm/texture_dump.bmp`
+SELECT+Y - Dump hardware frame output to `/3ds/open_agb_firm/screenshots/YYYY_MM_DD_HH_MM_SS.bmp`
+* The file name is the current date and time from your real-time clock.
 * If the screen output freezes, press HOME to fix it. This is a hard to track down bug that will be fixed.
 
 X+UP/DOWN - Adjust screen brightness up or down by `backlightSteps` units.
@@ -81,6 +82,9 @@ Video-related settings.
 
 `string colorProfile` - Color correction profile. `none`, `gba`, `nds` or `nds_white`.
 * Default: `none`
+* For the gba profile it's recommended to adjust lcdGamma to match a GBA. For New 3DS XL with IPS LCD roughly 1.8 is good.
+* Due to most 2/3DS LCDs not being calibrated correctly from factory the look may not match exactly what you see on a real GBA.
+* Due to a lot of extra RAM access and up to 6.3 ms (worst case for scaler=2) of extra CPU processing time per frame, battery run time is affected with color profiles other than none.
 
 ### Audio
 Audio settings.
@@ -260,7 +264,7 @@ You may use this under the terms of the GNU General Public License GPL v3 or the
 * **Wolfvak, Sono and all the other people in #GodMode9 on freenode/Discord**
 * **endrift, Extrems and all the other people in #mgba on Libera.Chat**
 * **Oleh Prypin (oprypin) for nightly.link**
-* **hunterk and Pokefan531 for their amazing libretro shaders**
+* **[hunterk and Pokefan531 for their amazing libretro shaders](https://forums.libretro.com/t/real-gba-and-ds-phat-colors/1540/220)**
 * ...everyone who contributed to **3dbrew.org**
 
 Copyright (C) 2024 derrek, profi200, d0k3
