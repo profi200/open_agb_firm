@@ -20,7 +20,7 @@
 #include <string.h>
 #include "types.h"
 #include "util.h"
-#include "arm_intrinsic.h"
+#include "arm11/fast_rom_padding.h"
 #include "oaf_error_codes.h"
 #include "fs.h"
 #include "arm11/fmt.h"
@@ -49,9 +49,9 @@ static u32 fixRomPadding(const u32 romFileSize)
 	// Pad unused ROM area with 0xFFs (trimmed ROMs).
 	// Smallest retail ROM chip is 8 Mbit (1 MiB).
 	u32 romSize = nextPow2(romFileSize);
-	if(romSize < 0x100000) romSize = 0x100000;
+	romSize = (romSize < 0x100000 ? 0x100000 : romSize);
 	const uintptr_t romLoc = LGY_ROM_LOC;
-	memset((void*)(romLoc + romFileSize), 0xFFFFFFFF, romSize - romFileSize);
+	memset((void*)(romLoc + romFileSize), 0xFF, romSize - romFileSize);
 
 	u32 mirroredSize = romSize;
 	if(romSize == 0x100000) // 1 MiB.
@@ -69,13 +69,7 @@ static u32 fixRomPadding(const u32 romFileSize)
 	}
 
 	// Fake "open bus" padding.
-	u32 padding = (romLoc + mirroredSize) / 2;
-	padding = __pkhbt(padding, padding + 1, 16); // Copy lower half + 1 to upper half.
-	for(uintptr_t i = romLoc + mirroredSize; i < romLoc + LGY_MAX_ROM_SIZE; i += 4)
-	{
-		*(u32*)i = padding;
-		padding = __uadd16(padding, 0x20002); // Unsigned parallel halfword-wise addition.
-	}
+	makeOpenBusPaddingFast((u32*)(romLoc + mirroredSize));
 
 	// We don't return the mirrored size because the db hashes are over unmirrored dumps.
 	return romSize;
