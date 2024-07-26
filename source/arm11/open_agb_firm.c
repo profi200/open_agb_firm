@@ -69,7 +69,8 @@ static u32 fixRomPadding(const u32 romFileSize)
 	}
 
 	// Fake "open bus" padding.
-	makeOpenBusPaddingFast((u32*)(romLoc + mirroredSize));
+	if(romSize < LGY_MAX_ROM_SIZE)
+		makeOpenBusPaddingFast((u32*)(romLoc + mirroredSize));
 
 	// We don't return the mirrored size because the db hashes are over unmirrored dumps.
 	return romSize;
