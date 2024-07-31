@@ -92,7 +92,8 @@ static Result scanDir(const char *const path, DirList *const dList, const char *
 				const u32 nameLen = strlen(fis[i].fname);
 				if(entType == ENT_TYPE_FILE)
 				{
-					if(nameLen <= filterLen || strcmp(filter, fis[i].fname + nameLen - filterLen) != 0)
+					if(nameLen <= filterLen || strcmp(filter, fis[i].fname + nameLen - filterLen) != 0
+					   || fis[i].fname[0] == '.')
 						continue;
 				}
 
