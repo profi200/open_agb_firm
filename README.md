@@ -8,10 +8,12 @@ open_agb_firm is also a complete and better alternative to GBA VC injects (AGB_F
 * User configuration, such as gamma settings
 * Button remapping
 * Border support for 1:1 scaling mode
+* Gamma correction to fix the washed out look of games
+* Color correction to mimic the look of the GBA/DS phat LCD
 * And more to come!
 
 ## Disclaimer
-open_agb_firm is currently in alpha. While open_agb_firm is relatively stable and safe to use, some quirks that have not been fixed. See [Known Issues](#known-issues) for more information.
+open_agb_firm is currently in beta. While open_agb_firm is relatively stable and safe to use, some quirks that have not been fixed. See [Known Issues](#known-issues) for more information.
 
 Additionally, we are not responsible for any damage that may occur to your system as a direct or indirect result of you using open_agb_firm.
 
