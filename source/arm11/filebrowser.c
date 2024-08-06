@@ -145,16 +145,62 @@ Result browseFiles(const char *const basePath, char selected[512])
 	if(curDir == NULL) return RES_OUT_OF_MEM;
 	safeStrcpy(curDir, basePath, 512);
 
+	// Check if full rom path was passed in (ends in .gba)
+	bool isRomPath = strstr(basePath, ".gba") == basePath + strlen(basePath) - 4;
+	char* preselectedRomName = NULL;
+	// Convert rom path to base path
+	if (isRomPath)
+	{
+		size_t cmpLen = strrchr(basePath, '/') - basePath;
+		cmpLen++; 
+		if (cmpLen < 512)
+		{
+			if (cmpLen < strlen(basePath))
+			{
+				// Double null as insecure code on KEY_A 
+				//  replaces null terminator with '/'
+				//  and does not null terminate it.
+				curDir[cmpLen] = '\0';
+				// Remove trailing / as it causes KEY_B 
+				//  to navigate to the same directory initially
+				curDir[cmpLen-1] = '\0';
+			}
+		}
+		preselectedRomName = basePath + cmpLen;
+	}
+	
 	DirList *const dList = (DirList*)malloc(sizeof(DirList));
 	if(dList == NULL) return RES_OUT_OF_MEM;
 
 	Result res;
 	if((res = scanDir(curDir, dList, ".gba")) != RES_OK) goto end;
-	showDirList(dList, 0);
 
 	s32 cursorPos = 0; // Within the entire list.
 	u32 windowPos = 0; // Window start position within the list.
 	s32 oldCursorPos = 0;
+
+	// Look for preselected rom and set cursor and window position to it
+	if (preselectedRomName != NULL)
+	{
+		for (int i = 0; i < dList->num; i++)
+		{
+			
+			char* romName = &dList->ptrs[i][1];
+
+			if (strncmp(preselectedRomName, romName, 512) == 0)
+			{
+				// Found preselected rom
+				windowPos = i;
+				cursorPos = i;
+				break;
+			}
+		}
+
+	}
+
+	// Show dir list with preselected rom or default location
+	showDirList(dList, windowPos);
+
 	while(1)
 	{
 		ee_printf("\x1b[%lu;H ", oldCursorPos - windowPos + 1);      // Clear old cursor.
