@@ -220,12 +220,12 @@ static void makeColorLut(const ColorProfile *const p)
 
 static Result dumpFrameTex(void)
 {
-	// Stop LgyCap before dumping the frame to prevent glitches.
-	LGYCAP_stop(LGYCAP_DEV_TOP);
+	if(LGYCAP_captureFrameUnscaled(LGYCAP_DEV_TOP) != KRES_OK)
+		return RES_INVALID_ARG;
 
 	// A1BGR5 format (alpha ignored).
 	constexpr u32 alignment = 0x80; // Make PPF happy.
-	alignas(4) static BmpV1WithMasks bmpHeaders =
+	alignas(4) static const BmpV1WithMasks bmpHeaders =
 	{
 		{
 			.magic       = 0x4D42,
@@ -252,25 +252,12 @@ static Result dumpFrameTex(void)
 		.bMask = 0x003E
 	};
 
-	u32 outDim   = PPF_DIM(240, 160);
-	u32 fileSize = alignment + 240 * 160 * 2;
-	if(g_oafConfig.scaler > 1)
-	{
-		outDim   = PPF_DIM(360, 240);
-		fileSize = alignment + 360 * 240 * 2;
-
-		bmpHeaders.header.fileSize = fileSize;
-		bmpHeaders.dib.width     = 360;
-		bmpHeaders.dib.height    = -240;
-		bmpHeaders.dib.imageSize = 360 * 240 * 2;
-	}
-
 	// Transfer frame data out of the 512x512 texture.
 	// We will use the currently hidden frame buffer as temporary buffer.
 	// Note: This is a race with the currently displaying frame buffer
 	//       because we just swapped buffers in the gfx handler function.
 	u32 *const tmpBuf = GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT);
-	GX_displayTransfer((u32*)GPU_TEXTURE_ADDR, PPF_DIM(512, 240), tmpBuf + (alignment / 4), outDim,
+	GX_displayTransfer((u32*)GPU_TEXTURE_ADDR, PPF_DIM(512, 160), tmpBuf + (alignment / 4), PPF_DIM(240, 160),
 	                   PPF_O_FMT(GX_A1BGR5) | PPF_I_FMT(GX_A1BGR5) | PPF_CROP_EN);
 	memcpy(tmpBuf, &bmpHeaders, sizeof(bmpHeaders));
 	GFX_waitForPPF();
@@ -282,8 +269,13 @@ static Result dumpFrameTex(void)
 	// Construct file path from date & time. Then write the file.
 	char fn[36];
 	ee_sprintf(fn, OAF_SCREENSHOT_DIR "/%04X_%02X_%02X_%02X_%02X_%02X.bmp",
-	           td.y + 0x2000, td.mon, td.d, td.h, td.min, td.s);
-	const Result res = fsQuickWrite(fn, tmpBuf, fileSize);
+	           td.year + 0x2000, td.mon, td.day, td.hour, td.min, td.sec);
+	const Result res = fsQuickWrite(fn, tmpBuf, bmpHeaders.header.fileSize);
+
+	// Clear overwritten texture area in case we overwrote padding (different resolution).
+	// This is important because padding pixels must be fully transparent to get sharp edges when the GPU renders.
+	GX_memoryFill((u32*)GPU_TEXTURE_ADDR, PSC_FILL_32_BITS, 512 * 160 * 2, 0, NULL, 0, 0, 0);
+	GFX_waitForPSC0();
 
 	// Restart LgyCap.
 	LGYCAP_start(LGYCAP_DEV_TOP);
