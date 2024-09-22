@@ -12,6 +12,8 @@ open_agb_firm is also a complete and better alternative to GBA VC injects (AGB_F
 * Color correction to mimic the look of the GBA/DS phat LCD
 * And more to come!
 
+Unlike AGB_FIRM open_agb_firm is not affected by the famous bug where the video output wraps around leaving garbled lines at the bottom of the screen. SD cluster size doesn't matter.
+
 ## Disclaimer
 open_agb_firm is currently in beta. While open_agb_firm is relatively stable and safe to use, some quirks that have not been fixed. See [Known Issues](#known-issues) for more information.
 
