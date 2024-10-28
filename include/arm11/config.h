@@ -39,6 +39,7 @@ typedef struct
 	u8 backlightSteps;
 	bool directBoot;
 	bool useGbaDb;
+	bool useSavesFolder;
 
 	// [video]
 	u8 scaler;          // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
