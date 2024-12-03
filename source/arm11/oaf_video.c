@@ -126,7 +126,7 @@ typedef struct
 	float displayGamma;
 } ColorProfile;
 
-static const ColorProfile g_colorProfiles[3] =
+static const ColorProfile g_colorProfiles[5] =
 {
 	{ // libretro GBA color (sRGB). Credits: hunterk and Pokefan531.
 		2.f + 0.5f,
@@ -151,6 +151,22 @@ static const ColorProfile g_colorProfiles[3] =
 		0.1f,    0.64f,    0.26f,
 		0.1075f, 0.1725f,  0.72f,
 		1.f / 2.f
+	},
+	{ // libretro Nintendo Switch Online (sRGB). Credits: hunterk and Pokefan531.
+		2.2f + 0.8f,
+		1.f,
+		0.865f,  0.1225f, 0.0125f,
+		0.0575f,  0.925f, 0.0125f,
+		0.0575f, 0.1225f,   0.82f,
+		1.f / 2.2f
+	},
+	{ // Identity.
+		1.f,
+		1.f,
+		1.f, 0.f, 0.f,
+		0.f, 1.f, 0.f,
+		0.f, 0.f, 1.f,
+		1.f / 1.f
 	}
 };
 
@@ -159,9 +175,21 @@ ALWAYS_INLINE float clamp_float(const float x, const float min, const float max)
 	return (x < min ? min : (x > max ? max : x));
 }
 
-static void makeColorLut(const ColorProfile *const p)
+void makeColorLut(const ColorProfile *const p)
 {
-	u32 *colorLut = (u32*)COLOR_LUT_ADDR;
+	const float targetGamma    = p->targetGamma;
+	const float contrast       = g_oafConfig.contrast;
+	const float brightness     = g_oafConfig.brightness / contrast;
+	const float targetContrast = powf(contrast, targetGamma);
+
+	// Calculate saturation weights.
+	// Note: We are using the Rec. 709 luminance vector here.
+	const float sat   = g_oafConfig.saturation;
+	const float rwgt  = (1.f - sat) * 0.2126f;
+	const float gwgt  = (1.f - sat) * 0.7152f;
+	const float bwgt  = (1.f - sat) * 0.0722f;
+
+	u32 *const colorLut = (u32*)COLOR_LUT_ADDR;
 	for(u32 i = 0; i < 32768; i++)
 	{
 		// Convert to 8-bit and normalize.
@@ -170,10 +198,9 @@ static void makeColorLut(const ColorProfile *const p)
 		float r = (float)rgbFive2Eight(i>>10) / 255;
 
 		// Convert to linear gamma.
-		const float targetGamma = p->targetGamma;
-		b = powf(b, targetGamma);
-		g = powf(g, targetGamma);
-		r = powf(r, targetGamma);
+		b = powf(b + brightness, targetGamma);
+		g = powf(g + brightness, targetGamma);
+		r = powf(r + brightness, targetGamma);
 
 		// Apply luminance.
 		const float lum = p->lum;
@@ -193,33 +220,41 @@ static void makeColorLut(const ColorProfile *const p)
 		 * [rb][gb][ b]   [b]
 		*/
 		// Assuming no alpha channel in original calculation.
-		float newB = p->rb * r + p->gb * g + p->b * b;
-		float newG = p->rg * r + p->g * g + p->bg * b;
-		float newR = p->r * r + p->gr * g + p->br * b;
+		float tmpB = p->rb * r + p->gb * g + p->b  * b;
+		float tmpG = p->rg * r + p->g  * g + p->bg * b;
+		float tmpR = p->r  * r + p->gr * g + p->br * b;
 
-		newB = (newB < 0.f ? 0.f : newB);
-		newG = (newG < 0.f ? 0.f : newG);
-		newR = (newR < 0.f ? 0.f : newR);
+		// Apply saturation.
+		// Note: Some duplicated muls here. gcc optimizes them out.
+		b = rwgt         * tmpR + gwgt         * tmpG + (bwgt + sat) * tmpB;
+		g = rwgt         * tmpR + (gwgt + sat) * tmpG + bwgt         * tmpB;
+		r = (rwgt + sat) * tmpR + gwgt         * tmpG + bwgt         * tmpB;
+
+		b = (b < 0.f ? 0.f : b);
+		g = (g < 0.f ? 0.f : g);
+		r = (r < 0.f ? 0.f : r);
 
 		// Convert to display gamma.
 		const float displayGamma = p->displayGamma;
-		newB = powf(newB, displayGamma);
-		newG = powf(newG, displayGamma);
-		newR = powf(newR, displayGamma);
+		b = powf(targetContrast * b, displayGamma);
+		g = powf(targetContrast * g, displayGamma);
+		r = powf(targetContrast * r, displayGamma);
 
 		// Denormalize, clamp, convert to ABGR8 and write lut.
-		u32 tmp = 0xFF; // Alpha.
-		tmp |= clamp_s32(lroundf(newB * 255), 0, 255)<<8;
-		tmp |= clamp_s32(lroundf(newG * 255), 0, 255)<<16;
-		tmp |= clamp_s32(lroundf(newR * 255), 0, 255)<<24;
-		*colorLut++ = tmp;
+		u32 entry = 255; // Alpha.
+		entry |= clamp_s32(lroundf(b * 255), 0, 255)<<8;
+		entry |= clamp_s32(lroundf(g * 255), 0, 255)<<16;
+		entry |= clamp_s32(lroundf(r * 255), 0, 255)<<24;
+		colorLut[i] = entry;
 	}
 
-	flushDCacheRange((void*)COLOR_LUT_ADDR, 1024u * 128);
+	flushDCacheRange(colorLut, 4 * 32768);
 }
 
 static Result dumpFrameTex(void)
 {
+	// Capture a single frame in native resolution.
+	// Note: This adds 1 frame of delay after pressing the screenshot buttons.
 	if(LGYCAP_captureFrameUnscaled(LGYCAP_DEV_TOP) != KRES_OK)
 		return RES_INVALID_ARG;
 

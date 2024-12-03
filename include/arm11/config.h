@@ -42,12 +42,11 @@ typedef struct
 	bool useSavesFolder;
 
 	// [video]
-	u8 scaler;          // 0 = 1:1, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
-	float gbaGamma;
-	float lcdGamma;
-	float contrast;
-	float brightness;
-	u8 colorProfile;    // 0 = none, 1 = GBA, 2 = DS phat, 3 = DS phat white.
+	u8 scaler;          // 0 = 1:1/none, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
+	u8 colorProfile;    // 0 = none, 1 = GBA, 2 = DS phat, 3 = DS phat white, 4 = Nintendo Switch Online, 5 = identity.
+	float contrast;     // Range 0.0-1.0.
+	float brightness;   // Range 0.0-1.0.
+	float saturation;   // Range 0.0-1.0.
 
 	// [audio]
 	u8 audioOut;        // 0 = auto, 1 = speakers, 2 = headphones.
@@ -63,11 +62,10 @@ typedef struct
 
 	// [advanced]
 	bool saveOverride;
-	u16 defaultSave;
+	u16 defaultSave; // TODO: Should be u8. Investigate if u8 has any downsides.
 } OafConfig;
-//static_assert(sizeof(OafConfig) == 76, "nope");
 
-extern OafConfig g_oafConfig;
+extern OafConfig g_oafConfig; // Global config in config.c.
 
 
 

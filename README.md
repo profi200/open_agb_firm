@@ -49,7 +49,7 @@ Settings are stored in `/3ds/open_agb_firm/config.ini`.
 ### General
 General settings.
 
-`u8 backlight` - Backlight brightness in luminance (cd/m²)
+`u8 backlight` - Backlight brightness in luminance (cd/m²).
 * Default: `64`
 * Possible values:
   * Old 3DS: `20`-`117`
@@ -57,47 +57,47 @@ General settings.
 * Values ≤`64` are recommended.
 * Hardware calibration from your CTRNAND is required to get the correct brightness for both LCDs.
 
-`u8 backlightSteps` - How much to adjust backlight brightness by
+`u8 backlightSteps` - How much to adjust backlight brightness by.
 * Default: `5`
 
-`bool directBoot` - Skip GBA BIOS intro at game startup
+`bool directBoot` - Skip GBA BIOS intro at game startup.
 * Default: `false`
 
-`bool useGbaDb` - Use `gba_db.bin` to get save types
+`bool useGbaDb` - Use `gba_db.bin` to get save types.
 * Default: `true`
 
-`bool useSavesFolder` - Use `/3ds/open_agb_firm/saves` for save files instead of the ROM directory
+`bool useSavesFolder` - Use `/3ds/open_agb_firm/saves` for save files instead of the ROM directory.
 * Default: `true`
 
 ### Video
 Video-related settings.
 
-`u8 scaler` - Video scaler. 0 = none, 1 = bilinear, 2 = hardware.
-* Default: `2`
+`string scaler` - Video scaler.
+* Default: `matrix`
+* Options: `none`, `bilinear`, `matrix`
 
-`float gbaGamma` - GBA input gamma
-* Default: `2.2`
+`string colorProfile` - Color correction profile.
+* Default: `none`
+* Options: `none`, `gba`, `nds`, `nds_white`, `nso`, `identity`
+* If you just want less saturated colors or change other basic settings like contrast or brightness then set this to `identity`.
+* Due to most 2/3DS LCDs not being calibrated correctly from factory the look may not match exactly what you see on real hardware.
+* Due to a lot of extra RAM access and extra CPU processing per frame, battery runtime is affected with color profiles other than `none`.
 
-`float lcdGamma` - Output LCD gamma
-* Default : `1.54`
-
-`float contrast` - Screen gain
+`float contrast` - Screen gain. No effect when `colorProfile=none`.
 * Default: `1.0`
 
-`float brightness` - Screen lift
+`float brightness` - Screen lift. No effect when `colorProfile=none`.
 * Default: `0.0`
 
-`string colorProfile` - Color correction profile. `none`, `gba`, `nds` or `nds_white`.
-* Default: `none`
-* For the gba profile it's recommended to adjust lcdGamma to match a GBA. For New 3DS XL with IPS LCD roughly 1.8 is good.
-* Due to most 2/3DS LCDs not being calibrated correctly from factory the look may not match exactly what you see on a real GBA.
-* Due to a lot of extra RAM access and up to 6.3 ms (worst case for scaler=2) of extra CPU processing time per frame, battery run time is affected with color profiles other than none.
+`float saturation` - Screen saturation. No effect when `colorProfile=none`.
+* Default: `1.0`
 
 ### Audio
 Audio settings.
 
-`u8 audioOut` - Audio output. 0 = auto, 1 = speakers, 2 = headphones.
-* Default: `0`
+`string audioOut` - Audio output.
+* Default: `auto`
+* Options: `auto`, `speakers`, `headphones`
 
 `s8 volume` - Audio volume. Values above 48 mean control via volume slider. Range -128 (muted) to -20 (100%). Avoid the range -19 to 48.
 * Default: `127`
@@ -139,7 +139,7 @@ Note that button mappings can cause input lag of up to 1 frame depending on when
 `L` - Button map for the L button.
 * Default: `none`
 
-Example:
+Example which maps the D-Pad and Circle-Pad to the GBA D-Pad:
 ```
 [input]
 RIGHT=RIGHT,CP_RIGHT
@@ -151,29 +151,38 @@ DOWN=DOWN,CP_DOWN
 ### Game
 Game-specific settings. Only intended to be used in the per-game settings (romName.ini in `/3ds/open_agb_firm/saves`).
 
-`u8 saveSlot` - Savegame slot (0-9)
+`u8 saveSlot` - Savegame slot (0-9).
 * Default: `0`
 
-`u8 saveType` - Override to use a specific save type, see values for `defaultSave` (0-15, 255)
-* Default: `255` (disabled)
+`string saveType` - Override to use a specific save type.
+* Default: `auto`
+* Options starting with `rom_256m` are intended for 32 MiB games. Options ending with `rtc` enable the hardware real-time clock. Options:
+  * `eeprom_8k`
+  * `rom_256m_eeprom_8k`
+  * `eeprom_64k`
+  * `rom_256m_eeprom_64k`
+  * `flash_512k_atmel_rtc`
+  * `flash_512k_atmel`
+  * `flash_512k_sst_rtc`
+  * `flash_512k_sst`
+  * `flash_512k_panasonic_rtc`
+  * `flash_512k_panasonic`
+  * `flash_1m_macronix_rtc`
+  * `flash_1m_macronix`
+  * `flash_1m_sanyo_rtc`
+  * `flash_1m_sanyo`
+  * `sram_256k`
+  * `none`
+  * `auto`
 
 ### Advanced
 Options for advanced users. No pun intended.
 
-`bool saveOverride` - Open save type override menu after selecting a game
+`bool saveOverride` - Open save type override menu after selecting a game.
 * Default: `false`
 
-`u16 defaultSave` - Change save type default when save type is not in `gba_db.bin` and cannot be autodetected
-* Default: `14` (SRAM 256k)
-* Possible values:
-  * `0`, `1`: EEPROM 8k
-  * `2`, `3`: EEPROM 64k
-  * `4`, `6`, `8`: Flash 512k RTC
-  * `5`, `7`, `9`: Flash 512k
-  * `10`, `12`: Flash 1m RTC
-  * `11`, `13`: Flash 1m
-  * `14`: SRAM 256k
-  * `15`: None
+`string defaultSave` - Save type default when save type is not in `gba_db.bin` and cannot be autodetected. Same options as for `saveType` above except `auto` is not supported.
+* Default: `sram_256k`
 
 ## Patches
 open_agb_firm supports automatically applying IPS and UPS patches. To use a patch, rename the patch file to match the ROM file name (without the extension).

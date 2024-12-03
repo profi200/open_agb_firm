@@ -32,19 +32,21 @@
                         "directBoot=false\n"      \
                         "useGbaDb=true\n"         \
                         "useSavesFolder=true\n\n" \
+                                                  \
                         "[video]\n"               \
-                        "scaler=2\n"              \
-                        "gbaGamma=2.2\n"          \
-                        "lcdGamma=1.54\n"         \
+                        "scaler=matrix\n"         \
+                        "colorProfile=none\n"     \
                         "contrast=1.0\n"          \
                         "brightness=0.0\n"        \
-                        "colorProfile=none\n\n"   \
+                        "saturation=1.0\n\n"      \
+                                                  \
                         "[audio]\n"               \
-                        "audioOut=0\n"            \
+                        "audioOut=auto\n"         \
                         "volume=127\n\n"          \
+                                                  \
                         "[advanced]\n"            \
                         "saveOverride=false\n"    \
-                        "defaultSave=14"
+                        "defaultSave=sram_256k"
 
 
 
@@ -60,11 +62,10 @@ OafConfig g_oafConfig =
 
 	// [video]
 	2,     // scaler
-	2.2f,  // gbaGamma
-	1.54f, // lcdGamma
+	0,     // colorProfile
 	1.f,   // contrast
 	0.f,   // brightness
-	0,     // colorProfile
+	1.f,   // saturation
 
 	// [audio]
 	0,     // Automatic audio output.
@@ -86,7 +87,7 @@ OafConfig g_oafConfig =
 
 	// [game]
 	0,     // saveSlot
-	0xFF,  // saveType
+	255,   // saveType
 
 	// [advanced]
 	false, // saveOverride
@@ -131,7 +132,7 @@ static u32 parseButtons(const char *str)
 	return map & ~(1u<<12);
 }
 
-static int cfgIniCallback(void* user, const char* section, const char* name, const char* value)
+static int cfgIniCallback(void *user, const char *section, const char *name, const char *value)
 {
 	OafConfig *const config = (OafConfig*)user;
 
@@ -151,15 +152,14 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 	else if(strcmp(section, "video") == 0)
 	{
 		if(strcmp(name, "scaler") == 0)
-			config->scaler = (u8)strtoul(value, NULL, 10);
-		else if(strcmp(name, "gbaGamma") == 0)
-			config->gbaGamma = str2float(value);
-		else if(strcmp(name, "lcdGamma") == 0)
-			config->lcdGamma = str2float(value);
-		else if(strcmp(name, "contrast") == 0)
-			config->contrast = str2float(value);
-		else if(strcmp(name, "brightness") == 0)
-			config->brightness = str2float(value);
+		{
+			if(strcmp(value, "none") == 0)
+				config->scaler = 0;
+			else if(strcmp(value, "bilinear") == 0)
+				config->scaler = 1;
+			else if(strcmp(value, "matrix") == 0)
+				config->scaler = 2;
+		}
 		else if(strcmp(name, "colorProfile") == 0)
 		{
 			if(strcmp(value, "none") == 0)
@@ -170,14 +170,31 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 				config->colorProfile = 2;
 			else if(strcmp(value, "nds_white") == 0)
 				config->colorProfile = 3;
+			else if(strcmp(value, "nso") == 0)
+				config->colorProfile = 4;
+			else if(strcmp(value, "identity") == 0)
+				config->colorProfile = 5;
 			//else if(strcmp(value, "custom") == 0) // TODO: Implement user provided profile.
-			//	config->colorProfile = 4;
+			//	config->colorProfile = 6;
 		}
+		else if(strcmp(name, "contrast") == 0)
+			config->contrast = str2float(value);
+		else if(strcmp(name, "brightness") == 0)
+			config->brightness = str2float(value);
+		else if(strcmp(name, "saturation") == 0)
+			config->saturation = str2float(value);
 	}
 	else if(strcmp(section, "audio") == 0)
 	{
 		if(strcmp(name, "audioOut") == 0)
-			config->audioOut = (u8)strtoul(value, NULL, 10);
+		{
+			if(strcmp(value, "auto") == 0)
+				config->audioOut = 0;
+			else if(strcmp(value, "speakers") == 0)
+				config->audioOut = 1;
+			else if(strcmp(value, "headphones") == 0)
+				config->audioOut = 2;
+		}
 		else if(strcmp(name, "volume") == 0)
 			config->volume = (s8)strtol(value, NULL, 10);
 	}
@@ -197,14 +214,82 @@ static int cfgIniCallback(void* user, const char* section, const char* name, con
 		if(strcmp(name, "saveSlot") == 0)
 			config->saveSlot = (u8)strtoul(value, NULL, 10);
 		if(strcmp(name, "saveType") == 0)
-			config->saveType = (u8)strtoul(value, NULL, 10);
+		{
+			if(strcmp(value, "eeprom_8k") == 0)
+				config->saveType = 0;
+			if(strcmp(value, "rom_256m_eeprom_8k") == 0)
+				config->saveType = 1;
+			if(strcmp(value, "eeprom_64k") == 0)
+				config->saveType = 2;
+			if(strcmp(value, "rom_256m_eeprom_64k") == 0)
+				config->saveType = 3;
+			if(strcmp(value, "flash_512k_atmel_rtc") == 0)
+				config->saveType = 4;
+			if(strcmp(value, "flash_512k_atmel") == 0)
+				config->saveType = 5;
+			if(strcmp(value, "flash_512k_sst_rtc") == 0)
+				config->saveType = 6;
+			if(strcmp(value, "flash_512k_sst") == 0)
+				config->saveType = 7;
+			if(strcmp(value, "flash_512k_panasonic_rtc") == 0)
+				config->saveType = 8;
+			if(strcmp(value, "flash_512k_panasonic") == 0)
+				config->saveType = 9;
+			if(strcmp(value, "flash_1m_macronix_rtc") == 0)
+				config->saveType = 10;
+			if(strcmp(value, "flash_1m_macronix") == 0)
+				config->saveType = 11;
+			if(strcmp(value, "flash_1m_sanyo_rtc") == 0)
+				config->saveType = 12;
+			if(strcmp(value, "flash_1m_sanyo") == 0)
+				config->saveType = 13;
+			if(strcmp(value, "sram_256k") == 0)
+				config->saveType = 14;
+			if(strcmp(value, "none") == 0)
+				config->saveType = 15;
+			if(strcmp(value, "auto") == 0)
+				config->saveType = 255;
+		}
 	}
 	else if(strcmp(section, "advanced") == 0)
 	{
 		if(strcmp(name, "saveOverride") == 0)
 			config->saveOverride = (strcmp(value, "false") == 0 ? false : true);
 		if(strcmp(name, "defaultSave") == 0)
-			config->defaultSave = (u16)strtoul(value, NULL, 10);
+		{
+			if(strcmp(value, "eeprom_8k") == 0)
+				config->defaultSave = 0;
+			if(strcmp(value, "rom_256m_eeprom_8k") == 0)
+				config->defaultSave = 1;
+			if(strcmp(value, "eeprom_64k") == 0)
+				config->defaultSave = 2;
+			if(strcmp(value, "rom_256m_eeprom_64k") == 0)
+				config->defaultSave = 3;
+			if(strcmp(value, "flash_512k_atmel_rtc") == 0)
+				config->defaultSave = 4;
+			if(strcmp(value, "flash_512k_atmel") == 0)
+				config->defaultSave = 5;
+			if(strcmp(value, "flash_512k_sst_rtc") == 0)
+				config->defaultSave = 6;
+			if(strcmp(value, "flash_512k_sst") == 0)
+				config->defaultSave = 7;
+			if(strcmp(value, "flash_512k_panasonic_rtc") == 0)
+				config->defaultSave = 8;
+			if(strcmp(value, "flash_512k_panasonic") == 0)
+				config->defaultSave = 9;
+			if(strcmp(value, "flash_1m_macronix_rtc") == 0)
+				config->defaultSave = 10;
+			if(strcmp(value, "flash_1m_macronix") == 0)
+				config->defaultSave = 11;
+			if(strcmp(value, "flash_1m_sanyo_rtc") == 0)
+				config->defaultSave = 12;
+			if(strcmp(value, "flash_1m_sanyo") == 0)
+				config->defaultSave = 13;
+			if(strcmp(value, "sram_256k") == 0)
+				config->defaultSave = 14;
+			if(strcmp(value, "none") == 0)
+				config->defaultSave = 15;
+		}
 	}
 	else return 0; // Error.
 
