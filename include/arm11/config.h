@@ -43,7 +43,7 @@ typedef struct
 
 	// [video]
 	u8 scaler;          // 0 = 1:1/none, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
-	u8 colorProfile;    // 0 = none, 1 = GBA, 2 = DS phat, 3 = DS phat white, 4 = Nintendo Switch Online, 5 = identity.
+	u8 colorProfile;    // 0 = none, 1 = GBA, 2 = GB micro, 3 = GBA SP (AGS-101), 4 = DS phat, 5 = DS lite, 6 = Nintendo Switch Online, 7 = Visual Boy Advance/No$GBA, 8 = identity.
 	float contrast;     // Range 0.0-1.0.
 	float brightness;   // Range 0.0-1.0.
 	float saturation;   // Range 0.0-1.0.

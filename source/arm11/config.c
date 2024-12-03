@@ -166,16 +166,22 @@ static int cfgIniCallback(void *user, const char *section, const char *name, con
 				config->colorProfile = 0;
 			else if(strcmp(value, "gba") == 0)
 				config->colorProfile = 1;
-			else if(strcmp(value, "nds") == 0)
+			else if(strcmp(value, "gb_micro") == 0)
 				config->colorProfile = 2;
-			else if(strcmp(value, "nds_white") == 0)
+			else if(strcmp(value, "gba_sp101") == 0)
 				config->colorProfile = 3;
-			else if(strcmp(value, "nso") == 0)
+			else if(strcmp(value, "nds") == 0)
 				config->colorProfile = 4;
-			else if(strcmp(value, "identity") == 0)
+			else if(strcmp(value, "ds_lite") == 0)
 				config->colorProfile = 5;
+			else if(strcmp(value, "nso") == 0)
+				config->colorProfile = 6;
+			else if(strcmp(value, "vba") == 0)
+				config->colorProfile = 7;
+			else if(strcmp(value, "identity") == 0)
+				config->colorProfile = 8;
 			//else if(strcmp(value, "custom") == 0) // TODO: Implement user provided profile.
-			//	config->colorProfile = 6;
+			//	config->colorProfile = 9;
 		}
 		else if(strcmp(name, "contrast") == 0)
 			config->contrast = str2float(value);

@@ -78,8 +78,17 @@ Video-related settings.
 
 `string colorProfile` - Color correction profile.
 * Default: `none`
-* Options: `none`, `gba`, `nds`, `nds_white`, `nso`, `identity`
-* If you just want less saturated colors or change other basic settings like contrast or brightness then set this to `identity`.
+* Options:
+  * `none` Disable all color correction options.
+  * `gba` Game Boy Advance.
+  * `gb_micro` Game Boy micro.
+  * `gba_sp101` Game Boy Advance SP (AGS-101).
+  * `nds` Nintendo DS (DS phat).
+  * `ds_lite` Nintendo DS lite.
+  * `nso` Nintendo Switch Online.
+  * `vba` Visual Boy Advance/No$GBA full.
+  * `identity` No color space conversion.
+* If you just want less saturated colors or to change other basic settings like contrast or brightness then set this to `identity`.
 * Due to most 2/3DS LCDs not being calibrated correctly from factory the look may not match exactly what you see on real hardware.
 * Due to a lot of extra RAM access and extra CPU processing per frame, battery runtime is affected with color profiles other than `none`.
 
@@ -156,7 +165,7 @@ Game-specific settings. Only intended to be used in the per-game settings (romNa
 
 `string saveType` - Override to use a specific save type.
 * Default: `auto`
-* Options starting with `rom_256m` are intended for 32 MiB games. Options ending with `rtc` enable the hardware real-time clock. Options:
+* Options starting with `rom_256m` are intended for 32 MiB games. Options ending with `rtc` enable the hardware real-time clock:
   * `eeprom_8k`
   * `rom_256m_eeprom_8k`
   * `eeprom_64k`

@@ -126,39 +126,65 @@ typedef struct
 	float displayGamma;
 } ColorProfile;
 
-static const ColorProfile g_colorProfiles[5] =
+// libretro shader values. Credits: hunterk and Pokefan531.
+// Last updated 2014-12-03.
+static const ColorProfile g_colorProfiles[8] =
 {
-	{ // libretro GBA color (sRGB). Credits: hunterk and Pokefan531.
-		2.f + 0.5f,
-		0.93f,
-		0.8f,   0.275f, -0.075f,
-		0.135f, 0.64f,   0.225f,
-		0.195f, 0.155f,  0.65f,
-		1.f / 2.f
+	{ // libretro GBA color (sRGB).
+		2.2f + (0.3f * 1.6f), // Darken screen. Default 0. Modified to 0.3.
+		0.91f,
+		0.905f,  0.195f,  -0.1f,
+		0.1f,    0.65f,    0.25f,
+		0.1575f, 0.1425f,  0.7f,
+		1.f / 2.2f
 	},
-	{ // libretro DS phat (sRGB). Credits: hunterk and Pokefan531.
-		2.f,
-		1.f,
-		0.705f,  0.235f,  -0.075f,
-		0.09f,   0.585f,   0.24f,
-		0.1075f, 0.1725f,  0.72f,
-		1.f / 2.f
+	{ // libretro GB micro color (sRGB).
+		2.2f,
+		0.9f,
+		0.8025f, 0.31f,   -0.1125f,
+		0.1f,    0.6875f,  0.2125f,
+		0.1225f, 0.1125f,  0.765f,
+		1.f / 2.2f
 	},
-	{ // libretro DS phat white (sRGB). Credits: hunterk and Pokefan531.
-		2.f,
-		0.915f,
-		0.815f,  0.275f,  -0.09f,
-		0.1f,    0.64f,    0.26f,
-		0.1075f, 0.1725f,  0.72f,
-		1.f / 2.f
+	{ // libretro GBA SP (AGS-101) color (sRGB).
+		2.2f,
+		0.935f,
+		0.96f,    0.11f, -0.07f,
+		0.0325f,  0.89f,  0.0775f,
+		0.001f,  -0.03f,  1.029f,
+		1.f / 2.2f
 	},
-	{ // libretro Nintendo Switch Online (sRGB). Credits: hunterk and Pokefan531.
-		2.2f + 0.8f,
+	{ // libretro NDS color (sRGB).
+		2.2f,
+		0.905f,
+		0.835f, 0.27f,   -0.105f,
+		0.1f,   0.6375f,  0.2625f,
+		0.105f, 0.175f,   0.72f,
+		1.f / 2.2f
+	},
+	{ // libretro NDS lite color (sRGB).
+		2.2f,
+		0.935f,
+		0.93f,   0.14f, -0.07f,
+		0.025f,  0.9f,   0.075f,
+		0.008f, -0.03f,  1.022f,
+		1.f / 2.2f
+	},
+	{ // libretro Nintendo Switch Online color (sRGB).
+		2.2f + 0.8f, // Darken screen. Default 0.8.
 		1.f,
 		0.865f,  0.1225f, 0.0125f,
-		0.0575f,  0.925f, 0.0125f,
-		0.0575f, 0.1225f,   0.82f,
+		0.0575f, 0.925f,  0.0125f,
+		0.0575f, 0.1225f, 0.82f,
 		1.f / 2.2f
+	},
+	{ // libretro Visual Boy Advance/No$GBA full color.
+		1.45f + 1.f, // Darken screen. Default 1.
+		1.f,
+		0.73f,   0.27f,   0.f,
+		0.0825f, 0.6775f, 0.24f,
+		0.0825f, 0.24f,   0.6775f,
+		1.f / 1.45f
 	},
 	{ // Identity.
 		1.f,
