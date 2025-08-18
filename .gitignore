@@ -7,3 +7,4 @@
 /tools/gba-db/gba.*
 !/tools/gba-db/gba.csv
 /open_agb_firm*.*
+/ctr_firm_builder-master

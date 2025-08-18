@@ -69,6 +69,12 @@ General settings.
 `bool useSavesFolder` - Use `/3ds/open_agb_firm/saves` for save files instead of the ROM directory.
 * Default: `true`
 
+`bool enableBacklightHotkeys` - Enables/disables the backlight adjustment hotkeys.
+* Default: `true`
+
+`bool enableScreenshotHotkey` - Enables/disables the hardware frame dump hotkey.
+* Default: `true`
+
 ### Video
 Video-related settings.
 
@@ -155,6 +161,38 @@ RIGHT=RIGHT,CP_RIGHT
 LEFT=LEFT,CP_LEFT
 UP=UP,CP_UP
 DOWN=DOWN,CP_DOWN
+```
+
+### Hotkeys
+Hotkey input settings. These use the same formatting as regular inputs. Entries with multiple buttons are treated as button combos (all buttons must be pressed), unlike regular inputs.
+
+`takeScreenshot` - Button map for dumping hardware frame output.
+* Default: `SELECT,Y`
+
+`backlightUp` - Button map for increasing screen brightness.
+* Default: `X,UP`
+
+`backlightDown` - Button map for decreasing screen brightness.
+* Default: `X,DOWN`
+
+`backlightOff` - Button map for turning off LCD backlight.
+* Default: `X,LEFT`
+
+`backlightOn` - Button map for turning on LCD backlight.
+* Default: `X,RIGHT`
+
+`skipPatching` - Button map for skipping patching upon game launch.
+* Default: `X`
+
+Notes: The general setting `enableBacklightHotkeys` must be set to `true` to use the backlight hotkeys. `enableScreenshotHotkey` must be `true` to dump hardware frames.
+
+Example which maps Y + D-Pad to backlight controls:
+```
+[hotkeys]
+backlightUp=Y,UP
+backlightDown=Y,DOWN
+backlightOff=Y,LEFT
+backlightOn=Y,RIGHT
 ```
 
 ### Game

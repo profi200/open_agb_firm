@@ -22,6 +22,7 @@
 #include "oaf_error_codes.h"
 #include "util.h"
 #include "arm11/drivers/hid.h"
+#include "arm11/config.h"
 #include "drivers/lgy_common.h"
 #include "arm11/fmt.h"
 #include "fs.h"
@@ -240,7 +241,7 @@ Result patchRom(const char *const gamePath, u32 *romSize) {
 
 	//if X is held during launch, skip patching
 	hidScanInput();
-	if(hidKeysHeld() == KEY_X)
+	if(hidKeysHeld() == g_oafConfig.skipPatching)
 		return res;
 
 	//get base path for game with 'gba' extension removed

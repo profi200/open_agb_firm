@@ -131,11 +131,11 @@ static void updateBacklight(void)
 	{
 		// Adjust LCD brightness up.
 		const s16 steps = g_oafConfig.backlightSteps;
-		if(kHeld == (KEY_X | KEY_DUP))
+		if(kHeld == g_oafConfig.backlightUp)
 			changeBacklight(steps);
 
 		// Adjust LCD brightness down.
-		if(kHeld == (KEY_X | KEY_DDOWN))
+		if(kHeld == g_oafConfig.backlightDown)
 			changeBacklight(-steps);
 
 		// Disable backlight switching in debug builds on 2DS.
@@ -145,14 +145,14 @@ static void updateBacklight(void)
 #endif
 		{
 			// Turn off backlight.
-			if(backlightOn && kHeld == (KEY_X | KEY_DLEFT))
+			if(backlightOn && kHeld == g_oafConfig.backlightOff)
 			{
 				backlightOn = false;
 				GFX_powerOffBacklight(lcd);
 			}
 
 			// Turn on backlight.
-			if(!backlightOn && kHeld == (KEY_X | KEY_DRIGHT))
+			if(!backlightOn && kHeld == g_oafConfig.backlightOn)
 			{
 				backlightOn = true;
 				GFX_powerOnBacklight(lcd);
@@ -364,7 +364,8 @@ void oafUpdate(void)
 	LGY11_setInputState(pressed);
 
 	CODEC_runHeadphoneDetection();
-	updateBacklight();
+	if (g_oafConfig.enableBacklightHotkeys)
+		updateBacklight();
 	waitForEvent(g_frameReadyEvent);
 	clearEvent(g_frameReadyEvent);
 }

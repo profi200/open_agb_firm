@@ -40,6 +40,8 @@ typedef struct
 	bool directBoot;
 	bool useGbaDb;
 	bool useSavesFolder;
+	bool enableBacklightHotkeys;
+	bool enableScreenshotHotkey;
 
 	// [video]
 	u8 scaler;          // 0 = 1:1/none, 1 = bilinear (GPU) x1.5, 2 = matrix (hardware) x1.5.
@@ -55,6 +57,14 @@ typedef struct
 
 	// [input]
 	u32 buttonMaps[10]; // A, B, Select, Start, Right, Left, Up, Down, R, L.
+
+	// [hotkeys]
+	u32 takeScreenshot;
+	u32 backlightUp;
+	u32 backlightDown;
+	u32 backlightOff;
+	u32 backlightOn;
+	u32 skipPatching;
 
 	// [game]
 	u8 saveSlot;
