@@ -442,7 +442,7 @@ static KHandle setupFrameCapture(const u8 scaler, const bool colorCorrectionEnab
 	return LGYCAP_init(LGYCAP_DEV_TOP, &gbaCfg);
 }
 
-KHandle OAF_videoInit(void)
+KHandle OAF_videoInit(const char* const borderFile)
 {
 #ifdef NDEBUG
 	// Force black and turn the backlight off on the bottom screen.
@@ -494,7 +494,9 @@ KHandle OAF_videoInit(void)
 	{
 		// Abuse currently invisible frame buffer as temporary buffer.
 		void *const borderBuf = GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT);
-		if(fsQuickRead("border.bgr", borderBuf, 400 * 240 * 3) == RES_OK)
+		const u32 borderBufSize = 400 * 240 * 3;
+		if(fsQuickRead(borderFile, borderBuf, borderBufSize) == RES_OK // read per-game border or default
+			|| fsQuickRead("border.bgr", borderBuf, borderBufSize) == RES_OK)
 		{
 			// Copy border in swizzled form to GPU render buffer.
 			GX_displayTransfer(borderBuf, PPF_DIM(240, 400), (u32*)GPU_RENDER_BUF_ADDR,

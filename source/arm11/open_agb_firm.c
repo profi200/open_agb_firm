@@ -209,25 +209,35 @@ static Result showFileBrowser(char romAndSavePath[512])
 	return res;
 }
 
-static void rom2GameCfgPath(char romPath[512])
+static void rom2GameFilePath(char romPath[512], char fileExt[4])
 {
 	if (g_oafConfig.useSavesFolder)
 	{
 		// Extract the file name and change the extension.
 		// For cfg2SavePath() we need to reserve 2 extra bytes/chars.
-		char tmpIniFileName[256];
-		safeStrcpy(tmpIniFileName, strrchr(romPath, '/') + 1, 256 - 2);
-		strcpy(tmpIniFileName + strlen(tmpIniFileName) - 4, ".ini");
+		char tmpNewFileName[256];
+		safeStrcpy(tmpNewFileName, strrchr(romPath, '/') + 1, 256 - 2);
+		strcpy(tmpNewFileName + strlen(tmpNewFileName) - 4, fileExt);
 
 		// Construct the new path.
 		strcpy(romPath, OAF_SAVE_DIR "/");
-		strcat(romPath, tmpIniFileName);
+		strcat(romPath, tmpNewFileName);
 	}
 	else
 	{
-		// Change the extension to .ini.
-		strcpy(romPath + strlen(romPath) - 4, ".ini");
+		// Change the extension.
+		strcpy(romPath + strlen(romPath) - 4, fileExt);
 	}
+}
+
+static void rom2GameCfgPath(char romPath[512])
+{
+	rom2GameFilePath(romPath, ".ini");
+}
+
+static void rom2GameBorderPath(char romPath[512])
+{
+	rom2GameFilePath(romPath, ".bgr");
 }
 
 static void gameCfg2SavePath(char cfgPath[512], const u8 saveSlot)
@@ -307,6 +317,12 @@ Result oafInitAndRun(void)
 			res = parseOafConfig(filePath, &g_oafConfig, false);
 			if(res != RES_OK && res != RES_FR_NO_FILE) break;
 
+			// Load and copy the per-game border file path.
+			rom2GameBorderPath(filePath);
+			char* const borderFilePath = (char*)calloc(strlen(filePath) + 1, 1);
+			if (borderFilePath == NULL) { res = RES_OUT_OF_MEM; break; }
+			strcpy(borderFilePath, filePath);
+
 			// Adjust the path for the save file and get save type.
 			gameCfg2SavePath(filePath, g_oafConfig.saveSlot);
 			u16 saveType;
@@ -329,7 +345,7 @@ Result oafInitAndRun(void)
 			if(res == RES_OK)
 			{
 				// Initialize video output (frame capture, post processing ect.).
-				g_frameReadyEvent = OAF_videoInit();
+				g_frameReadyEvent = OAF_videoInit(borderFilePath);
 
 				// Setup button overrides.
 				const u32 *const maps = g_oafConfig.buttonMaps;
