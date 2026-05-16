@@ -27,7 +27,7 @@ extern "C"
 {
 #endif
 
-Result browseFiles(const char *const basePath, char selected[512]);
+Result browseFiles(const char *const basePath, char** selected, char** lastPath);
 
 #ifdef __cplusplus
 } // extern "C"

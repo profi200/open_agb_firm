@@ -161,76 +161,110 @@ static void updateBacklight(void)
 	}
 }
 
-static Result showFileBrowser(char romAndSavePath[512])
+static Result loadPathFromSD(const char *const path, char **pathOut)
 {
-	Result res;
-	char *lastDir = (char*)calloc(512, 1);
-	if(lastDir != NULL)
+	FHandle f;
+	Result res = fOpen(&f, path, FA_OPEN_EXISTING | FA_READ);
+	if(res == RES_OK)
 	{
-		do
+		u32 fileSize = fSize(f);
+		char *pathBuf = (char*)malloc(fileSize + 1);
+		if (!pathBuf) return RES_OUT_OF_MEM;
+		u32 read;
+		res = fRead(f, (void*)pathBuf, fileSize, &read);
+		fClose(f);
+		if(read == fileSize)
 		{
-			// Get last ROM launch path.
-			res = fsLoadPathFromFile("lastdir.txt", lastDir);
-			if(res != RES_OK)
-			{
-				if(res == RES_FR_NO_FILE) strcpy(lastDir, "sdmc:/");
-				else                      break;
-			}
-
-			// Show file browser.
-			*romAndSavePath = '\0';
-			res = browseFiles(lastDir, romAndSavePath);
-			if(res == RES_FR_NO_PATH)
-			{
-				// Second chance in case the last dir has been deleted.
-				strcpy(lastDir, "sdmc:/");
-				res = browseFiles(lastDir, romAndSavePath);
-				if(res != RES_OK) break;
-			}
-			else if(res != RES_OK) break;
-
-			size_t cmpLen = strrchr(romAndSavePath, '/') - romAndSavePath;
-			if((size_t)(strchr(romAndSavePath, '/') - romAndSavePath) == cmpLen) cmpLen++; // Keep the first '/'.
-			if(cmpLen < 512)
-			{
-				if(cmpLen < strlen(lastDir) || strncmp(lastDir, romAndSavePath, cmpLen) != 0)
-				{
-					strncpy(lastDir, romAndSavePath, cmpLen);
-					lastDir[cmpLen] = '\0';
-					res = fsQuickWrite("lastdir.txt", lastDir, cmpLen + 1);
-				}
-			}
-		} while(0);
-
-		free(lastDir);
+			pathBuf[fileSize] = '\0';
+			*pathOut = pathBuf;
+		} else {
+			free(pathBuf);
+			res = RES_OUT_OF_RANGE;
+		}
 	}
-	else res = RES_OUT_OF_MEM;
 
 	return res;
 }
 
-static void rom2GameCfgPath(char romPath[512])
+static Result showFileBrowser(char **romAndSavePath)
 {
+	if (!romAndSavePath)
+		return RES_INVALID_ARG;
+	Result res;
+	char *lastDir = NULL;
+	char *lastViewedDir = NULL;
+	do
+	{
+		// Get last ROM launch path.
+		res = loadPathFromSD("lastdir.txt", &lastDir);
+		if(res != RES_OK)
+		{
+			if(res == RES_FR_NO_FILE)
+			{
+				lastDir = (char*) malloc(7);
+				if(!lastDir)
+				{
+					return RES_OUT_OF_MEM;
+				}
+				strcpy(lastDir, "sdmc:/");
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		// Show file browser.
+		res = browseFiles(lastDir, romAndSavePath, &lastViewedDir);
+		if(res == RES_FR_NO_PATH)
+		{
+			res = browseFiles("sdmc:/", romAndSavePath, &lastViewedDir);
+			if(res != RES_OK) break;
+		}
+		else if(res != RES_OK) break;
+
+		if (!*romAndSavePath)
+			break;
+
+		if (lastViewedDir)
+		{
+			res = fsQuickWrite("lastdir.txt", lastViewedDir, strlen(lastViewedDir));
+		}
+	} while(0);
+
+	return res;
+}
+
+static char* rom2GameCfgPath(char *romPath)
+{
+	if (!romPath) return NULL;
 	if (g_oafConfig.useSavesFolder)
 	{
 		// Extract the file name and change the extension.
 		// For cfg2SavePath() we need to reserve 2 extra bytes/chars.
-		char tmpIniFileName[256];
-		safeStrcpy(tmpIniFileName, strrchr(romPath, '/') + 1, 256 - 2);
-		strcpy(tmpIniFileName + strlen(tmpIniFileName) - 4, ".ini");
+		char *fileNameOnly = strrchr(romPath, '/') + 1;
+		size_t bufLen = strlen(fileNameOnly) + strlen(OAF_SAVE_DIR "/") + 2;
+		char *iniPath = (char*)malloc(bufLen + 1);
+		if (!iniPath) return NULL;
 
 		// Construct the new path.
-		strcpy(romPath, OAF_SAVE_DIR "/");
-		strcat(romPath, tmpIniFileName);
+		strcpy(iniPath, OAF_SAVE_DIR "/");
+		strcat(iniPath, fileNameOnly);
+		strcpy(iniPath + strlen(iniPath) - 4, ".ini");
+		return iniPath;
 	}
 	else
 	{
 		// Change the extension to .ini.
-		strcpy(romPath + strlen(romPath) - 4, ".ini");
+		char *iniPath = malloc(strlen(romPath) + 1);
+		if (!iniPath) return NULL;
+		strcpy(iniPath, romPath);
+		strcpy(iniPath + strlen(iniPath) - 4, ".ini");
+		return iniPath;
 	}
 }
 
-static void gameCfg2SavePath(char cfgPath[512], const u8 saveSlot)
+static void gameCfg2SavePath(char *cfgPath, const u8 saveSlot)
 {
 	if(saveSlot > 9)
 	{
@@ -276,78 +310,80 @@ Result oafParseConfigEarly(void)
 Result oafInitAndRun(void)
 {
 	Result res;
-	char *const filePath = (char*)calloc(512, 1);
-	if(filePath != NULL)
+	char* romFilePath = NULL;
+	char* filePath = NULL;
+	do
 	{
-		do
+		// Try to load the ROM path from autoboot.txt.
+		// If this file doesn't exist show the file browser.
+		res = loadPathFromSD("autoboot.txt", &romFilePath);
+		if(res == RES_FR_NO_FILE)
 		{
-			// Try to load the ROM path from autoboot.txt.
-			// If this file doesn't exist show the file browser.
-			res = fsLoadPathFromFile("autoboot.txt", filePath);
-			if(res == RES_FR_NO_FILE)
-			{
-				res = showFileBrowser(filePath);
-				if(res != RES_OK || *filePath == '\0') break;
-				ee_puts("Loading...");
-			}
-			else if(res != RES_OK) break;
+			res = showFileBrowser(&romFilePath);
+			if(res != RES_OK || !romFilePath || *romFilePath == '\0') break;
+			ee_puts("Loading...");
+		}
+		else if(res != RES_OK) break;
 
-			//make copy of rom path
-			char *const romFilePath = (char*)calloc(strlen(filePath)+1, 1);
-			if(romFilePath == NULL) { res = RES_OUT_OF_MEM; break; }
-			strcpy(romFilePath, filePath);
 
-			// Load the ROM file.
-			u32 romSize;
-			res = loadGbaRom(filePath, &romSize);
-			if(res != RES_OK) break;
 
-			// Load the per-game config.
-			rom2GameCfgPath(filePath);
-			res = parseOafConfig(filePath, &g_oafConfig, false);
-			if(res != RES_OK && res != RES_FR_NO_FILE) break;
+		// Load the ROM file.
+		u32 romSize;
+		res = loadGbaRom(romFilePath, &romSize);
+		if(res != RES_OK) break;
 
-			// Adjust the path for the save file and get save type.
-			gameCfg2SavePath(filePath, g_oafConfig.saveSlot);
-			u16 saveType;
-			if(g_oafConfig.saveType != 0xFF)
-				saveType = g_oafConfig.saveType;
-			else if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
-				saveType = getSaveType(&g_oafConfig, romSize, filePath);
-			else
-				saveType = detectSaveType(romSize, g_oafConfig.defaultSave);
+		// Load the per-game config.
+		filePath = rom2GameCfgPath(romFilePath);
+		if (!filePath)
+		{
+			res = RES_OUT_OF_MEM;
+			break;
+		}
+		res = parseOafConfig(filePath, &g_oafConfig, false);
+		if(res != RES_OK && res != RES_FR_NO_FILE) break;
 
-			patchRom(romFilePath, &romSize);
-			free(romFilePath);
+		// Adjust the path for the save file and get save type.
+		gameCfg2SavePath(filePath, g_oafConfig.saveSlot);
+		u16 saveType;
+		if(g_oafConfig.saveType != 0xFF)
+			saveType = g_oafConfig.saveType;
+		else if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
+			saveType = getSaveType(&g_oafConfig, romSize, filePath);
+		else
+			saveType = detectSaveType(romSize, g_oafConfig.defaultSave);
 
-			// Set audio output and volume.
-			CODEC_setAudioOutput(g_oafConfig.audioOut);
-			CODEC_setVolumeOverride(g_oafConfig.volume);
+		patchRom(romFilePath, &romSize);
+		free(romFilePath);
+		romFilePath = NULL;
 
-			// Prepare ARM9 for GBA mode + save loading.
-			res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath);
-			if(res == RES_OK)
-			{
-				// Initialize video output (frame capture, post processing ect.).
-				g_frameReadyEvent = OAF_videoInit();
+		// Set audio output and volume.
+		CODEC_setAudioOutput(g_oafConfig.audioOut);
+		CODEC_setVolumeOverride(g_oafConfig.volume);
 
-				// Setup button overrides.
-				const u32 *const maps = g_oafConfig.buttonMaps;
-				u16 overrides = 0;
-				for(unsigned i = 0; i < 10; i++)
-					if(maps[i] != 0) overrides |= 1u<<i;
-				LGY11_selectInput(overrides);
+		// Prepare ARM9 for GBA mode + save loading.
+		res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath);
+		if(res == RES_OK)
+		{
+			// Initialize video output (frame capture, post processing ect.).
+			g_frameReadyEvent = OAF_videoInit();
 
-				// Sync LgyCap start with LCD VBlank.
-				GFX_waitForVBlank0();
-				LGY11_switchMode();
-			}
-		} while(0);
-	}
-	else res = RES_OUT_OF_MEM;
+			// Setup button overrides.
+			const u32 *const maps = g_oafConfig.buttonMaps;
+			u16 overrides = 0;
+			for(unsigned i = 0; i < 10; i++)
+				if(maps[i] != 0) overrides |= 1u<<i;
+			LGY11_selectInput(overrides);
 
-	free(filePath);
+			// Sync LgyCap start with LCD VBlank.
+			GFX_waitForVBlank0();
+			LGY11_switchMode();
+		}
+	} while(0);
 
+	if (filePath)
+		free(filePath);
+	if (romFilePath)
+		free(romFilePath);
 	return res;
 }
 
