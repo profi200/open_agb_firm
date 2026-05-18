@@ -123,7 +123,7 @@ class Database:
 						if serial is None:
 							self.serial = xml_data.serial
 						else:
-							self.serial = serial.encode('ascii')
+							self.serial = serial.text.encode('ascii')
 
 						break
 				else:

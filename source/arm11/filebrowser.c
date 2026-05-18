@@ -209,9 +209,8 @@ Result browseFiles(const char *const basePath, char selected[512])
 
 			if(kDown & KEY_A && num != 0)
 			{
-				// TODO: !!! Insecure !!!
 				if(curDir[pathLen - 1] != '/') curDir[pathLen++] = '/';
-				safeStrcpy(curDir + pathLen, &dList->ptrs[cursorPos][1], 256);
+				safeStrcpy(curDir + pathLen, &dList->ptrs[cursorPos][1], 512 - pathLen);
 
 				if(*dList->ptrs[cursorPos] == ENT_TYPE_FILE)
 				{
