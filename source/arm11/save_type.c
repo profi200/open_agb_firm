@@ -45,7 +45,7 @@ static u16 checkSaveOverride(const u32 gameCode) // Save type overrides for mode
 	return 0xFF;
 }
 
-u16 detectSaveType(const u32 romSize, const u16 defaultSave)
+u16 detectSaveType(const u32 romSize, const u8 defaultSave)
 {
 	const u32 *romPtr = (u32*)LGY_ROM_LOC;
 	u16 saveType = checkSaveOverride(romPtr[0xAC / 4]);

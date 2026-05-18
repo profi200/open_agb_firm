@@ -46,7 +46,9 @@
                                                   \
                         "[advanced]\n"            \
                         "saveOverride=false\n"    \
-                        "defaultSave=sram_256k"
+                        "colorOverride=false\n"   \
+                        "defaultSave=sram_256k\n" \
+                        "sleepButtons=L,R,SELECT"
 
 
 
@@ -91,7 +93,9 @@ OafConfig g_oafConfig =
 
 	// [advanced]
 	false, // saveOverride
-	14     // defaultSave
+	false, // colorOverride
+	14,    // defaultSave
+	0x304  // sleepButtons (L+R+Select)
 };
 
 
@@ -261,6 +265,8 @@ static int cfgIniCallback(void *user, const char *section, const char *name, con
 	{
 		if(strcmp(name, "saveOverride") == 0)
 			config->saveOverride = (strcmp(value, "false") == 0 ? false : true);
+		if(strcmp(name, "colorOverride") == 0)
+			config->colorOverride = (strcmp(value, "false") == 0 ? false : true);
 		if(strcmp(name, "defaultSave") == 0)
 		{
 			if(strcmp(value, "eeprom_8k") == 0)
@@ -295,6 +301,13 @@ static int cfgIniCallback(void *user, const char *section, const char *name, con
 				config->defaultSave = 14;
 			if(strcmp(value, "none") == 0)
 				config->defaultSave = 15;
+		}
+		if(strcmp(name, "sleepButtons") == 0)
+		{
+			if(strcmp(value, "none") == 0)
+				config->sleepButtons = 0;
+			else
+				config->sleepButtons = (u16)(parseButtons(value) & 0x3FFu);
 		}
 	}
 	else return 0; // Error.
