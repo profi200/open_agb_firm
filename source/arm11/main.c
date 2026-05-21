@@ -35,16 +35,6 @@
 
 static void handleLidSleep(void)
 {
-	const u16 sleepButtons = g_oafConfig.sleepButtons;
-	if(sleepButtons == 0) return;
-
-	// Enable override for sleep buttons so the GBA sees the injected combo.
-	Lgy11 *const lgy11 = getLgy11Regs();
-	const u16 oldPadSel = lgy11->pad_sel;
-	lgy11->pad_sel = oldPadSel | sleepButtons;
-
-	// Enter sleep: inject button combo, mute, stop capture, dim LED.
-	LGY11_setInputState(sleepButtons);
 	CODEC_setVolumeOverride(-128);
 	LGYCAP_stop(LGYCAP_DEV_TOP);
 	GFX_powerOffBacklight(GFX_BL_BOTH);
@@ -53,17 +43,13 @@ static void handleLidSleep(void)
 	while(GPIO_read(GPIO_1_SHELL))
 		__wfi();
 
-	// Wake: restore LED, backlight, capture, volume, release buttons.
 	MCU_setPowerLedPattern(MCU_PWR_LED_AUTO);
 	GFX_powerOnBacklight(GFX_BL_BOTH);
 	LGYCAP_start(LGYCAP_DEV_TOP);
 	CODEC_setVolumeOverride(g_oafConfig.volume);
-	LGY11_setInputState(0);
-	lgy11->pad_sel = oldPadSel;
 
-	// Force-wake the GBA if it entered STOP mode (sleep-patched ROMs).
 	REG_HID_PADCNT = 0;
-	lgy11->sleep |= BIT(0);
+	getLgy11Regs()->sleep |= BIT(0);
 }
 
 int main(void)
