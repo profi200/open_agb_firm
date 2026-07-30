@@ -31,7 +31,8 @@
                         "backlightSteps=5\n"      \
                         "directBoot=false\n"      \
                         "useGbaDb=true\n"         \
-                        "useSavesFolder=true\n\n" \
+                        "useSavesFolder=true\n"   \
+                        "showBattery=true\n\n"    \
                                                   \
                         "[video]\n"               \
                         "scaler=matrix\n"         \
@@ -59,6 +60,7 @@ OafConfig g_oafConfig =
 	false, // directBoot
 	true,  // useGbaDb
 	true,  // useSavesFolder
+	true,  // showBattery
 
 	// [video]
 	2,     // scaler
@@ -148,6 +150,8 @@ static int cfgIniCallback(void *user, const char *section, const char *name, con
 			config->useGbaDb = (strcmp(value, "true") == 0 ? true : false);
 		else if(strcmp(name, "useSavesFolder") == 0)
 			config->useSavesFolder = (strcmp(value, "true") == 0 ? true : false);
+		else if(strcmp(name, "showBattery") == 0)
+			config->showBattery = (strcmp(value, "true") == 0 ? true : false);
 	}
 	else if(strcmp(section, "video") == 0)
 	{

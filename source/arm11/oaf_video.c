@@ -41,6 +41,8 @@
 
 #define COLOR_LUT_ADDR (0x1FF00000u)
 
+// Battery indicator state. Initialized from g_oafConfig.showBattery in OAF_videoInit().
+static bool g_showBattery = false;
 
 static KHandle g_convFinishedEvent = 0;
 static const u32 g_topLcdCurveCorrect[73] =
@@ -344,6 +346,158 @@ static Result dumpFrameTex(void)
 	return res;
 }
 
+// 3x5 digit bitmaps, each row is a byte with 3 LSBs used.
+static const u8 g_digitFont[10][5] =
+{
+	{0x7, 0x5, 0x5, 0x5, 0x7}, // 0
+	{0x2, 0x6, 0x2, 0x2, 0x7}, // 1
+	{0x7, 0x1, 0x7, 0x4, 0x7}, // 2
+	{0x7, 0x1, 0x7, 0x1, 0x7}, // 3
+	{0x5, 0x5, 0x7, 0x1, 0x1}, // 4
+	{0x7, 0x4, 0x7, 0x1, 0x7}, // 5
+	{0x7, 0x4, 0x7, 0x5, 0x7}, // 6
+	{0x7, 0x1, 0x2, 0x4, 0x4}, // 7
+	{0x7, 0x5, 0x7, 0x5, 0x7}, // 8
+	{0x7, 0x5, 0x7, 0x1, 0x7}, // 9
+};
+
+// Set a pixel in the tiled BGR8 GPU render buffer.
+// The render buffer matches the linear framebuffer layout but in 8x8 Morton-order tiles.
+// Linear framebuffer: pixel at screen (x, y) is at byte ((x * 240) + (239 - y)) * 3.
+// So the tiled buffer "width" is 240 and "height" is 400 (LCD is rotated 90 CCW).
+// Tiles are arranged in row-major order: 30 tiles across (240/8), 50 tiles down (400/8).
+static inline void setPixelTiled(u8 *const buf, const u32 screenX, const u32 screenY, const u8 b, const u8 g, const u8 r)
+{
+	// Convert screen coords to tiled buffer coords.
+	const u32 bufX = 239 - screenY; // 0..239, along buffer width
+	const u32 bufY = screenX;       // 0..399, along buffer height
+
+	// Tile position and pixel within tile.
+	const u32 tileX = bufX >> 3;
+	const u32 tileY = bufY >> 3;
+	const u32 inX = bufX & 7;
+	const u32 inY = bufY & 7;
+
+	// PICA200 Morton (Z-order) index within 8x8 tile.
+	// x bits in even positions, y bits in odd positions.
+	const u32 morton = (inX & 1) | ((inY & 1) << 1)
+	                 | ((inX & 2) << 1) | ((inY & 2) << 2)
+	                 | ((inX & 4) << 2) | ((inY & 4) << 3);
+
+	const u32 tileIdx = tileY * (240 / 8) + tileX;
+	const u32 offset = (tileIdx * 64 + morton) * 3;
+
+	buf[offset]     = b;
+	buf[offset + 1] = g;
+	buf[offset + 2] = r;
+}
+
+// Vertical battery indicator in the top-right corner.
+// Fits within the right-side border strip (x>=360) that is not overwritten
+// by the GPU in any scaler mode.
+//
+// Layout (screen coords):
+//   y=2:       terminal nub (2px wide, centered on body)
+//   y=3..10:   battery body outline 6px wide x 8px tall
+//   y=12..16:  percentage text (up to 15px wide x 5px, centered)
+//
+// Body at x=385..390, nub at x=387..388, text centered on x=387
+// Bounding box for clear/flush: x=380..399, y=2..16
+
+#define BATT_REGION_X  (380u)
+#define BATT_REGION_Y  (2u)
+#define BATT_REGION_W  (20u)  // x 380..399
+#define BATT_REGION_H  (15u)  // y 2..16
+
+#define BATT_BODY_X    (385u)
+#define BATT_BODY_Y    (3u)
+#define BATT_BODY_W    (6u)
+#define BATT_BODY_H    (8u)
+#define BATT_INNER_W   (BATT_BODY_W - 2)  // 4
+#define BATT_INNER_H   (BATT_BODY_H - 2)  // 24
+
+static void drawBatteryRegion(u8 *const buf, const bool draw)
+{
+	// Clear the entire indicator region to black.
+	for(u32 sy = BATT_REGION_Y; sy < BATT_REGION_Y + BATT_REGION_H; sy++)
+		for(u32 sx = BATT_REGION_X; sx < BATT_REGION_X + BATT_REGION_W; sx++)
+			setPixelTiled(buf, sx, sy, 0, 0, 0);
+
+	if(!draw) goto flush;
+
+	const u8 level = MCU_getBatteryLevel();
+
+	// Color based on level.
+	u8 cr, cg, cb;
+	if(level >= 30)      { cr = 60;  cg = 200; cb = 60;  }
+	else if(level >= 15) { cr = 220; cg = 200; cb = 20;  }
+	else                 { cr = 220; cg = 40;  cb = 40;  }
+
+	// Terminal nub: 2px wide, 1px tall, centered above body.
+	const u32 nubX = BATT_BODY_X + (BATT_BODY_W / 2) - 1; // 395
+	setPixelTiled(buf, nubX,     BATT_BODY_Y - 1, 255, 255, 255);
+	setPixelTiled(buf, nubX + 1, BATT_BODY_Y - 1, 255, 255, 255);
+
+	// Body outline.
+	for(u32 dx = 0; dx < BATT_BODY_W; dx++)
+	{
+		setPixelTiled(buf, BATT_BODY_X + dx, BATT_BODY_Y,                    255, 255, 255);
+		setPixelTiled(buf, BATT_BODY_X + dx, BATT_BODY_Y + BATT_BODY_H - 1, 255, 255, 255);
+	}
+	for(u32 dy = 0; dy < BATT_BODY_H; dy++)
+	{
+		setPixelTiled(buf, BATT_BODY_X,                    BATT_BODY_Y + dy, 255, 255, 255);
+		setPixelTiled(buf, BATT_BODY_X + BATT_BODY_W - 1, BATT_BODY_Y + dy, 255, 255, 255);
+	}
+
+	// Fill interior from bottom up. Full = top, empty = bottom.
+	const u32 fillH = (BATT_INNER_H * level + 50) / 100;
+	const u32 innerX = BATT_BODY_X + 1;
+	const u32 innerY = BATT_BODY_Y + 1;
+	for(u32 dy = 0; dy < fillH; dy++)
+		for(u32 dx = 0; dx < BATT_INNER_W; dx++)
+			setPixelTiled(buf, innerX + dx, innerY + BATT_INNER_H - 1 - dy, cb, cg, cr);
+
+	// Percentage text centered below the body.
+	char numStr[4];
+	u32 numLen;
+	if(level >= 100)     { numStr[0] = '1'; numStr[1] = '0'; numStr[2] = '0'; numLen = 3; }
+	else if(level >= 10) { numStr[0] = '0' + level / 10; numStr[1] = '0' + level % 10; numLen = 2; }
+	else                 { numStr[0] = '0' + level; numLen = 1; }
+
+	static const u8 percentGlyph[5] = {0x5, 0x1, 0x2, 0x4, 0x5};
+	const u32 textW = numLen * 4 + 3; // digits + percent sign
+	const u32 textX = BATT_BODY_X + (BATT_BODY_W / 2) - (textW / 2);
+	const u32 textY = BATT_BODY_Y + BATT_BODY_H + 1;
+
+	u32 cx = textX;
+	for(u32 i = 0; i < numLen; i++)
+	{
+		const u8 *const glyph = g_digitFont[numStr[i] - '0'];
+		for(u32 dy = 0; dy < 5; dy++)
+			for(u32 dx = 0; dx < 3; dx++)
+				if(glyph[dy] & (4 >> dx))
+					setPixelTiled(buf, cx + dx, textY + dy, 255, 255, 255);
+		cx += 4;
+	}
+	for(u32 dy = 0; dy < 5; dy++)
+		for(u32 dx = 0; dx < 3; dx++)
+			if(percentGlyph[dy] & (4 >> dx))
+				setPixelTiled(buf, cx + dx, textY + dy, 255, 255, 255);
+
+flush:
+	// Flush affected render buffer tiles from cache.
+	// The indicator spans tile rows starting at BATT_REGION_Y/8 = 0 through to the end
+	// of the region. Conservative: flush from the tile column containing BATT_REGION_X.
+	{
+		const u32 startTileRow = BATT_REGION_X / 8; // tile "row" in buffer height = screen X
+		const u32 tilesPerRow = 240 / 8;
+		const u32 startOffset = startTileRow * tilesPerRow * 64 * 3;
+		flushDCacheRange((u8*)GPU_RENDER_BUF_ADDR + startOffset,
+		                 240 * 400 * 3 - startOffset);
+	}
+}
+
 static void convFinishedHandler(UNUSED const u32 intSource)
 {
 	signalEvent(g_convFinishedEvent, false);
@@ -386,14 +540,54 @@ static void gbaGfxHandler(void *args)
 		}
 		GX_processCommandList(listSize, list);
 		GFX_waitForP3D();
-		GX_displayTransfer((u32*)GPU_RENDER_BUF_ADDR, PPF_DIM(240, 400), GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT),
-		                   PPF_DIM(240, 400), PPF_O_FMT(GX_BGR8) | PPF_I_FMT(GX_BGR8));
-		GFX_waitForPPF();
-		GFX_swapBuffers();
+		// Update battery indicator in the render buffer before display transfer.
+		// Only redraw on toggle or when the cached level changes (~every 2 seconds).
+		{
+			const u32 kHeld = hidKeysHeld();
+			const u32 kDown = hidKeysDown();
+			bool toggled = false;
+			if(kHeld == (KEY_X | KEY_SELECT) && kDown != 0)
+			{
+				g_showBattery = !g_showBattery;
+				toggled = true;
+			}
 
-		// Trigger only if both are held and at least one is detected as newly pressed down.
-		if(hidKeysHeld() == (KEY_Y | KEY_SELECT) && hidKeysDown() != 0)
-			dumpFrameTex();
+			static u8 prevLevel = 0;
+			static u32 frameCount = 0;
+			if(g_showBattery)
+			{
+				// Refresh battery level roughly every 2 seconds.
+				bool needsRedraw = toggled;
+				if(++frameCount >= 120)
+				{
+					frameCount = 0;
+					const u8 newLevel = MCU_getBatteryLevel();
+					if(newLevel != prevLevel)
+					{
+						prevLevel = newLevel;
+						needsRedraw = true;
+					}
+				}
+
+				if(needsRedraw)
+					drawBatteryRegion((u8*)GPU_RENDER_BUF_ADDR, true);
+			}
+			else if(toggled)
+			{
+				// Just toggled off — clear the region.
+				drawBatteryRegion((u8*)GPU_RENDER_BUF_ADDR, false);
+				frameCount = 0;
+			}
+
+			GX_displayTransfer((u32*)GPU_RENDER_BUF_ADDR, PPF_DIM(240, 400), GFX_getBuffer(GFX_LCD_TOP, GFX_SIDE_LEFT),
+			                   PPF_DIM(240, 400), PPF_O_FMT(GX_BGR8) | PPF_I_FMT(GX_BGR8));
+			GFX_waitForPPF();
+			GFX_swapBuffers();
+
+			// Trigger only if both are held and at least one is detected as newly pressed down.
+			if(kHeld == (KEY_Y | KEY_SELECT) && kDown != 0)
+				dumpFrameTex();
+		}
 	}
 
 	taskExit();
@@ -502,6 +696,11 @@ KHandle OAF_videoInit(void)
 			GFX_waitForPPF();
 		}
 	}
+
+	// Initialize battery indicator from config.
+	g_showBattery = g_oafConfig.showBattery;
+	if(g_showBattery)
+		drawBatteryRegion((u8*)GPU_RENDER_BUF_ADDR, true);
 
 	return frameReadyEvent;
 }
