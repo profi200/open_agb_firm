@@ -39,6 +39,8 @@ X+LEFT - Turn off LCD backlight.
 
 X+RIGHT - Turn on LCD backlight.
 
+Y+Touch - Toggle bottom screen backlight to show battery level and system time.
+
 Hold the X button while launching a game to skip applying patches (if present)
 
 Hold the power button to turn off the 3DS.

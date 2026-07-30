@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "types.h"
 #include "util.h"
 #include "arm11/fast_rom_padding.h"
@@ -36,6 +37,7 @@
 #include "drivers/lgy_common.h"
 #include "arm11/oaf_video.h"
 #include "arm11/drivers/lgy11.h"
+#include "arm11/console.h"
 #include "kernel.h"
 #include "kevent.h"
 
@@ -351,10 +353,48 @@ Result oafInitAndRun(void)
 	return res;
 }
 
+static bool g_botBacklightOn = false;
+static u32 g_statsFrameCount = 0;
+
+static void updateStats(void)
+{
+	if(!g_botBacklightOn) return;
+
+	if(g_statsFrameCount % 600 != 0)
+	{
+		g_statsFrameCount++;
+		return;
+	}
+
+	u8 battery = MCU_getBatteryLevel();
+	RtcTimeDate td;
+	MCU_getRtcTimeDate(&td);
+
+	// Convert BCD to decimal.
+	int hour = (td.hour / 16 * 10) + (td.hour % 16);
+	int min = (td.min / 16 * 10) + (td.min % 16);
+
+	if(g_statsFrameCount == 0)
+	{
+		ee_printf("Y + Touch: Toggle bottom screen\n");
+	}
+	else
+	{
+		// Move up 1 line to the start of the stats block (Time line).
+		ee_printf("\x1b[A\r");
+	}
+
+	ee_printf("Time: %02d:%02d\nBattery: %3d%%", hour, min, battery);
+	GFX_flushBuffers();
+
+	g_statsFrameCount++;
+}
+
 void oafUpdate(void)
 {
 	const u32 *const maps = g_oafConfig.buttonMaps;
 	const u32 kHeld = hidKeysHeld();
+	const u32 kDown = hidKeysDown();
 	u16 pressed = 0;
 	for(unsigned i = 0; i < 10; i++)
 	{
@@ -363,8 +403,22 @@ void oafUpdate(void)
 	}
 	LGY11_setInputState(pressed);
 
+	// Toggle bottom screen backlight with Y + TOUCH.
+	if(kDown == KEY_TOUCH && kHeld == (KEY_Y | KEY_TOUCH))
+	{
+		g_botBacklightOn = !g_botBacklightOn;
+		if(g_botBacklightOn)
+		{
+			GFX_powerOnBacklight(GFX_BL_BOT);
+			if(g_statsFrameCount % 600 != 0)
+				g_statsFrameCount = (g_statsFrameCount / 600 + 1) * 600;
+		}
+		else GFX_powerOffBacklight(GFX_BL_BOT);
+	}
+
 	CODEC_runHeadphoneDetection();
 	updateBacklight();
+	updateStats();
 	waitForEvent(g_frameReadyEvent);
 	clearEvent(g_frameReadyEvent);
 }

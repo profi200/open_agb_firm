@@ -444,13 +444,13 @@ static KHandle setupFrameCapture(const u8 scaler, const bool colorCorrectionEnab
 
 KHandle OAF_videoInit(void)
 {
-#ifdef NDEBUG
-	// Force black and turn the backlight off on the bottom screen.
-	// Don't turn the backlight off on 2DS (1 panel).
-	GFX_setForceBlack(false, true);
+	// Don't force black on the bottom screen.
+	GFX_setForceBlack(false, false);
+
+	// Turn off the backlight on the bottom screen by default.
+	// It can be toggled on later during gameplay.
 	if(MCU_getSystemModel() != SYS_MODEL_2DS)
 		GFX_powerOffBacklight(GFX_BL_BOT);
-#endif
 
 	// Initialize frame capture.
 	const u8 scaler = g_oafConfig.scaler;
