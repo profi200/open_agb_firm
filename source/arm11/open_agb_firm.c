@@ -100,6 +100,13 @@ static Result loadGbaRom(const char *const path, u32 *const romSizeOut)
 	return res;
 }
 
+bool shouldExit(u32 extraKeys)
+{
+    // Exit if power button is held or low battery alarm fires for 5% or lower
+    return (extraKeys & (KEY_POWER_HELD | KEY_POWER)) ||
+           ((extraKeys & KEY_LOW_BATTERY) && (MCU_getBatteryLevel() <= 6));
+}
+
 void changeBacklight(s16 amount)
 {
 	u8 min, max;

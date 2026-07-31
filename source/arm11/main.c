@@ -41,7 +41,7 @@ int main(void)
 		while(1)
 		{
 			hidScanInput();
-			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
+			if(shouldExit(hidGetExtraKeys(0))) break;
 
 			oafUpdate();
 		}

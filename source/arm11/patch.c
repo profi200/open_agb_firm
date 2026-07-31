@@ -21,6 +21,7 @@
 #include "types.h"
 #include "oaf_error_codes.h"
 #include "util.h"
+#include "arm11/open_agb_firm.h"
 #include "arm11/drivers/hid.h"
 #ifndef NDEBUG
 #include "arm11/drivers/mcu.h"
@@ -323,7 +324,7 @@ Result patchRom(const char *const gamePath, u32 *romSize) {
 				while(1){
 					hidScanInput();
 					if(hidKeysHeld() == (KEY_Y | KEY_DUP) && hidKeysDown() != 0) break;
-					if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) power_off();
+					if(shouldExit(hidGetExtraKeys(0))) power_off();
 				}
 			}
 
@@ -350,7 +351,7 @@ Result patchRom(const char *const gamePath, u32 *romSize) {
 				while(1){
 					hidScanInput();
 					if(hidKeysHeld() == (KEY_Y | KEY_DUP) && hidKeysDown() != 0) break;
-					if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) power_off();
+					if(shouldExit(hidGetExtraKeys(0))) power_off();
 				}
 			}
 

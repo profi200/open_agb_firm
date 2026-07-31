@@ -28,6 +28,7 @@ extern "C"
 #endif
 
 Result oafParseConfigEarly(void);
+bool shouldExit(u32 extraKeys);
 void changeBacklight(s16 amount);
 Result oafInitAndRun(void);
 void oafUpdate(void);

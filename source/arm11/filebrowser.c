@@ -22,6 +22,7 @@
 #include "error_codes.h"
 #include "fs.h"
 #include "util.h"
+#include "arm11/open_agb_firm.h"
 #include "arm11/drivers/hid.h"
 #include "arm11/fmt.h"
 #include "drivers/gfx.h"
@@ -167,7 +168,7 @@ Result browseFiles(const char *const basePath, char selected[512])
 			GFX_waitForVBlank0();
 
 			hidScanInput();
-			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
+			if(shouldExit(hidGetExtraKeys(0))) goto end;
 			kDown = hidKeysDown();
 		} while(kDown == 0);
 

@@ -18,6 +18,7 @@
 
 #include <string.h>
 #include "types.h"
+#include "arm11/open_agb_firm.h"
 #include "arm11/save_type.h"
 #include "drivers/lgy_common.h"
 #include "arm11/fmt.h"
@@ -255,7 +256,7 @@ u16 getSaveType(const OafConfig *const cfg, const u32 romSize, const char *const
 			GFX_waitForVBlank0();
 
 			hidScanInput();
-			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) goto end;
+			if(shouldExit(hidGetExtraKeys(0))) goto end;
 			kDown = hidKeysDown();
 		} while(kDown == 0);
 
