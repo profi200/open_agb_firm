@@ -21,5 +21,5 @@
 
 
 
-KHandle OAF_videoInit(void);
+KHandle OAF_videoInit(const char* const borderFile);
 void OAF_videoExit(void);
