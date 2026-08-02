@@ -45,7 +45,7 @@ static u16 checkSaveOverride(const u32 gameCode) // Save type overrides for mode
 	return 0xFF;
 }
 
-u16 detectSaveType(const u32 romSize, const u16 defaultSave)
+u16 detectSaveType(const u32 romSize, const u8 defaultSave)
 {
 	const u32 *romPtr = (u32*)LGY_ROM_LOC;
 	u16 saveType = checkSaveOverride(romPtr[0xAC / 4]);
@@ -215,12 +215,18 @@ u16 getSaveType(const OafConfig *const cfg, const u32 romSize, const char *const
 	ee_printf("==Save Type Override Menu==\n"
 	          "Save file: %s\n"
 	          "Save type (autodetected): %u\n"
-			  "Save type (from gba_db.bin): ", (saveExists ? "Found" : "Not found"), autoSaveType);
+	          "Save type (from gba_db.bin): ", (saveExists ? "Found" : "Not found"), autoSaveType);
 	if(res == RES_NOT_FOUND)
 		ee_puts("Not found");
 	else
 		ee_printf("%u\n", saveType);
+	ee_printf("Save type (per-game config): ");
+	if(cfg->saveType <= 15)
+		ee_printf("%u", cfg->saveType);
+	else
+		ee_printf("Not set");
 	ee_puts("\n"
+	        "\n"
 	        "=Save Types=\n"
 	        " EEPROM 8k (0, 1)\n"
 	        " EEPROM 64k (2, 3)\n"
@@ -238,14 +244,16 @@ u16 getSaveType(const OafConfig *const cfg, const u32 romSize, const char *const
 	static const u8 saveTypeCursorLut[16] = {0, 0, 1, 1, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7};
 	u8 oldCursor = 0;
 	u8 cursor;
-	if(!cfg->useGbaDb || res == RES_NOT_FOUND)
+	if(cfg->saveType <= 15)
+		cursor = saveTypeCursorLut[cfg->saveType];
+	else if(!cfg->useGbaDb || res == RES_NOT_FOUND)
 		cursor = saveTypeCursorLut[autoSaveType];
 	else
 		cursor = saveTypeCursorLut[saveType];
 	while(1)
 	{
-		ee_printf("\x1b[%u;H ", oldCursor + 7);
-		ee_printf("\x1b[%u;H>", cursor + 7);
+		ee_printf("\x1b[%u;H ", oldCursor + 8);
+		ee_printf("\x1b[%u;H>", cursor + 8);
 		oldCursor = cursor;
 		GFX_flushBuffers();
 

@@ -62,7 +62,9 @@ typedef struct
 
 	// [advanced]
 	bool saveOverride;
-	u16 defaultSave; // TODO: Should be u8. Investigate if u8 has any downsides.
+	bool colorOverride;
+	u8 defaultSave;
+	u16 sleepButtons;   // GBA button mask to inject on lid close. 0 = disabled.
 } OafConfig;
 
 extern OafConfig g_oafConfig; // Global config in config.c.

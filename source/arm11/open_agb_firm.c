@@ -24,6 +24,7 @@
 #include "oaf_error_codes.h"
 #include "fs.h"
 #include "arm11/fmt.h"
+#include "arm11/console.h"
 #include "arm11/drivers/mcu.h"
 #include "drivers/gfx.h"
 #include "arm11/drivers/hid.h"
@@ -42,6 +43,92 @@
 
 static KHandle g_frameReadyEvent = 0;
 
+
+static void selectColorProfile(const u8 globalProfile, const bool hasGameProfile)
+{
+	static const char *const profileNames[9] =
+	{
+		"none", "gba", "gb_micro", "gba_sp101",
+		"nds", "ds_lite", "nso", "vba", "identity"
+	};
+
+	consoleClear();
+	ee_printf("==Color Profile==\n"
+	          "Config (global): %s\n"
+	          "Config (per-game): ", profileNames[globalProfile]);
+	if(hasGameProfile)
+		ee_printf("%s", profileNames[g_oafConfig.colorProfile]);
+	else
+		ee_printf("Not set");
+	ee_puts("\n"
+	        "\n"
+	        " None\n"
+	        " GBA\n"
+	        " GB Micro\n"
+	        " GBA SP (AGS-101)\n"
+	        " NDS\n"
+	        " DS Lite\n"
+	        " NSO\n"
+	        " VBA\n"
+	        " Identity\n"
+	        "\n"
+	        "Up/Down: Navigate\n"
+	        "A: Select");
+
+	u8 oldCursor = 0;
+	u8 cursor = g_oafConfig.colorProfile;
+	while(1)
+	{
+		ee_printf("\x1b[%u;H ", oldCursor + 5);
+		ee_printf("\x1b[%u;H>", cursor + 5);
+		oldCursor = cursor;
+		GFX_flushBuffers();
+
+		u32 kDown;
+		do
+		{
+			GFX_waitForVBlank0();
+
+			hidScanInput();
+			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) return;
+			kDown = hidKeysDown();
+		} while(kDown == 0);
+
+		if((kDown & KEY_DUP) && cursor > 0)        cursor--;
+		else if((kDown & KEY_DDOWN) && cursor < 8) cursor++;
+		else if(kDown & KEY_A) break;
+	}
+
+	g_oafConfig.colorProfile = cursor;
+	consoleClear();
+}
+
+static void saveGameConfig(const char *const path, const u16 saveType, const u8 colorProfile,
+                           const bool writeSave, const bool writeColor)
+{
+	static const char *const saveTypeNames[16] =
+	{
+		"eeprom_8k", "rom_256m_eeprom_8k", "eeprom_64k", "rom_256m_eeprom_64k",
+		"flash_512k_atmel_rtc", "flash_512k_atmel", "flash_512k_sst_rtc", "flash_512k_sst",
+		"flash_512k_panasonic_rtc", "flash_512k_panasonic", "flash_1m_macronix_rtc", "flash_1m_macronix",
+		"flash_1m_sanyo_rtc", "flash_1m_sanyo", "sram_256k", "none"
+	};
+	static const char *const profileNames[9] =
+	{
+		"none", "gba", "gb_micro", "gba_sp101",
+		"nds", "ds_lite", "nso", "vba", "identity"
+	};
+
+	char buf[128];
+	unsigned len = 0;
+	if(writeSave && saveType <= 15)
+		len += ee_snprintf(buf + len, sizeof(buf) - len, "[game]\nsaveType=%s\n\n", saveTypeNames[saveType]);
+	if(writeColor && colorProfile <= 8)
+		len += ee_snprintf(buf + len, sizeof(buf) - len, "[video]\ncolorProfile=%s\n", profileNames[colorProfile]);
+
+	if(len > 0)
+		fsQuickWrite(path, buf, len);
+}
 
 
 static u32 fixRomPadding(const u32 romFileSize)
@@ -302,15 +389,24 @@ Result oafInitAndRun(void)
 			res = loadGbaRom(filePath, &romSize);
 			if(res != RES_OK) break;
 
+			// Save global colorProfile before per-game config may override it.
+			const u8 globalColorProfile = g_oafConfig.colorProfile;
+
 			// Load the per-game config.
 			rom2GameCfgPath(filePath);
 			res = parseOafConfig(filePath, &g_oafConfig, false);
+			const bool hasGameConfig = (res == RES_OK);
 			if(res != RES_OK && res != RES_FR_NO_FILE) break;
+
+			// Save game config path before it's overwritten.
+			char *const gameCfgPath = (char*)calloc(strlen(filePath)+1, 1);
+			if(gameCfgPath == NULL) { res = RES_OUT_OF_MEM; break; }
+			strcpy(gameCfgPath, filePath);
 
 			// Adjust the path for the save file and get save type.
 			gameCfg2SavePath(filePath, g_oafConfig.saveSlot);
 			u16 saveType;
-			if(g_oafConfig.saveType != 0xFF)
+			if(g_oafConfig.saveType != 0xFF && !g_oafConfig.saveOverride)
 				saveType = g_oafConfig.saveType;
 			else if(g_oafConfig.useGbaDb || g_oafConfig.saveOverride)
 				saveType = getSaveType(&g_oafConfig, romSize, filePath);
@@ -328,6 +424,15 @@ Result oafInitAndRun(void)
 			res = LGY_prepareGbaMode(g_oafConfig.directBoot, saveType, filePath);
 			if(res == RES_OK)
 			{
+				if(g_oafConfig.colorOverride)
+					selectColorProfile(globalColorProfile,
+					                   hasGameConfig && g_oafConfig.colorProfile != globalColorProfile);
+
+				// Save per-game overrides if either menu was shown.
+				if(g_oafConfig.saveOverride || g_oafConfig.colorOverride)
+					saveGameConfig(gameCfgPath, saveType, g_oafConfig.colorProfile,
+					               g_oafConfig.saveOverride, g_oafConfig.colorOverride);
+
 				// Initialize video output (frame capture, post processing ect.).
 				g_frameReadyEvent = OAF_videoInit();
 
@@ -342,6 +447,7 @@ Result oafInitAndRun(void)
 				GFX_waitForVBlank0();
 				LGY11_switchMode();
 			}
+			free(gameCfgPath);
 		} while(0);
 	}
 	else res = RES_OUT_OF_MEM;
@@ -350,6 +456,7 @@ Result oafInitAndRun(void)
 
 	return res;
 }
+
 
 void oafUpdate(void)
 {
