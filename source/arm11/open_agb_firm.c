@@ -189,17 +189,9 @@ static Result showFileBrowser(char romAndSavePath[512])
 			}
 			else if(res != RES_OK) break;
 
-			size_t cmpLen = strrchr(romAndSavePath, '/') - romAndSavePath;
-			if((size_t)(strchr(romAndSavePath, '/') - romAndSavePath) == cmpLen) cmpLen++; // Keep the first '/'.
-			if(cmpLen < 512)
-			{
-				if(cmpLen < strlen(lastDir) || strncmp(lastDir, romAndSavePath, cmpLen) != 0)
-				{
-					strncpy(lastDir, romAndSavePath, cmpLen);
-					lastDir[cmpLen] = '\0';
-					res = fsQuickWrite("lastdir.txt", lastDir, cmpLen + 1);
-				}
-			}
+			// Save selected path if any rom was selected
+			if (romAndSavePath[0] != '\0')
+				res = fsQuickWrite("lastdir.txt", romAndSavePath, 512);
 		} while(0);
 
 		free(lastDir);
