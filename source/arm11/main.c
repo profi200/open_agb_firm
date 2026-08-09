@@ -26,7 +26,6 @@
 #include "arm11/drivers/hid.h"
 #include "arm11/drivers/interrupt.h"
 #include "arm11/drivers/lgycap.h"
-#include "arm11/drivers/lgy11.h"
 #include "arm11/drivers/mcu.h"
 #include "arm11/console.h"
 #include "arm11/power.h"
@@ -47,9 +46,6 @@ static void handleLidSleep(void)
 	GFX_powerOnBacklight(GFX_BL_BOTH);
 	LGYCAP_start(LGYCAP_DEV_TOP);
 	CODEC_setVolumeOverride(g_oafConfig.volume);
-
-	REG_HID_PADCNT = 0;
-	getLgy11Regs()->sleep |= BIT(0);
 }
 
 int main(void)
