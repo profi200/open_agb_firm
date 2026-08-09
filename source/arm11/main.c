@@ -29,11 +29,21 @@
 #include "arm11/drivers/mcu.h"
 #include "arm11/console.h"
 #include "arm11/power.h"
+#include "drivers/lgy_common.h"
 
 
 
+// The GBA keeps running the whole time the lid is closed - there's no way
+// to actually pause it from the 3DS side. This only mutes audio, stops
+// frame capture, and blanks the screen; it is not real power-saving sleep.
+// Back up the save as it stands at the moment the lid closes, same as the
+// normal shutdown path (LGY11_deinit()) already does without first
+// confirming the GBA is quiescent - so if power is lost while the lid is
+// closed, at least nothing from before that point is lost.
 static void handleLidSleep(void)
 {
+	LGY_backupGbaSave();
+
 	CODEC_setVolumeOverride(-128);
 	LGYCAP_stop(LGYCAP_DEV_TOP);
 	GFX_powerOffBacklight(GFX_BL_BOTH);
