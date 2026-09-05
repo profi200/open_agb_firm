@@ -97,6 +97,10 @@ END_ASM_FUNC*/
 
 @ Converts a 160p frame while it's being DMAd to memory.
 BEGIN_ASM_FUNC convert160pFrameFast
+	@ Video suspend can return this worker to libn3ds core1Standby().
+	@ Preserve the callee-saved context and LR so the entry call can return.
+	stmfd sp!, {r4-r12, lr}
+
 	@ Enable top LCD LgyCap IRQs.
 	mov  r0, #77                                   @ r0 = 77; // id     IRQ_LGYCAP_TOP.
 	mov  r1, #0                                    @ r1 = 0;  // prio   0 (highest).
@@ -104,12 +108,20 @@ BEGIN_ASM_FUNC convert160pFrameFast
 	mov  r3, #0                                    @ r3 = 0;  // isr    NULL.
 	blx IRQ_registerIsr                            @ IRQ_registerIsr(IRQ_LGYCAP_TOP, 0, 0, (IrqIsr)NULL);
 
+	@ Private Core-1 stop wakeup, consumed manually while IRQs are masked.
+	mov  r0, #14                                   @ r0 = IRQ_IPI14.
+	mov  r1, #0                                    @ Highest priority.
+	mov  r2, #0                                    @ Target this CPU.
+	mov  r3, #0                                    @ No ISR; converter drains GICC manually.
+	blx IRQ_registerIsr
+
 	@ We will be using IRQs without our IRQ handler to minimize latency.
 	cpsid i                                        @ __disableIrq();
 
 	@ Load lookup table address and color mask.
 	ldr   r2, =0x1FF00000                          @ r2 = 0x1FF00000;
-	ldrh r12, =0x7FFF                              @ r12 = 0x7FFF;
+	mov  r12, #0x8000                              @ r12 = 0x8000;
+	sub  r12, r12, #1                             @ r12 = 0x7FFF; // Avoid a short-range LDRH literal pool.
 
 	convert160pFrameFast_frame_lp:
 		@ Load input and output addresses.
@@ -123,8 +135,14 @@ BEGIN_ASM_FUNC convert160pFrameFast
 			ldr  r5, =MPCORE_PRIV_BASE             @ r5 = MPCORE_PRIV_BASE;  // u32.
 
 			convert160pFrameFast_wait_irq:
-				@ Wait for LgyCap IRQs.
+				@ Wait for LgyCap DREQ or the private Core-1 stop IPI.
 				wfi                                @ __waitForInterrupt();
+
+				/* Check teardown before interpreting the wakeup as LGYCAP. */
+				ldr  r6, =g_oafColorConverterStopRequested
+				ldr  r6, [r6]
+				cmp  r6, #0
+				bne  convert160pFrameFast_stop
 
 				@ Acknowledge IRQ and extract line number.
 				ldr r11, [r4]                      @ r11 = REG_LGYCAP_STAT; // u32.
@@ -201,10 +219,44 @@ BEGIN_ASM_FUNC convert160pFrameFast
 		mcr p15, 0, r3, c7, c10, 4                 @ Data Synchronization Barrier.
 		str  r5, [r4]                              @ *r4 = r5; // u32.
 		b convert160pFrameFast_frame_lp            @ goto convert160pFrameFast_frame_lp;
+
+	convert160pFrameFast_stop:
+		/*
+		 * Capture may stop between scanline chunks. Flush all private dirty cache
+		 * lines before graphics power-down; a complete final frame is not required.
+		 */
+		mov  r3, #0
+		mcr p15, 0, r3, c7, c14, 0                 @ Clean + invalidate entire D-cache.
+		mcr p15, 0, r3, c7, c10, 4                 @ Data Synchronization Barrier.
+
+		/* Drain pending IRQs until the private stop IPI has been acknowledged. */
+		ldr  r5, =MPCORE_PRIV_BASE
+	convert160pFrameFast_stop_drain:
+		ldr  r7, [r5, #0x10C]                      @ REG_GICC_INTACK.
+		str  r7, [r5, #0x110]                      @ REG_GICC_EOI.
+		mov  r6, r7, lsl #22
+		mov  r6, r6, lsr #22                       @ Interrupt ID = IAR[9:0].
+		cmp  r6, #14                                @ IRQ_IPI14?
+		bne  convert160pFrameFast_stop_drain
+
+		mov  r0, #77                                @ IRQ_LGYCAP_TOP.
+		blx  IRQ_unregisterIsr
+		mov  r0, #14                                @ Private stop IPI.
+		blx  IRQ_unregisterIsr
+		cpsie i                                     @ core1Standby() expects normal IRQ handling.
+		ldr  r0, =g_oafColorConverterStopped
+		mov  r1, #1
+		str  r1, [r0]
+		mcr p15, 0, r1, c7, c10, 4                 @ Data Synchronization Barrier.
+		ldmfd sp!, {r4-r12, pc}                    @ Return to core1Standby().
 END_ASM_FUNC
 
 @ Converts the frame while it's being DMAd to memory.
 BEGIN_ASM_FUNC convert240pFrameFast
+	@ Video suspend can return this worker to libn3ds core1Standby().
+	@ Preserve the callee-saved context and LR so the entry call can return.
+	stmfd sp!, {r4-r12, lr}
+
 	@ Enable top LCD LgyCap IRQs.
 	mov  r0, #77                                   @ r0 = 77; // id     IRQ_LGYCAP_TOP.
 	mov  r1, #0                                    @ r1 = 0;  // prio   0 (highest).
@@ -212,12 +264,20 @@ BEGIN_ASM_FUNC convert240pFrameFast
 	mov  r3, #0                                    @ r3 = 0;  // isr    NULL.
 	blx IRQ_registerIsr                            @ IRQ_registerIsr(IRQ_LGYCAP_TOP, 0, 0, (IrqIsr)NULL);
 
+	@ Private Core-1 stop wakeup, consumed manually while IRQs are masked.
+	mov  r0, #14                                   @ r0 = IRQ_IPI14.
+	mov  r1, #0                                    @ Highest priority.
+	mov  r2, #0                                    @ Target this CPU.
+	mov  r3, #0                                    @ No ISR; converter drains GICC manually.
+	blx IRQ_registerIsr
+
 	@ We will be using IRQs without our IRQ handler to minimize latency.
 	cpsid i                                        @ __disableIrq();
 
 	@ Load lookup table address and color mask.
 	ldr   r2, =0x1FF00000                          @ r2 = 0x1FF00000;
-	ldrh r12, =0x7FFF                              @ r12 = 0x7FFF;
+	mov  r12, #0x8000                              @ r12 = 0x8000;
+	sub  r12, r12, #1                             @ r12 = 0x7FFF; // Avoid a short-range LDRH literal pool.
 
 	convert240pFrameFast_frame_lp:
 		@ Load input and output addresses.
@@ -231,8 +291,14 @@ BEGIN_ASM_FUNC convert240pFrameFast
 			ldr  r5, =MPCORE_PRIV_BASE             @ r5 = MPCORE_PRIV_BASE;  // u32.
 
 			convert240pFrameFast_wait_irq:
-				@ Wait for LgyCap IRQs.
+				@ Wait for LgyCap DREQ or the private Core-1 stop IPI.
 				wfi                                @ __waitForInterrupt();
+
+				/* Check teardown before interpreting the wakeup as LGYCAP. */
+				ldr  r6, =g_oafColorConverterStopRequested
+				ldr  r6, [r6]
+				cmp  r6, #0
+				bne  convert240pFrameFast_stop
 
 				@ Acknowledge IRQ and extract line number.
 				ldr r11, [r4]                      @ r11 = REG_LGYCAP_STAT; // u32.
@@ -309,4 +375,34 @@ BEGIN_ASM_FUNC convert240pFrameFast
 		mcr p15, 0, r3, c7, c10, 4                 @ Data Synchronization Barrier.
 		str  r5, [r4]                              @ *r4 = r5; // u32.
 		b convert240pFrameFast_frame_lp            @ goto convert240pFrameFast_frame_lp;
+
+	convert240pFrameFast_stop:
+		/*
+		 * Capture may stop between scanline chunks. Flush all private dirty cache
+		 * lines before graphics power-down; a complete final frame is not required.
+		 */
+		mov  r3, #0
+		mcr p15, 0, r3, c7, c14, 0                 @ Clean + invalidate entire D-cache.
+		mcr p15, 0, r3, c7, c10, 4                 @ Data Synchronization Barrier.
+
+		/* Drain pending IRQs until the private stop IPI has been acknowledged. */
+		ldr  r5, =MPCORE_PRIV_BASE
+	convert240pFrameFast_stop_drain:
+		ldr  r7, [r5, #0x10C]                      @ REG_GICC_INTACK.
+		str  r7, [r5, #0x110]                      @ REG_GICC_EOI.
+		mov  r6, r7, lsl #22
+		mov  r6, r6, lsr #22                       @ Interrupt ID = IAR[9:0].
+		cmp  r6, #14                                @ IRQ_IPI14?
+		bne  convert240pFrameFast_stop_drain
+
+		mov  r0, #77                                @ IRQ_LGYCAP_TOP.
+		blx  IRQ_unregisterIsr
+		mov  r0, #14                                @ Private stop IPI.
+		blx  IRQ_unregisterIsr
+		cpsie i                                     @ core1Standby() expects normal IRQ handling.
+		ldr  r0, =g_oafColorConverterStopped
+		mov  r1, #1
+		str  r1, [r0]
+		mcr p15, 0, r1, c7, c10, 4                 @ Data Synchronization Barrier.
+		ldmfd sp!, {r4-r12, pc}                    @ Return to core1Standby().
 END_ASM_FUNC

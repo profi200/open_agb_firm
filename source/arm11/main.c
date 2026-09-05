@@ -25,6 +25,7 @@
 #include "arm11/drivers/codec.h"
 #include "arm11/drivers/hid.h"
 #include "arm11/power.h"
+#include "arm11/sleep.h"
 
 
 
@@ -41,7 +42,11 @@ int main(void)
 		while(1)
 		{
 			hidScanInput();
-			if(hidGetExtraKeys(0) & (KEY_POWER_HELD | KEY_POWER)) break;
+			const u32 extraKeys = hidGetExtraKeys(KEY_SHELL);
+			if(extraKeys & (KEY_POWER_HELD | KEY_POWER)) break;
+
+			if(extraKeys & KEY_SHELL)
+				OAF_sleep();
 
 			oafUpdate();
 		}
